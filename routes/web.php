@@ -82,6 +82,8 @@ Route::middleware('auth')->group(function (): void {
     Route::get('financial-reports/{financialReport}', [FinancialReportController::class, 'show'])->name('financial-reports.show');
     Route::post('financial-reports', [FinancialReportController::class, 'store'])->name('financial-reports.store');
 
+
+
     Route::resource('roles', RoleController::class)->except(['show']);
     Route::resource('permissions', PermissionController::class)->except(['show']);
 });
