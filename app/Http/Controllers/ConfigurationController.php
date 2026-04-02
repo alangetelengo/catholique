@@ -5,17 +5,28 @@ namespace App\Http\Controllers;
 use App\Helpers\FlashAlert;
 use App\Models\Configuration;
 use App\Traits\LogsErrors;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Validation\ValidationException;
+use Illuminate\View\View;
 
 class ConfigurationController extends Controller
 {
     use LogsErrors;
 
     /**
-     * Affiche la liste des configurations
+     * Redirige vers le hub « Configuration application » (onglet paramètres paroisse).
      */
-    public function index()
+    public function index(): RedirectResponse
+    {
+        return redirect()->route('application-configuration.index', ['tab' => 'appearance']);
+    }
+
+    /**
+     * Page complète des formulaires de configuration (identité, couleurs, PDF, etc.).
+     */
+    public function workspace(): View|RedirectResponse
     {
         try {
             $paroisseId = auth()->check() ? (auth()->user()->paroisse_id ?? null) : null;
@@ -35,6 +46,7 @@ class ConfigurationController extends Controller
                     if (in_array($config->cle, ['monnaie', 'format_date', 'format_heure', 'langue'])) {
                         return 'general';
                     }
+
                     return 'autres';
                 });
 
@@ -42,6 +54,7 @@ class ConfigurationController extends Controller
         } catch (\Exception $e) {
             $this->logError('Erreur lors de la récupération des configurations', $e);
             FlashAlert::error('Une erreur est survenue lors de la récupération des configurations.');
+
             return redirect()->route('home');
         }
     }
@@ -81,12 +94,13 @@ class ConfigurationController extends Controller
             Cache::forget("config_{$paroisseId}_{$validated['cle']}");
 
             $this->logInfo("Configuration créée : {$validated['cle']}");
-            FlashAlert::success("La configuration a été créée avec succès.");
+            FlashAlert::success('La configuration a été créée avec succès.');
 
-            return redirect()->route('configurations.index');
+            return redirect()->route('configurations.workspace');
         } catch (\Exception $e) {
             $this->logError('Erreur lors de la création de la configuration', $e, ['data' => $request->all()]);
             FlashAlert::error('Une erreur est survenue lors de la création de la configuration.');
+
             return back()->withInput();
         }
     }
@@ -125,15 +139,16 @@ class ConfigurationController extends Controller
             Cache::forget("config_{$configuration->paroisse_id}_{$configuration->cle}");
 
             $this->logInfo("Configuration mise à jour : {$configuration->cle}");
-            FlashAlert::success("La configuration a été mise à jour avec succès.");
+            FlashAlert::success('La configuration a été mise à jour avec succès.');
 
-            return redirect()->route('configurations.index');
+            return redirect()->route('configurations.workspace');
         } catch (\Exception $e) {
             $this->logError('Erreur lors de la mise à jour de la configuration', $e, [
                 'configuration_id' => $configuration->id,
-                'data' => $request->all()
+                'data' => $request->all(),
             ]);
             FlashAlert::error('Une erreur est survenue lors de la mise à jour de la configuration.');
+
             return back()->withInput();
         }
     }
@@ -148,6 +163,7 @@ class ConfigurationController extends Controller
             $request->validate([
                 'nom_paroisse' => 'nullable|string|max:255',
                 'logo_path' => 'nullable|string|max:255',
+                'responsable_paroisse' => 'nullable|string|max:255',
                 'couleur_primaire' => 'nullable|string|max:7',
                 'couleur_secondaire' => 'nullable|string|max:7',
                 'couleur_succes' => 'nullable|string|max:7',
@@ -202,12 +218,12 @@ class ConfigurationController extends Controller
             $paroisseId = ($section === 'login') ? null : (auth()->check() ? (auth()->user()->paroisse_id ?? null) : null);
 
             // Gérer les champs de couleur avec texte (priorité au champ texte)
-            if (isset($data['pdf_header_bg_color_text']) && !empty($data['pdf_header_bg_color_text'])) {
+            if (isset($data['pdf_header_bg_color_text']) && ! empty($data['pdf_header_bg_color_text'])) {
                 $data['pdf_header_bg_color'] = $data['pdf_header_bg_color_text'];
             }
             unset($data['pdf_header_bg_color_text']);
 
-            if (isset($data['pdf_header_text_color_text']) && !empty($data['pdf_header_text_color_text'])) {
+            if (isset($data['pdf_header_text_color_text']) && ! empty($data['pdf_header_text_color_text'])) {
                 $data['pdf_header_text_color'] = $data['pdf_header_text_color_text'];
             }
             unset($data['pdf_header_text_color_text']);
@@ -226,11 +242,14 @@ class ConfigurationController extends Controller
 
             $updatedKeys = [];
 
+            $identiteKeys = ['nom_paroisse', 'logo_path', 'responsable_paroisse'];
+
             foreach ($data as $cle => $valeur) {
                 $isLoginBg = ($section === 'login' && $cle === 'login_bg_image');
                 $hasValue = $valeur !== null && $valeur !== '';
+                $forceIdentite = $section === 'identite' && in_array($cle, $identiteKeys, true);
 
-                if ($hasValue || $isLoginBg) {
+                if ($hasValue || $isLoginBg || $forceIdentite) {
                     $type = $this->detectType($valeur ?? '');
                     Configuration::setValue($paroisseId, $cle, $valeur ?? '', $type);
                     Cache::forget("config_{$paroisseId}_{$cle}");
@@ -242,21 +261,23 @@ class ConfigurationController extends Controller
                 FlashAlert::warning('Aucune configuration n\'a été mise à jour.');
             } else {
                 $this->logInfo('Configurations mises à jour en masse', ['keys' => $updatedKeys, 'count' => count($updatedKeys)]);
-                FlashAlert::success(count($updatedKeys) . " configuration(s) mise(s) à jour avec succès.");
+                FlashAlert::success(count($updatedKeys).' configuration(s) mise(s) à jour avec succès.');
             }
 
-            return redirect()->route('configurations.index');
-        } catch (\Illuminate\Validation\ValidationException $e) {
+            return redirect()->route('configurations.workspace');
+        } catch (ValidationException $e) {
             $this->logError('Erreur de validation lors de la mise à jour en masse', $e, [
-                'errors' => $e->errors()
+                'errors' => $e->errors(),
             ]);
+
             return back()->withErrors($e->errors())->withInput();
         } catch (\Exception $e) {
             $this->logError('Erreur lors de la mise à jour en masse des configurations', $e, [
                 'data' => $request->except(['_token', '_method']),
-                'paroisse_id' => $paroisseId
+                'paroisse_id' => $paroisseId,
             ]);
             FlashAlert::error('Une erreur est survenue lors de la mise à jour des configurations.');
+
             return back()->withInput();
         }
     }
@@ -271,14 +292,15 @@ class ConfigurationController extends Controller
             Cache::forget("config_{$configuration->paroisse_id}_{$configuration->cle}");
 
             $this->logInfo("Configuration désactivée : {$configuration->cle}");
-            FlashAlert::success("La configuration a été supprimée avec succès.");
+            FlashAlert::success('La configuration a été supprimée avec succès.');
 
-            return redirect()->route('configurations.index');
+            return redirect()->route('configurations.workspace');
         } catch (\Exception $e) {
             $this->logError('Erreur lors de la suppression de la configuration', $e, [
-                'configuration_id' => $configuration->id
+                'configuration_id' => $configuration->id,
             ]);
             FlashAlert::error('Une erreur est survenue lors de la suppression de la configuration.');
+
             return back();
         }
     }
@@ -300,6 +322,7 @@ class ConfigurationController extends Controller
         if (is_array($valeur) || is_object($valeur)) {
             return 'json';
         }
+
         return 'string';
     }
 }

@@ -105,7 +105,7 @@
     </div>
     @if($events->hasPages())
     <div class="px-6 py-4 border-t border-slate-200 dark:border-slate-700 bg-slate-50/80 dark:bg-slate-900/40 flex justify-center">
-        {{ $events->withQueryString()->links() }}
+        @include('partials.pagination-fr', ['paginator' => $events, 'itemLabel' => 'événements'])
     </div>
     @endif
     @else

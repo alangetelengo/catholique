@@ -7,8 +7,10 @@ use App\Http\Requests\StoreMemberRequest;
 use App\Http\Requests\UpdateMemberRequest;
 use App\Models\Member;
 use App\Models\Paroisse;
+use App\Support\PaginationPerPage;
 use App\Traits\LogsErrors;
 use Exception;
+use Illuminate\Http\Request;
 use Illuminate\Routing\Controllers\HasMiddleware;
 use Illuminate\Routing\Controllers\Middleware;
 use Illuminate\Support\Facades\Auth;
@@ -33,7 +35,7 @@ class MemberController extends Controller implements HasMiddleware
     /**
      * Display a listing of the resource.
      */
-    public function index()
+    public function index(Request $request)
     {
         try {
             $query = Member::query()->with('paroisse');
@@ -45,24 +47,24 @@ class MemberController extends Controller implements HasMiddleware
                 } else {
                     $query->whereRaw('1 = 0');
                 }
-            } elseif (request('paroisse_id')) {
-                $query->where('paroisse_id', request('paroisse_id'));
+            } elseif ($request->filled('paroisse_id')) {
+                $query->where('paroisse_id', $request->input('paroisse_id'));
             }
 
             // Filtre statut
-            if ($statut = request('statut')) {
+            if ($statut = $request->input('statut')) {
                 $query->where('statut', $statut);
             }
 
             // Filtre sexe
-            if ($sexe = request('sexe')) {
+            if ($sexe = $request->input('sexe')) {
                 $query->where('sexe', $sexe);
             }
 
             // La recherche texte se fait côté client uniquement (sur la liste déjà chargée)
             // pour ne pas être liée aux filtres qui interrogent la base de données.
 
-            $members = $query->latest()->paginate(15)->withQueryString();
+            $members = $query->latest()->paginate(PaginationPerPage::resolve($request))->withQueryString();
 
             $paroisses = Auth::check() && Auth::user()->hasRole('super_admin')
                 ? Paroisse::query()->orderBy('nom')->get()

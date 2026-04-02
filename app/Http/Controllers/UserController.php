@@ -16,27 +16,17 @@ class UserController extends Controller
 {
     use LogsErrors;
 
-    public function index(Request $request): View
+    public function index(Request $request): RedirectResponse
     {
-        $query = User::query()->with(['roles', 'paroisse'])->orderBy('name');
-
-        if ($request->filled('q')) {
-            $search = mb_strtolower($request->string('q')->value());
-            $query->where(function ($builder) use ($search): void {
-                $builder
-                    ->whereRaw('LOWER(name) LIKE ?', ["%{$search}%"])
-                    ->orWhereRaw('LOWER(email) LIKE ?', ["%{$search}%"]);
-            });
-        }
-
-        $users = $query->paginate(15)->withQueryString();
-
-        return view('users.index', compact('users'));
+        return redirect()->route('application-configuration.index', array_merge(
+            $request->query(),
+            ['tab' => 'users']
+        ));
     }
 
     public function create(): View
     {
-        $user = new User();
+        $user = new User;
         $roles = Role::query()->orderBy('name')->get();
         $paroisses = Paroisse::query()->orderBy('nom')->get();
 

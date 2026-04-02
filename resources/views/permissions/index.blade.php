@@ -68,6 +68,9 @@
             </tbody>
         </table>
     </div>
+    <div class="px-6 py-4 border-t border-slate-200 dark:border-slate-700 bg-slate-50/80 dark:bg-slate-900/40">
+        @include('partials.pagination-fr', ['paginator' => $permissions, 'itemLabel' => 'permissions'])
+    </div>
     @else
     <div class="px-6 py-16 text-center">
         <i class="fas fa-key text-5xl text-slate-200 dark:text-slate-600 mb-4 block" aria-hidden="true"></i>

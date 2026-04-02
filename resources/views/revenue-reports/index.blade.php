@@ -80,6 +80,6 @@
         </div>
     </div>
 
-    <div class="mt-4">{{ $reports->links() }}</div>
+    @include('partials.pagination-fr', ['paginator' => $reports, 'itemLabel' => 'rapports'])
 @endsection
 

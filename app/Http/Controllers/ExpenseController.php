@@ -3,8 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Models\Expense;
+use App\Support\PaginationPerPage;
 use App\Traits\LogsErrors;
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
@@ -18,41 +20,25 @@ class ExpenseController extends Controller
     public function index(Request $request): View
     {
         try {
-            $query = Expense::query()
+            $expenses = $this->expensesIndexFilteredQuery($request)
                 ->with('createdBy')
                 ->orderByDesc('date_depense')
-                ->orderByDesc('id');
+                ->orderByDesc('id')
+                ->paginate(PaginationPerPage::resolve($request))
+                ->withQueryString();
 
-            if ($request->filled('categorie_charge')) {
-                $query->where('categorie_charge', $request->string('categorie_charge')->value());
-            }
+            $totalMontantDepenses = (float) $this->expensesIndexFilteredQuery($request)->sum('montant');
+            $montantDerniereDepense = $this->expensesIndexFilteredQuery($request)
+                ->orderByDesc('date_depense')
+                ->orderByDesc('id')
+                ->value('montant');
+            $montantDerniereDepense = $montantDerniereDepense !== null ? (float) $montantDerniereDepense : null;
 
-            if ($request->filled('type_charge')) {
-                $query->where('type_charge', $request->string('type_charge')->value());
-            }
-
-            if ($request->filled('date_from')) {
-                $query->whereDate('date_depense', '>=', $request->date('date_from'));
-            }
-
-            if ($request->filled('date_to')) {
-                $query->whereDate('date_depense', '<=', $request->date('date_to'));
-            }
-
-            if ($request->filled('q')) {
-                $search = mb_strtolower($request->string('q')->value());
-                $query->where(function ($builder) use ($search): void {
-                    $builder
-                        ->whereRaw('LOWER(notes) LIKE ?', ["%{$search}%"])
-                        ->orWhereRaw('LOWER(fournisseur) LIKE ?', ["%{$search}%"])
-                        ->orWhereRaw('LOWER(facture_reference) LIKE ?', ["%{$search}%"])
-                        ->orWhereRaw('LOWER(libelle) LIKE ?', ["%{$search}%"]);
-                });
-            }
-
-            $expenses = $query->paginate(20)->withQueryString();
-
-            return view('expenses.index', compact('expenses'));
+            return view('expenses.index', compact(
+                'expenses',
+                'totalMontantDepenses',
+                'montantDerniereDepense',
+            ));
         } catch (Throwable $e) {
             $this->logError($e, 'Erreur lors du chargement des dépenses');
             throw $e;
@@ -129,6 +115,40 @@ class ExpenseController extends Controller
             $this->logError($e, 'Erreur lors de la suppression de la dépense', ['expense_id' => $expense->id]);
             throw $e;
         }
+    }
+
+    private function expensesIndexFilteredQuery(Request $request): Builder
+    {
+        $query = Expense::query();
+
+        if ($request->filled('categorie_charge')) {
+            $query->where('categorie_charge', $request->string('categorie_charge')->value());
+        }
+
+        if ($request->filled('type_charge')) {
+            $query->where('type_charge', $request->string('type_charge')->value());
+        }
+
+        if ($request->filled('date_from')) {
+            $query->whereDate('date_depense', '>=', $request->date('date_from'));
+        }
+
+        if ($request->filled('date_to')) {
+            $query->whereDate('date_depense', '<=', $request->date('date_to'));
+        }
+
+        if ($request->filled('q')) {
+            $search = mb_strtolower($request->string('q')->value());
+            $query->where(function ($builder) use ($search): void {
+                $builder
+                    ->whereRaw('LOWER(notes) LIKE ?', ["%{$search}%"])
+                    ->orWhereRaw('LOWER(fournisseur) LIKE ?', ["%{$search}%"])
+                    ->orWhereRaw('LOWER(facture_reference) LIKE ?', ["%{$search}%"])
+                    ->orWhereRaw('LOWER(libelle) LIKE ?', ["%{$search}%"]);
+            });
+        }
+
+        return $query;
     }
 
     private function validateExpense(Request $request): array

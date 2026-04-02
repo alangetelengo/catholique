@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Helpers\FlashAlert;
 use App\Models\InventairePatrimoine;
 use App\Models\Paroisse;
+use App\Support\PaginationPerPage;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -31,7 +32,7 @@ class InventairePatrimoineController extends Controller
             });
         }
 
-        $items = $query->orderBy('nom')->paginate(15)->withQueryString();
+        $items = $query->orderBy('nom')->paginate(PaginationPerPage::resolve($request))->withQueryString();
         $paroisses = $user->hasRole('super_admin') ? Paroisse::orderBy('nom')->get() : collect();
 
         return view('inventaire-patrimoine.index', [
@@ -48,7 +49,7 @@ class InventairePatrimoineController extends Controller
             : Paroisse::whereKey($user->paroisse_id)->get();
 
         return view('inventaire-patrimoine.create', [
-            'item' => new InventairePatrimoine(),
+            'item' => new InventairePatrimoine,
             'paroisses' => $paroisses,
         ]);
     }
@@ -82,6 +83,7 @@ class InventairePatrimoineController extends Controller
         $user = $request->user();
         if (! $user->hasRole('super_admin') && $inventaire_patrimoine->paroisse_id !== $user->paroisse_id) {
             FlashAlert::error('Accès non autorisé.');
+
             return redirect()->route('inventaire-patrimoine.index');
         }
         $paroisses = $user->hasRole('super_admin')
@@ -99,6 +101,7 @@ class InventairePatrimoineController extends Controller
         $user = $request->user();
         if (! $user->hasRole('super_admin') && $inventaire_patrimoine->paroisse_id !== $user->paroisse_id) {
             FlashAlert::error('Accès non autorisé.');
+
             return redirect()->route('inventaire-patrimoine.index');
         }
         $validated = $request->validate([
@@ -127,6 +130,7 @@ class InventairePatrimoineController extends Controller
         $user = $request->user();
         if (! $user->hasRole('super_admin') && $inventaire_patrimoine->paroisse_id !== $user->paroisse_id) {
             FlashAlert::error('Accès non autorisé.');
+
             return redirect()->route('inventaire-patrimoine.index');
         }
         $inventaire_patrimoine->delete();

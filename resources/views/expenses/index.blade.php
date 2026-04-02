@@ -10,9 +10,7 @@
 
 @section('content')
     @php
-        $totalPage = (float) $expenses->getCollection()->sum('montant');
         $countPage = $expenses->count();
-        $averagePage = $countPage > 0 ? $totalPage / $countPage : 0;
         $formatFcfa = static fn (float $value): string => number_format($value, 0, ',', ' ') . ' fcfa';
         $categories = [
             'charge_fixe' => 'Charge fixe',
@@ -34,12 +32,18 @@
             <p class="mt-1 text-2xl font-bold text-slate-900 dark:text-slate-100">{{ $countPage }}</p>
         </div>
         <div class="adventiste-card-pro-static p-4">
-            <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Montant total (page)</p>
-            <p class="mt-1 text-2xl font-bold text-rose-700 dark:text-rose-400">{{ $formatFcfa($totalPage) }}</p>
+            <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Total des dépenses</p>
+            <p class="mt-1 text-2xl font-bold text-rose-700 dark:text-rose-400">{{ $formatFcfa($totalMontantDepenses) }}</p>
         </div>
         <div class="adventiste-card-pro-static p-4">
-            <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Panier moyen</p>
-            <p class="mt-1 text-2xl font-bold text-slate-900 dark:text-slate-100">{{ $formatFcfa($averagePage) }}</p>
+            <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Dernière dépense</p>
+            <p class="mt-1 text-2xl font-bold text-slate-900 dark:text-slate-100">
+                @if ($montantDerniereDepense !== null)
+                    {{ $formatFcfa($montantDerniereDepense) }}
+                @else
+                    <span class="text-slate-400 dark:text-slate-500">—</span>
+                @endif
+            </p>
         </div>
     </div>
 
@@ -153,7 +157,7 @@
     </div>
 
     <div class="mt-4">
-        {{ $expenses->links() }}
+        @include('partials.pagination-fr', ['paginator' => $expenses, 'itemLabel' => 'dépenses'])
     </div>
 @endsection
 

@@ -10,14 +10,12 @@ use Illuminate\View\View;
 
 class RevenueCategoryController extends Controller
 {
-    public function index(): View
+    public function index(Request $request): RedirectResponse
     {
-        $categories = RevenueCategory::query()
-            ->orderBy('ordre')
-            ->orderBy('nom')
-            ->paginate(20);
-
-        return view('revenue-categories.index', compact('categories'));
+        return redirect()->route('application-configuration.index', array_merge(
+            $request->query(),
+            ['tab' => 'revenue-categories']
+        ));
     }
 
     public function create(): View

@@ -7,6 +7,7 @@ use App\Models\FinancialReport;
 use App\Models\Paroisse;
 use App\Models\Revenue;
 use App\Models\RevenueCategory;
+use App\Support\PaginationPerPage;
 use App\Traits\LogsErrors;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
@@ -39,7 +40,7 @@ class PopoteSubventionReportController extends Controller
             $query->whereYear('date_debut', (int) $request->integer('year'));
         }
 
-        $reports = $query->paginate(20)->withQueryString();
+        $reports = $query->paginate(PaginationPerPage::resolve($request))->withQueryString();
         $paroisses = $user?->hasRole('super_admin') ? Paroisse::query()->orderBy('nom')->get() : collect();
 
         return view('popote-reports.index', compact('reports', 'paroisses'));
@@ -82,6 +83,7 @@ class PopoteSubventionReportController extends Controller
             return redirect()->route('popote-reports.show', $report)->with('success', 'Rapport Subvention Popote enregistré.');
         } catch (Throwable $e) {
             $this->logError($e, 'Erreur création rapport Subvention Popote', ['data' => $request->all()]);
+
             return back()->withInput()->with('error', 'Impossible de créer le rapport Subvention Popote.');
         }
     }
@@ -136,9 +138,11 @@ class PopoteSubventionReportController extends Controller
             ]);
 
             $this->logInfo('Rapport subvention popote mis à jour', ['report_id' => $popoteReport->id]);
+
             return redirect()->route('popote-reports.show', $popoteReport)->with('success', 'Rapport mis à jour.');
         } catch (Throwable $e) {
             $this->logError($e, 'Erreur MAJ rapport Subvention Popote', ['report_id' => $popoteReport->id]);
+
             return back()->withInput()->with('error', 'Mise à jour impossible.');
         }
     }
@@ -186,7 +190,7 @@ class PopoteSubventionReportController extends Controller
             'paroisse' => $popoteReport->paroisse,
         ])->setPaper('a4', 'portrait');
 
-        return $pdf->download('rapport-subvention-popote-' . optional($popoteReport->date_debut)->format('Y-m-d') . '.pdf');
+        return $pdf->download('rapport-subvention-popote-'.optional($popoteReport->date_debut)->format('Y-m-d').'.pdf');
     }
 
     private function validatePayload(Request $request): array
@@ -288,4 +292,3 @@ class PopoteSubventionReportController extends Controller
         }
     }
 }
-

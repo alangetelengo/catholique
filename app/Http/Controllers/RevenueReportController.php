@@ -6,13 +6,14 @@ use App\Models\FinancialReport;
 use App\Models\Paroisse;
 use App\Models\Revenue;
 use App\Models\RevenueCategory;
+use App\Support\PaginationPerPage;
 use App\Traits\LogsErrors;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
-use Illuminate\Validation\ValidationException;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 use Throwable;
 
@@ -43,7 +44,7 @@ class RevenueReportController extends Controller
             $query->where('periode_type', $mapped);
         }
 
-        $reports = $query->paginate(20)->withQueryString();
+        $reports = $query->paginate(PaginationPerPage::resolve($request))->withQueryString();
         $paroisses = $user?->hasRole('super_admin') ? Paroisse::query()->orderBy('nom')->get() : collect();
 
         return view('revenue-reports.index', compact('reports', 'paroisses'));
@@ -346,4 +347,3 @@ class RevenueReportController extends Controller
         }
     }
 }
-

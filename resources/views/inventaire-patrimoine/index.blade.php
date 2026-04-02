@@ -107,7 +107,7 @@
                 </table>
             </div>
         </div>
-        <div class="mt-4">{{ $items->withQueryString()->links() }}</div>
+        @include('partials.pagination-fr', ['paginator' => $items, 'itemLabel' => 'lignes'])
     @else
         <div class="adventiste-card-pro-static p-12 text-center">
             <div class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-100 dark:bg-slate-800 text-slate-400">

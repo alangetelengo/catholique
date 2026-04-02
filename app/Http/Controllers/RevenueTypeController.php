@@ -11,18 +11,12 @@ use Illuminate\View\View;
 
 class RevenueTypeController extends Controller
 {
-    public function index(Request $request): View
+    public function index(Request $request): RedirectResponse
     {
-        $query = RevenueType::query()->with('category')->orderBy('ordre')->orderBy('nom');
-
-        if ($request->filled('revenue_category_id')) {
-            $query->where('revenue_category_id', $request->integer('revenue_category_id'));
-        }
-
-        $types = $query->paginate(25)->withQueryString();
-        $categories = RevenueCategory::query()->orderBy('ordre')->orderBy('nom')->get();
-
-        return view('revenue-types.index', compact('types', 'categories'));
+        return redirect()->route('application-configuration.index', array_merge(
+            $request->query(),
+            ['tab' => 'revenue-types']
+        ));
     }
 
     public function create(): View

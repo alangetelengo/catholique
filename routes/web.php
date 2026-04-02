@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\SyncController;
+use App\Http\Controllers\ApplicationConfigurationController;
 use App\Http\Controllers\ChargesFixesReportController;
 use App\Http\Controllers\ConfigurationController;
 use App\Http\Controllers\DashboardController;
@@ -88,7 +89,11 @@ Route::middleware('auth')->group(function (): void {
     Route::get('financial-reports/{financialReport}', [FinancialReportController::class, 'show'])->name('financial-reports.show');
     Route::post('financial-reports', [FinancialReportController::class, 'store'])->name('financial-reports.store');
 
+    Route::get('application-configuration', [ApplicationConfigurationController::class, 'index'])
+        ->name('application-configuration.index');
+
     Route::post('configurations/update-bulk', [ConfigurationController::class, 'updateBulk'])->name('configurations.update-bulk');
+    Route::get('configurations/workspace', [ConfigurationController::class, 'workspace'])->name('configurations.workspace');
     Route::resource('configurations', ConfigurationController::class)->except(['show']);
 
     Route::resource('roles', RoleController::class)->except(['show']);

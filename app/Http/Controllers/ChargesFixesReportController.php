@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Expense;
 use App\Models\FinancialReport;
 use App\Models\Paroisse;
+use App\Support\PaginationPerPage;
 use App\Traits\LogsErrors;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
@@ -35,7 +36,7 @@ class ChargesFixesReportController extends Controller
             $query->whereYear('date_debut', (int) $request->integer('year'));
         }
 
-        $reports = $query->paginate(20)->withQueryString();
+        $reports = $query->paginate(PaginationPerPage::resolve($request))->withQueryString();
         $paroisses = $user?->hasRole('super_admin') ? Paroisse::query()->orderBy('nom')->get() : collect();
 
         return view('charges-fixes-reports.index', compact('reports', 'paroisses'));
@@ -76,6 +77,7 @@ class ChargesFixesReportController extends Controller
             return redirect()->route('charges-fixes-reports.show', $report)->with('success', 'Rapport charges fixes enregistré.');
         } catch (Throwable $e) {
             $this->logError($e, 'Erreur création rapport charges fixes', ['data' => $request->all()]);
+
             return back()->withInput()->with('error', 'Impossible de créer le rapport.');
         }
     }
@@ -120,9 +122,11 @@ class ChargesFixesReportController extends Controller
             ]);
 
             $this->logInfo('Rapport charges fixes mis à jour', ['report_id' => $chargesFixesReport->id]);
+
             return redirect()->route('charges-fixes-reports.show', $chargesFixesReport)->with('success', 'Rapport mis à jour.');
         } catch (Throwable $e) {
             $this->logError($e, 'Erreur MAJ rapport charges fixes', ['report_id' => $chargesFixesReport->id]);
+
             return back()->withInput()->with('error', 'Mise à jour impossible.');
         }
     }
@@ -141,6 +145,7 @@ class ChargesFixesReportController extends Controller
         $this->authorizeAccess($chargesFixesReport, request()->user()?->paroisse_id, (bool) request()->user()?->hasRole('super_admin'));
         $details = (array) ($chargesFixesReport->details_depenses ?? []);
         $rows = collect($details['expenses'] ?? []);
+
         return view('charges-fixes-reports.print', ['report' => $chargesFixesReport, 'details' => $details, 'rows' => $rows, 'paroisse' => $chargesFixesReport->paroisse]);
     }
 
@@ -154,7 +159,7 @@ class ChargesFixesReportController extends Controller
         $pdf = app('dompdf.wrapper')->loadView('charges-fixes-reports.pdf', ['report' => $chargesFixesReport, 'details' => $details, 'rows' => $rows, 'paroisse' => $chargesFixesReport->paroisse])
             ->setPaper('a4', 'portrait');
 
-        return $pdf->download('rapport-charges-fixes-' . optional($chargesFixesReport->date_debut)->format('Y-m-d') . '.pdf');
+        return $pdf->download('rapport-charges-fixes-'.optional($chargesFixesReport->date_debut)->format('Y-m-d').'.pdf');
     }
 
     private function validatePayload(Request $request): array
@@ -228,4 +233,3 @@ class ChargesFixesReportController extends Controller
         }
     }
 }
-

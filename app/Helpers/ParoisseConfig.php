@@ -29,6 +29,7 @@ class ParoisseConfig
             'titre_paroisse' => 'Paroisse',
             'nom_paroisse' => 'SAINT-ESPRIT DE MOUNGALI',
             'logo_path' => '/images/logo-paroisse.svg',
+            'responsable_paroisse' => '',
             'preloader_logo_path' => null, // Si null, utilise logo_path (logo paramétrable pour le preloader)
             // Couleurs officielles de l'Église catholique
             'couleur_primaire' => '#003366',        // Bleu marine - Vierge Marie

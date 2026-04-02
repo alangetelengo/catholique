@@ -10,9 +10,7 @@
 
 @section('content')
     @php
-        $totalPage = (float) $revenues->getCollection()->sum('montant');
         $countPage = $revenues->count();
-        $averagePage = $countPage > 0 ? $totalPage / $countPage : 0;
         $formatFcfa = static fn (float $value): string => number_format($value, 0, ',', ' ') . ' fcfa';
     @endphp
 
@@ -22,12 +20,18 @@
             <p class="mt-1 text-2xl font-bold text-slate-900 dark:text-slate-100">{{ $countPage }}</p>
         </div>
         <div class="adventiste-card-pro-static p-4">
-            <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Montant total (page)</p>
-            <p class="mt-1 text-2xl font-bold text-emerald-700 dark:text-emerald-400">{{ $formatFcfa($totalPage) }}</p>
+            <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Total des recettes</p>
+            <p class="mt-1 text-2xl font-bold text-emerald-700 dark:text-emerald-400">{{ $formatFcfa($totalMontantRecettes) }}</p>
         </div>
         <div class="adventiste-card-pro-static p-4">
-            <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Panier moyen</p>
-            <p class="mt-1 text-2xl font-bold text-slate-900 dark:text-slate-100">{{ $formatFcfa($averagePage) }}</p>
+            <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Dernière recette</p>
+            <p class="mt-1 text-2xl font-bold text-slate-900 dark:text-slate-100">
+                @if ($montantDerniereRecette !== null)
+                    {{ $formatFcfa($montantDerniereRecette) }}
+                @else
+                    <span class="text-slate-400 dark:text-slate-500">—</span>
+                @endif
+            </p>
         </div>
     </div>
 
@@ -131,6 +135,6 @@
     </div>
 
     <div class="mt-4">
-        {{ $revenues->links() }}
+        @include('partials.pagination-fr', ['paginator' => $revenues, 'itemLabel' => 'recettes'])
     </div>
 @endsection

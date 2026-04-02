@@ -1,19 +1,20 @@
-@extends('layouts.app')
+@php
+    $configTab = 'users';
+@endphp
+<div class="application-config-panel space-y-4" data-config-tab="{{ $configTab }}">
+    <div class="flex flex-wrap items-center justify-between gap-3">
+        <a href="{{ route('users.create') }}" class="adventiste-btn-primary text-sm no-underline">+ Nouvel utilisateur</a>
+    </div>
 
-@section('title', 'Utilisateurs - Catholique')
-@section('page-title', 'Gestion des utilisateurs')
-@section('page-title-info', 'Création, édition et gestion des accès utilisateurs.')
-
-@section('btn-create')
-    <a href="{{ route('users.create') }}" class="adventiste-btn-primary">+ Nouvel utilisateur</a>
-@endsection
-
-@section('content')
-    <div class="adventiste-card-pro-static p-4 sm:p-5 mb-5">
-        <form method="get" class="flex flex-wrap items-center gap-3">
+    <div class="adventiste-card-pro-static p-4 sm:p-5">
+        <form method="get" action="{{ route('application-configuration.index') }}" class="flex flex-wrap items-center gap-3 app-config-filter-form">
+            <input type="hidden" name="tab" value="{{ $configTab }}">
+            @if (request()->filled('per_page'))
+                <input type="hidden" name="per_page" value="{{ request('per_page') }}">
+            @endif
             <input type="text" name="q" value="{{ request('q') }}" placeholder="Rechercher (nom ou email)" class="w-full md:w-[360px] rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2.5 text-sm">
             <button type="submit" class="adventiste-btn-primary">Filtrer</button>
-            <a href="{{ route('users.index') }}" class="adventiste-btn-secondary">Réinitialiser</a>
+            <a href="{{ route('application-configuration.index', ['tab' => $configTab]) }}" class="adventiste-btn-secondary no-underline">Réinitialiser</a>
         </form>
     </div>
 
@@ -70,7 +71,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="4" class="px-4 py-8 text-center text-slate-500">Aucun utilisateur trouvé.</td>
+                            <td colspan="5" class="px-4 py-8 text-center text-slate-500">Aucun utilisateur trouvé.</td>
                         </tr>
                     @endforelse
                 </tbody>
@@ -78,5 +79,5 @@
         </div>
     </div>
 
-    @include('partials.pagination-fr', ['paginator' => $users, 'itemLabel' => 'utilisateurs'])
-@endsection
+    @include('application-configuration.partials.pagination-footer', ['paginator' => $users, 'itemLabel' => 'utilisateurs'])
+</div>

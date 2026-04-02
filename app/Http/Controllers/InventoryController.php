@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Models\Inventory;
 use App\Models\Paroisse;
+use App\Models\User;
+use App\Support\PaginationPerPage;
 use App\Traits\LogsErrors;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -55,7 +57,7 @@ class InventoryController extends Controller
                 });
             }
 
-            $inventories = $query->paginate(20)->withQueryString();
+            $inventories = $query->paginate(PaginationPerPage::resolve($request))->withQueryString();
             $paroisses = $user?->hasRole('super_admin')
                 ? Paroisse::query()->orderBy('nom')->get()
                 : collect();
@@ -162,7 +164,7 @@ class InventoryController extends Controller
     /**
      * Accès : super-admin sur toutes les paroisses ; sinon uniquement la paroisse de l’utilisateur.
      */
-    private function authorizeInventory(?\App\Models\User $user, Inventory $inventory): void
+    private function authorizeInventory(?User $user, Inventory $inventory): void
     {
         if ($user?->hasRole('super_admin')) {
             return;
@@ -178,7 +180,7 @@ class InventoryController extends Controller
      *
      * @return array<string, mixed>
      */
-    private function validatedInventory(Request $request, ?Inventory $existing, ?\App\Models\User $user): array
+    private function validatedInventory(Request $request, ?Inventory $existing, ?User $user): array
     {
         $paroisseId = $this->resolveParoisseIdForValidation($request, $existing, $user);
 
@@ -213,7 +215,7 @@ class InventoryController extends Controller
         return $validated;
     }
 
-    private function resolveParoisseIdForValidation(Request $request, ?Inventory $existing, ?\App\Models\User $user): int
+    private function resolveParoisseIdForValidation(Request $request, ?Inventory $existing, ?User $user): int
     {
         if ($user?->hasRole('super_admin')) {
             return (int) $request->integer('paroisse_id', $existing?->paroisse_id ?? 0);

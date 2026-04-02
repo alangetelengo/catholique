@@ -1,26 +1,19 @@
-@extends('layouts.app')
+@php
+    $configTab = 'revenue-categories';
+@endphp
+<div class="application-config-panel space-y-4" data-config-tab="{{ $configTab }}">
+    <div class="flex flex-wrap items-center justify-between gap-3">
+        <a href="{{ route('revenue-categories.create') }}" class="adventiste-btn-primary text-sm no-underline">+ Nouvelle catégorie</a>
+    </div>
 
-@section('title', 'Catégories de revenus - Catholique')
-@section('page-title', 'Catégories de revenus')
-@section('page-title-info', 'Paramétrage des catégories utilisées pour classer les recettes.')
-
-@section('btn-create')
-    <a href="{{ route('revenue-categories.create') }}" class="adventiste-btn-primary">+ Nouvelle catégorie</a>
-@endsection
-
-@section('content')
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-5">
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div class="adventiste-card-pro-static p-4">
             <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Total catégories</p>
             <p class="mt-1 text-2xl font-bold text-slate-900 dark:text-slate-100">{{ $categories->total() }}</p>
         </div>
         <div class="adventiste-card-pro-static p-4">
-            <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Actives</p>
-            <p class="mt-1 text-2xl font-bold text-emerald-700 dark:text-emerald-400">{{ $categories->getCollection()->where('actif', true)->count() }}</p>
-        </div>
-        <div class="adventiste-card-pro-static p-4">
-            <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Inactives</p>
-            <p class="mt-1 text-2xl font-bold text-amber-700 dark:text-amber-400">{{ $categories->getCollection()->where('actif', false)->count() }}</p>
+            <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Sur cette page</p>
+            <p class="mt-1 text-2xl font-bold text-emerald-700 dark:text-emerald-400">{{ $categories->count() }}</p>
         </div>
     </div>
 
@@ -75,5 +68,5 @@
         </div>
     </div>
 
-    @include('partials.pagination-fr', ['paginator' => $categories, 'itemLabel' => 'catégories'])
-@endsection
+    @include('application-configuration.partials.pagination-footer', ['paginator' => $categories, 'itemLabel' => 'catégories'])
+</div>

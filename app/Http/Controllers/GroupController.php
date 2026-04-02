@@ -6,6 +6,7 @@ use App\Helpers\FlashAlert;
 use App\Models\Group;
 use App\Models\Member;
 use App\Models\Paroisse;
+use App\Support\PaginationPerPage;
 use App\Traits\LogsErrors;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -61,7 +62,7 @@ class GroupController extends Controller implements HasMiddleware
                 });
             }
 
-            $groups = $query->orderBy('nom')->paginate(15)->withQueryString();
+            $groups = $query->orderBy('nom')->paginate(PaginationPerPage::resolve($request))->withQueryString();
 
             $paroisses = $user->hasRole('super_admin')
                 ? Paroisse::orderBy('nom')->get()
@@ -76,7 +77,7 @@ class GroupController extends Controller implements HasMiddleware
             FlashAlert::error('Une erreur est survenue lors du chargement de la liste des groupes.');
 
             $emptyPage = (int) $request->input('page', 1);
-            $groups = new LengthAwarePaginator([], 0, 15, max(1, $emptyPage), [
+            $groups = new LengthAwarePaginator([], 0, PaginationPerPage::resolve($request), max(1, $emptyPage), [
                 'path' => $request->url(),
                 'query' => $request->query(),
             ]);
@@ -105,7 +106,7 @@ class GroupController extends Controller implements HasMiddleware
             ->get();
 
         return view('groups.create', [
-            'group' => new Group(),
+            'group' => new Group,
             'paroisses' => $paroisses,
             'responsables' => $responsables,
         ]);
@@ -233,4 +234,3 @@ class GroupController extends Controller implements HasMiddleware
         return redirect()->route('groups.index');
     }
 }
-

@@ -6,6 +6,7 @@ use App\Helpers\FlashAlert;
 use App\Models\Member;
 use App\Models\Paroisse;
 use App\Models\Sacrament;
+use App\Support\PaginationPerPage;
 use App\Traits\LogsErrors;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -37,6 +38,7 @@ class SacramentController extends Controller
                     }
                 }
             }
+
             return redirect()->route('sacraments.index', ['type' => $type]);
         }
 
@@ -65,7 +67,7 @@ class SacramentController extends Controller
             $query->whereDate('date_celebration', '<=', $request->date('date_to'));
         }
 
-        $sacraments = $query->paginate(15)->withQueryString();
+        $sacraments = $query->paginate(PaginationPerPage::resolve($request))->withQueryString();
         $paroisses = $request->user()->hasRole('super_admin') ? Paroisse::orderBy('nom')->get() : collect();
 
         return view('sacraments.index', [
@@ -109,6 +111,7 @@ class SacramentController extends Controller
         $type = $request->string('type', 'bapteme')->value();
         if (! array_key_exists($type, Sacrament::TYPES)) {
             FlashAlert::error('Type de sacrement invalide.');
+
             return redirect()->route('sacraments.index', ['type' => 'bapteme']);
         }
         $this->authorize(self::TYPE_PERMISSIONS[$type]['create']);
@@ -140,10 +143,12 @@ class SacramentController extends Controller
         try {
             Sacrament::create($validated);
             FlashAlert::success('Le sacrement a été enregistré avec succès.');
+
             return redirect()->route('sacraments.index', ['type' => $type]);
         } catch (Throwable $e) {
             $this->logError($e, 'Erreur création sacrement');
             FlashAlert::error('Une erreur est survenue.');
+
             return back()->withInput();
         }
     }
@@ -155,6 +160,7 @@ class SacramentController extends Controller
         }
         $this->ensureAccess($sacrament);
         $sacrament->load(['paroisse', 'celebrant', 'beneficiary']);
+
         return view('sacraments.show', compact('sacrament'));
     }
 
@@ -203,10 +209,12 @@ class SacramentController extends Controller
         try {
             $sacrament->update($validated);
             FlashAlert::success('Le sacrement a été mis à jour.');
+
             return redirect()->route('sacraments.index', ['type' => $sacrament->type]);
         } catch (Throwable $e) {
             $this->logError($e, 'Erreur mise à jour sacrement');
             FlashAlert::error('Une erreur est survenue.');
+
             return back()->withInput();
         }
     }
@@ -221,10 +229,12 @@ class SacramentController extends Controller
         try {
             $sacrament->delete();
             FlashAlert::success('Le sacrement a été supprimé.');
+
             return redirect()->route('sacraments.index', ['type' => $type]);
         } catch (Throwable $e) {
             $this->logError($e, 'Erreur suppression sacrement');
             FlashAlert::error('Une erreur est survenue.');
+
             return back();
         }
     }

@@ -4,7 +4,6 @@
     // Recettes : saisie uniquement ; les rapports recettes (resource) ouvrent le menu « Rapports ».
     $isRevenueRoute = request()->routeIs('revenues.*');
     $isExpenseRoute = request()->routeIs('expenses.*', 'charges-fixes-reports.*');
-    $isSettingsRoute = request()->routeIs('revenue-categories.*', 'revenue-types.*');
     $isReportsRoute = request()->routeIs('financial-reports.*', 'revenue-reports.*', 'popote-reports.*', 'charges-fixes-reports.*');
     $isFinancialHub = request()->routeIs(
         'financial-reports.index',
@@ -23,11 +22,10 @@
     $isRevenueReportCreate = request()->routeIs('revenue-reports.create');
     $isStatsRoute = request()->routeIs('financial-statistics.*');
     $isDashboardRoute = request()->routeIs('home');
-    $isParoisseRoute = request()->routeIs('paroisses.*');
+    $isAppConfigRoute = request()->routeIs('application-configuration.*');
     $isEventsRoute = request()->routeIs('events.*');
     $isGroupsRoute = request()->routeIs('groups.*');
-    $isConfigRoute = request()->routeIs('configurations.*');
-    $isAdminAccessRoute = request()->routeIs('roles.*', 'permissions.*');
+    $isLegacyAdminRoute = request()->routeIs('paroisses.*', 'users.*', 'roles.*', 'permissions.*', 'revenue-categories.*', 'revenue-types.*', 'configurations.*');
     $isMembersRoute = request()->routeIs('members.*');
     $isSacramentsRoute = request()->routeIs('sacraments.*');
     $canSacramentsNav = auth()->check() && (
@@ -102,20 +100,6 @@
                 </details>
             </li>
             <li>
-                <details class="group" @if($isSettingsRoute) open @endif>
-                    <summary class="{{ $isSettingsRoute ? $navBase . ' nav-link-active' : $navBase }} cursor-pointer list-none">
-                        <span>🏷️</span>
-                        <span class="nav-text">Paramètres</span>
-                        <span class="sidebar-chevron" aria-hidden="true"></span>
-                    </summary>
-                    <ul class="sidebar-sub-menu mt-1" role="list">
-                        <li class="sidebar-sub-item"><a href="{{ route('revenue-categories.index') }}" class="sidebar-sub-link {{ request()->routeIs('revenue-categories.*') ? 'is-active' : '' }}">Catégories recettes</a></li>
-                        <li class="sidebar-sub-item"><a href="{{ route('revenue-types.index') }}" class="sidebar-sub-link {{ request()->routeIs('revenue-types.*') ? 'is-active' : '' }}">Types recettes</a></li>
-                    </ul>
-                </details>
-            </li>
-
-            <li>
                 <details class="group" @if($isReportsRoute) open @endif>
                     <summary class="{{ $isReportsRoute ? $navBase . ' nav-link-active' : $navBase }} cursor-pointer list-none">
                         <span>📑</span>
@@ -144,34 +128,12 @@
                 </a>
             </li>
 
-            @can('manage_paroisses')
-            <li><a href="{{ route('paroisses.index') }}" class="{{ $isParoisseRoute ? $navBase . ' nav-link-active' : $navBase }}"><span>⛪</span><span class="nav-text">Paroisses</span></a></li>
-            @endcan
-            @can('manage_users')
-            <li><a href="{{ route('users.index') }}" class="{{ $navBase }}"><span>⚙️</span><span class="nav-text">Utilisateurs</span></a></li>
-            @endcan
-            @can('view_configuration')
-            <li><a href="{{ route('configurations.index') }}" class="{{ $isConfigRoute ? $navBase . ' nav-link-active' : $navBase }}"><span>🔧</span><span class="nav-text">Configuration paroisse</span></a></li>
-            @endcan
-            @if(auth()->user()->can('manage_roles') || auth()->user()->can('manage_permissions'))
             <li>
-                <details class="group" @if($isAdminAccessRoute) open @endif>
-                    <summary class="{{ $isAdminAccessRoute ? $navBase . ' nav-link-active' : $navBase }} cursor-pointer list-none">
-                        <span>🔐</span>
-                        <span class="nav-text">Accès</span>
-                        <span class="sidebar-chevron" aria-hidden="true"></span>
-                    </summary>
-                    <ul class="sidebar-sub-menu mt-1" role="list">
-                        @can('manage_roles')
-                        <li class="sidebar-sub-item"><a href="{{ route('roles.index') }}" class="sidebar-sub-link {{ request()->routeIs('roles.*') ? 'is-active' : '' }}">Rôles</a></li>
-                        @endcan
-                        @can('manage_permissions')
-                        <li class="sidebar-sub-item"><a href="{{ route('permissions.index') }}" class="sidebar-sub-link {{ request()->routeIs('permissions.*') ? 'is-active' : '' }}">Permissions</a></li>
-                        @endcan
-                    </ul>
-                </details>
+                <a href="{{ route('application-configuration.index') }}" class="{{ ($isAppConfigRoute || $isLegacyAdminRoute) ? $navBase . ' nav-link-active' : $navBase }}">
+                    <span>⚙️</span>
+                    <span class="nav-text">Configuration</span>
+                </a>
             </li>
-            @endif
         </ul>
     </nav>
 
@@ -187,7 +149,7 @@
                     }
                 @endphp
                 @if($sidebarParoisse)
-                    <span class="block mt-2 text-sm font-bold text-white leading-tight drop-shadow-[0_1px_2px_rgba(0,0,0,0.45)]">{{ $sidebarParoisse }}</span>
+                    <span class="block mt-2 text-sm font-bold text-white leading-tight drop-shadow-[0_1px_2px_rgba(0,0,0,0.45)] muted">{{ $sidebarParoisse }}</span>
                 @endif
             @endauth
         </p>

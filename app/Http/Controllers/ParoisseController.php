@@ -25,42 +25,12 @@ class ParoisseController extends Controller
         abort_unless($request->user()?->hasRole('super_admin'), 403, 'Action réservée aux administrateurs.');
     }
 
-    public function index(Request $request): View
+    public function index(Request $request): RedirectResponse
     {
-        try {
-            $query = Paroisse::query()
-                ->with('curé')
-                ->orderBy('nom');
-
-            if (! $request->user()?->hasRole('super_admin')) {
-                if ($request->user()?->paroisse_id) {
-                    $query->where('id', $request->user()->paroisse_id);
-                } else {
-                    $query->whereRaw('1 = 0');
-                }
-            } else {
-                if ($request->filled('q')) {
-                    $s = '%'.addcslashes(mb_strtolower($request->string('q')->value()), '%_\\').'%';
-                    $query->where(function ($q) use ($s): void {
-                        $q->whereRaw('LOWER(nom) LIKE ?', [$s])
-                            ->orWhereRaw('LOWER(COALESCE(ville, "")) LIKE ?', [$s])
-                            ->orWhereRaw('LOWER(COALESCE(code_paroisse, "")) LIKE ?', [$s]);
-                    });
-                }
-                if ($request->filled('actif')) {
-                    $query->where('actif', $request->boolean('actif'));
-                }
-            }
-
-            $paroisses = $query->paginate(15)->withQueryString();
-            $canManage = $request->user()?->hasRole('super_admin') ?? false;
-
-            return view('paroisses.index', compact('paroisses', 'canManage'));
-        } catch (Throwable $e) {
-            $this->logError($e, 'Erreur lors du chargement des paroisses');
-
-            throw $e;
-        }
+        return redirect()->route('application-configuration.index', array_merge(
+            $request->query(),
+            ['tab' => 'paroisses']
+        ));
     }
 
     public function create(Request $request): View

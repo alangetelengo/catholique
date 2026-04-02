@@ -9,6 +9,7 @@ use App\Models\FinancialReport;
 use App\Models\Paroisse;
 use App\Models\Revenue;
 use App\Models\RevenueCategory;
+use App\Support\PaginationPerPage;
 use App\Traits\LogsErrors;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
@@ -223,7 +224,7 @@ class FinancialReportController extends Controller implements HasMiddleware
                 $query->whereYear('date_debut', $request->integer('year'));
             }
 
-            $reports = $query->paginate(15);
+            $reports = $query->paginate(PaginationPerPage::resolve($request))->withQueryString();
 
             $paroisses = $user->hasRole('super_admin')
                 ? Paroisse::orderBy('nom')->get()

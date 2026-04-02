@@ -6,8 +6,10 @@ use App\Models\Paroisse;
 use App\Models\Revenue;
 use App\Models\RevenueCategory;
 use App\Models\RevenueType;
+use App\Support\PaginationPerPage;
 use App\Traits\LogsErrors;
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
@@ -21,45 +23,28 @@ class RevenueController extends Controller
     public function index(Request $request): View
     {
         try {
-            $query = Revenue::query()
+            $revenues = $this->revenuesIndexFilteredQuery($request)
                 ->with(['category', 'type', 'createdBy'])
                 ->orderByDesc('date_recette')
-                ->orderByDesc('id');
+                ->orderByDesc('id')
+                ->paginate(PaginationPerPage::resolve($request))
+                ->withQueryString();
 
-            if ($request->filled('categorie')) {
-                $query->whereHas('category', function ($builder) use ($request): void {
-                    $builder->where('code', $request->string('categorie')->value());
-                });
-            }
+            $totalMontantRecettes = (float) $this->revenuesIndexFilteredQuery($request)->sum('montant');
+            $montantDerniereRecette = $this->revenuesIndexFilteredQuery($request)
+                ->orderByDesc('date_recette')
+                ->orderByDesc('id')
+                ->value('montant');
+            $montantDerniereRecette = $montantDerniereRecette !== null ? (float) $montantDerniereRecette : null;
 
-            if ($request->filled('type')) {
-                $query->whereHas('type', function ($builder) use ($request): void {
-                    $builder->where('code', $request->string('type')->value());
-                });
-            }
-
-            if ($request->filled('date_from')) {
-                $query->whereDate('date_recette', '>=', $request->date('date_from'));
-            }
-
-            if ($request->filled('date_to')) {
-                $query->whereDate('date_recette', '<=', $request->date('date_to'));
-            }
-
-            if ($request->filled('q')) {
-                $search = mb_strtolower($request->string('q')->value());
-                $query->where(function ($builder) use ($search): void {
-                    $builder
-                        ->whereRaw('LOWER(notes) LIKE ?', ["%{$search}%"])
-                        ->orWhereRaw('LOWER(reference_paiement) LIKE ?', ["%{$search}%"])
-                        ->orWhereRaw('LOWER(donateur_nom) LIKE ?', ["%{$search}%"]);
-                });
-            }
-
-            $revenues = $query->paginate(20)->withQueryString();
             $categories = RevenueCategory::query()->with('types')->orderBy('ordre')->orderBy('nom')->get();
 
-            return view('revenues.index', compact('revenues', 'categories'));
+            return view('revenues.index', compact(
+                'revenues',
+                'categories',
+                'totalMontantRecettes',
+                'montantDerniereRecette',
+            ));
         } catch (Throwable $e) {
             $this->logError($e, 'Erreur lors du chargement des recettes');
             throw $e;
@@ -132,6 +117,43 @@ class RevenueController extends Controller
             $this->logError($e, 'Erreur lors de la suppression de la recette', ['revenue_id' => $revenue->id]);
             throw $e;
         }
+    }
+
+    private function revenuesIndexFilteredQuery(Request $request): Builder
+    {
+        $query = Revenue::query();
+
+        if ($request->filled('categorie')) {
+            $query->whereHas('category', function ($builder) use ($request): void {
+                $builder->where('code', $request->string('categorie')->value());
+            });
+        }
+
+        if ($request->filled('type')) {
+            $query->whereHas('type', function ($builder) use ($request): void {
+                $builder->where('code', $request->string('type')->value());
+            });
+        }
+
+        if ($request->filled('date_from')) {
+            $query->whereDate('date_recette', '>=', $request->date('date_from'));
+        }
+
+        if ($request->filled('date_to')) {
+            $query->whereDate('date_recette', '<=', $request->date('date_to'));
+        }
+
+        if ($request->filled('q')) {
+            $search = mb_strtolower($request->string('q')->value());
+            $query->where(function ($builder) use ($search): void {
+                $builder
+                    ->whereRaw('LOWER(notes) LIKE ?', ["%{$search}%"])
+                    ->orWhereRaw('LOWER(reference_paiement) LIKE ?', ["%{$search}%"])
+                    ->orWhereRaw('LOWER(donateur_nom) LIKE ?', ["%{$search}%"]);
+            });
+        }
+
+        return $query;
     }
 
     private function validateRevenue(Request $request): array
@@ -210,15 +232,15 @@ class RevenueController extends Controller
         }
 
         if (str_starts_with($digits, '242')) {
-            return '242' . substr($digits, 3);
+            return '242'.substr($digits, 3);
         }
 
-        return '242' . $digits;
+        return '242'.$digits;
     }
 
     private function generateReference(): string
     {
-        return 'REV-' . now()->format('YmdHis') . '-' . strtoupper((string) str()->random(4));
+        return 'REV-'.now()->format('YmdHis').'-'.strtoupper((string) str()->random(4));
     }
 
     private function resolveParoisseId(Request $request): int
@@ -237,5 +259,4 @@ class RevenueController extends Controller
             'revenue_category_id' => 'Aucune paroisse disponible. Créez une paroisse avant d\'enregistrer une recette.',
         ]);
     }
-
 }

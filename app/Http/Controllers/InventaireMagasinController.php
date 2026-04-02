@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Helpers\FlashAlert;
 use App\Models\InventaireMagasin;
 use App\Models\Paroisse;
+use App\Support\PaginationPerPage;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -30,7 +31,7 @@ class InventaireMagasinController extends Controller
             });
         }
 
-        $items = $query->orderBy('nom')->paginate(15)->withQueryString();
+        $items = $query->orderBy('nom')->paginate(PaginationPerPage::resolve($request))->withQueryString();
         $paroisses = $user->hasRole('super_admin') ? Paroisse::orderBy('nom')->get() : collect();
 
         return view('inventaire-magasin.index', [
@@ -47,7 +48,7 @@ class InventaireMagasinController extends Controller
             : Paroisse::whereKey($user->paroisse_id)->get();
 
         return view('inventaire-magasin.create', [
-            'item' => new InventaireMagasin(),
+            'item' => new InventaireMagasin,
             'paroisses' => $paroisses,
         ]);
     }
@@ -80,6 +81,7 @@ class InventaireMagasinController extends Controller
         $user = $request->user();
         if (! $user->hasRole('super_admin') && $inventaire_magasin->paroisse_id !== $user->paroisse_id) {
             FlashAlert::error('Accès non autorisé.');
+
             return redirect()->route('inventaire-magasin.index');
         }
         $paroisses = $user->hasRole('super_admin')
@@ -97,6 +99,7 @@ class InventaireMagasinController extends Controller
         $user = $request->user();
         if (! $user->hasRole('super_admin') && $inventaire_magasin->paroisse_id !== $user->paroisse_id) {
             FlashAlert::error('Accès non autorisé.');
+
             return redirect()->route('inventaire-magasin.index');
         }
         $validated = $request->validate([
@@ -124,6 +127,7 @@ class InventaireMagasinController extends Controller
         $user = $request->user();
         if (! $user->hasRole('super_admin') && $inventaire_magasin->paroisse_id !== $user->paroisse_id) {
             FlashAlert::error('Accès non autorisé.');
+
             return redirect()->route('inventaire-magasin.index');
         }
         $inventaire_magasin->delete();

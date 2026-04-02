@@ -4,7 +4,7 @@
 @section('page-title', 'Créer une configuration')
 @section('breadcrumb')
     <li class="breadcrumb-item"><a href="{{ route('home') }}">Accueil</a></li>
-    <li class="breadcrumb-item"><a href="{{ route('configurations.index') }}">Configurations</a></li>
+    <li class="breadcrumb-item"><a href="{{ route('configurations.workspace') }}">Configurations</a></li>
     <li class="breadcrumb-item active" aria-current="page">Créer</li>
 @endsection
 
@@ -61,7 +61,7 @@
                     </div>
 
                     <div class="d-flex justify-content-between">
-                        <a href="{{ route('configurations.index') }}" class="btn btn-secondary">Annuler</a>
+                        <a href="{{ route('configurations.workspace') }}" class="btn btn-secondary">Annuler</a>
                         <button type="submit" class="btn btn-primary">Créer</button>
                     </div>
                 </form>

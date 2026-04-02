@@ -8,8 +8,10 @@ use App\Http\Requests\UpdateEventRequest;
 use App\Models\Event;
 use App\Models\Member;
 use App\Models\Paroisse;
+use App\Support\PaginationPerPage;
 use App\Traits\LogsErrors;
 use Exception;
+use Illuminate\Http\Request;
 use Illuminate\Routing\Controllers\HasMiddleware;
 use Illuminate\Routing\Controllers\Middleware;
 use Illuminate\Support\Facades\Auth;
@@ -34,7 +36,7 @@ class EventController extends Controller implements HasMiddleware
     /**
      * Display a listing of the resource.
      */
-    public function index()
+    public function index(Request $request)
     {
         try {
             $query = Event::query()->with(['paroisse', 'celebrePar']);
@@ -45,23 +47,23 @@ class EventController extends Controller implements HasMiddleware
                 } else {
                     $query->whereRaw('1 = 0');
                 }
-            } elseif (request('paroisse_id')) {
-                $query->where('paroisse_id', request('paroisse_id'));
+            } elseif ($request->filled('paroisse_id')) {
+                $query->where('paroisse_id', $request->input('paroisse_id'));
             }
 
-            if ($type = request('type')) {
+            if ($type = $request->input('type')) {
                 $query->where('type', $type);
             }
 
-            if ($dateFrom = request('date_from')) {
+            if ($dateFrom = $request->input('date_from')) {
                 $query->whereDate('date_evenement', '>=', $dateFrom);
             }
 
-            if ($dateTo = request('date_to')) {
+            if ($dateTo = $request->input('date_to')) {
                 $query->whereDate('date_evenement', '<=', $dateTo);
             }
 
-            $events = $query->orderByDesc('date_evenement')->orderByDesc('heure_evenement')->paginate(15)->withQueryString();
+            $events = $query->orderByDesc('date_evenement')->orderByDesc('heure_evenement')->paginate(PaginationPerPage::resolve($request))->withQueryString();
 
             $paroisses = Auth::check() && Auth::user()->hasRole('super_admin')
                 ? Paroisse::query()->orderBy('nom')->get()

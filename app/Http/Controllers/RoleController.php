@@ -7,6 +7,7 @@ use App\Models\Permission;
 use App\Models\Role;
 use App\Traits\LogsErrors;
 use Exception;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controllers\HasMiddleware;
 use Illuminate\Routing\Controllers\Middleware;
@@ -25,11 +26,12 @@ class RoleController extends Controller implements HasMiddleware
         ];
     }
 
-    public function index()
+    public function index(Request $request): RedirectResponse
     {
-        $roles = Role::query()->orderBy('name')->paginate(20);
-
-        return view('roles.index', compact('roles'));
+        return redirect()->route('application-configuration.index', array_merge(
+            $request->query(),
+            ['tab' => 'roles']
+        ));
     }
 
     public function create()
@@ -81,7 +83,7 @@ class RoleController extends Controller implements HasMiddleware
     public function update(Request $request, Role $role)
     {
         $data = $request->validate([
-            'name' => ['required', 'string', 'max:255', 'unique:roles,name,' . $role->id],
+            'name' => ['required', 'string', 'max:255', 'unique:roles,name,'.$role->id],
             'libelle_role' => ['required', 'string', 'max:255'],
             'permissions' => ['array'],
             'permissions.*' => ['integer', 'exists:permissions,id'],

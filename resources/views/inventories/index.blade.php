@@ -138,5 +138,5 @@
         </div>
     </div>
 
-    <div class="mt-4">{{ $inventories->links() }}</div>
+    @include('partials.pagination-fr', ['paginator' => $inventories, 'itemLabel' => 'articles'])
 @endsection

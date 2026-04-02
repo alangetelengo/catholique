@@ -6,6 +6,7 @@ use App\Helpers\FlashAlert;
 use App\Models\Permission;
 use App\Traits\LogsErrors;
 use Exception;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controllers\HasMiddleware;
 use Illuminate\Routing\Controllers\Middleware;
@@ -25,11 +26,12 @@ class PermissionController extends Controller implements HasMiddleware
         ];
     }
 
-    public function index()
+    public function index(Request $request): RedirectResponse
     {
-        $permissions = Permission::query()->orderBy('name')->paginate(30);
-
-        return view('permissions.index', compact('permissions'));
+        return redirect()->route('application-configuration.index', array_merge(
+            $request->query(),
+            ['tab' => 'permissions']
+        ));
     }
 
     public function create()

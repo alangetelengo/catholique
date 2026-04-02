@@ -1,31 +1,28 @@
-@extends('layouts.app')
+@php
+    $configTab = 'revenue-types';
+@endphp
+<div class="application-config-panel space-y-4" data-config-tab="{{ $configTab }}">
+    <div class="flex flex-wrap items-center justify-between gap-3">
+        <a href="{{ route('revenue-types.create') }}" class="adventiste-btn-primary text-sm no-underline">+ Nouveau type</a>
+    </div>
 
-@section('title', 'Types de revenus - Catholique')
-@section('page-title', 'Types de revenus')
-@section('page-title-info', 'Paramétrage fin des types de recettes par catégorie.')
-
-@section('btn-create')
-    <a href="{{ route('revenue-types.create') }}" class="adventiste-btn-primary">+ Nouveau type</a>
-@endsection
-
-@section('content')
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-5">
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div class="adventiste-card-pro-static p-4">
             <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Total types</p>
             <p class="mt-1 text-2xl font-bold text-slate-900 dark:text-slate-100">{{ $types->total() }}</p>
         </div>
         <div class="adventiste-card-pro-static p-4">
-            <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Actifs</p>
+            <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Actifs (page)</p>
             <p class="mt-1 text-2xl font-bold text-emerald-700 dark:text-emerald-400">{{ $types->getCollection()->where('actif', true)->count() }}</p>
-        </div>
-        <div class="adventiste-card-pro-static p-4">
-            <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Inactifs</p>
-            <p class="mt-1 text-2xl font-bold text-amber-700 dark:text-amber-400">{{ $types->getCollection()->where('actif', false)->count() }}</p>
         </div>
     </div>
 
-    <div class="adventiste-card-pro-static p-4 sm:p-5 mb-5">
-        <form method="get" class="flex flex-wrap items-center gap-3">
+    <div class="adventiste-card-pro-static p-4 sm:p-5">
+        <form method="get" action="{{ route('application-configuration.index') }}" class="flex flex-wrap items-center gap-3 app-config-filter-form">
+            <input type="hidden" name="tab" value="{{ $configTab }}">
+            @if (request()->filled('per_page'))
+                <input type="hidden" name="per_page" value="{{ request('per_page') }}">
+            @endif
             <select name="revenue_category_id" class="rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2.5 text-sm">
                 <option value="">Toutes catégories</option>
                 @foreach ($categories as $category)
@@ -35,7 +32,7 @@
                 @endforeach
             </select>
             <button class="adventiste-btn-primary" type="submit">Filtrer</button>
-            <a href="{{ route('revenue-types.index') }}" class="adventiste-btn-secondary">Réinitialiser</a>
+            <a href="{{ route('application-configuration.index', ['tab' => $configTab]) }}" class="adventiste-btn-secondary no-underline">Réinitialiser</a>
         </form>
     </div>
 
@@ -92,5 +89,5 @@
         </div>
     </div>
 
-    @include('partials.pagination-fr', ['paginator' => $types, 'itemLabel' => 'types'])
-@endsection
+    @include('application-configuration.partials.pagination-footer', ['paginator' => $types, 'itemLabel' => 'types'])
+</div>
