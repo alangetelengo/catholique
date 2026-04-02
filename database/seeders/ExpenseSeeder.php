@@ -94,6 +94,31 @@ class ExpenseSeeder extends Seeder
             $currentMonth->addMonth();
         }
 
+        // Dépenses alimentation popote (liées à la subvention) — une par mois sur la période
+        $joursSemaine = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'];
+        $popoteMonth = $startDate->copy()->startOfMonth();
+        while ($popoteMonth->lte($endDate)) {
+            $dateDepense = $popoteMonth->copy()->day(fake()->numberBetween(5, 25));
+            $expenses[] = [
+                'paroisse_id' => $paroisse->id,
+                'categorie_charge' => 'alimentation_popote',
+                'type_charge' => 'alimentation',
+                'montant' => fake()->numberBetween(120_000, 380_000),
+                'date_depense' => $dateDepense,
+                'jour_semaine' => $joursSemaine[$dateDepense->dayOfWeek],
+                'facture_reference' => null,
+                'fournisseur' => null,
+                'methode_paiement' => fake()->randomElement($methodesPaiement),
+                'statut' => 'valide',
+                'notes' => 'Courses alimentaires popote (données de test)',
+                'libelle' => fake()->randomElement(['Courses marché', 'Ravitaillement popote', 'Achats vivres mensuels']),
+                'created_by' => $user?->id,
+                'created_at' => $popoteMonth->copy(),
+                'updated_at' => $popoteMonth->copy(),
+            ];
+            $popoteMonth->addMonth();
+        }
+
         // Générer des dépenses variables - plusieurs par mois
         $currentDate = $startDate->copy();
         while ($currentDate->lte($endDate)) {

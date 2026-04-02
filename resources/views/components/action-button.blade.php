@@ -34,12 +34,16 @@ $viewClasses = 'border border-slate-200 dark:border-slate-600 bg-white dark:bg-s
     <span>{{ $title ?? 'Voir' }}</span>
 </a>
 @elseif ($variant === 'delete')
-<form method="{{ $method }}" action="{{ $action }}" class="inline m-0">
+{{-- HTML n'autorise que GET/POST sur <form> : DELETE/PUT en attribut method devient souvent un GET vers action → même effet qu'ouvrir la fiche. Toujours POST + @method. --}}
+@php
+    $deleteVerb = strtoupper(trim((string) $method));
+@endphp
+<form method="POST" action="{{ $action }}" class="inline m-0">
     @csrf
-    @if ($method !== 'POST')
-    @method($method)
+    @if (! in_array($deleteVerb, ['POST', 'GET'], true))
+        @method($deleteVerb)
     @endif
-    <button type="button" class="{{ $baseClasses }} {{ $deleteClasses }}" title="{{ $title ?? 'Supprimer' }}" onclick="flashAlert('{{ $confirmMessage }}', this.closest('form'), { icon: '{{ $confirmIcon }}', danger: true, confirmText: '{{ $confirmText }}' })" {{ $disabled ? 'disabled' : '' }}>
+    <button type="button" class="{{ $baseClasses }} {{ $deleteClasses }}" title="{{ $title ?? 'Supprimer' }}" onclick="flashAlert(@js($confirmMessage), this.closest('form'), { icon: @js($confirmIcon), danger: true, confirmText: @js($confirmText) })" {{ $disabled ? 'disabled' : '' }}>
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
         </svg>

@@ -19,7 +19,7 @@
         </ul>
         <p class="text-xs text-slate-500 dark:text-slate-400 mt-3 mb-0">
             <i class="fas fa-lightbulb text-amber-500 me-1" aria-hidden="true"></i>
-            Les liens en haut de page permettent d’accéder au rapport Subvention Popote, au rapport Charges fixes et à la liste des rapports déjà enregistrés.
+            Les boutons à côté du titre (stats, rapports enregistrés, catégories, Popote, charges fixes) permettent d’accéder aux autres vues du module.
         </p>
     </div>
     <div class="px-6 py-4 border-t border-slate-200 dark:border-slate-600 flex justify-end">

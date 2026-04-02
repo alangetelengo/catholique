@@ -27,7 +27,7 @@ use App\Http\Controllers\SacramentController;
 use App\Http\Controllers\UserController;
 use Illuminate\Support\Facades\Route;
 
-require __DIR__ . '/auth.php';
+require __DIR__.'/auth.php';
 
 Route::get('/connexion', fn () => redirect()->route('login'))->name('connexion');
 
@@ -47,7 +47,7 @@ Route::middleware('auth')->group(function (): void {
     Route::resource('events', EventController::class);
     Route::resource('groups', GroupController::class)->except(['show']);
     Route::resource('revenues', RevenueController::class)->except(['show']);
-    Route::resource('expenses', ExpenseController::class)->except(['show']);
+    Route::resource('expenses', ExpenseController::class);
     Route::resource('inventories', InventoryController::class)->except(['show']);
     Route::resource('inventaire-magasin', InventaireMagasinController::class)->except(['show']);
     Route::resource('inventaire-patrimoine', InventairePatrimoineController::class)->except(['show']);
@@ -55,9 +55,9 @@ Route::middleware('auth')->group(function (): void {
     Route::post('api/sync', [SyncController::class, 'store'])->name('api.sync');
     Route::resource('revenue-reports', RevenueReportController::class)->parameters(['revenue-reports' => 'revenueReport']);
     Route::get('revenue-reports/{revenueReport}/print', [RevenueReportController::class, 'print'])->name('revenue-reports.print');
-    Route::get('reports/quete-ordinaire', [QueteOrdinaireReportController::class, 'index'])->name('reports.quete.index');
-    Route::get('reports/quete-ordinaire/print', [QueteOrdinaireReportController::class, 'print'])->name('reports.quete.print');
-    Route::get('reports/quete-ordinaire/pdf', [QueteOrdinaireReportController::class, 'exportPdf'])->name('reports.quete.pdf');
+    Route::get('reports/quete-ordinaire', [QueteOrdinaireReportController::class, 'legacyRedirectIndex'])->name('reports.quete.index');
+    Route::get('reports/quete-ordinaire/print', [QueteOrdinaireReportController::class, 'legacyRedirectPrint'])->name('reports.quete.print');
+    Route::get('reports/quete-ordinaire/pdf', [QueteOrdinaireReportController::class, 'legacyRedirectPdf'])->name('reports.quete.pdf');
     Route::resource('charges-fixes-reports', ChargesFixesReportController::class)->parameters(['charges-fixes-reports' => 'chargesFixesReport']);
     Route::get('charges-fixes-reports/{chargesFixesReport}/print', [ChargesFixesReportController::class, 'print'])->name('charges-fixes-reports.print');
     Route::get('charges-fixes-reports/{chargesFixesReport}/pdf', [ChargesFixesReportController::class, 'exportPdf'])->name('charges-fixes-reports.pdf');
@@ -76,7 +76,7 @@ Route::middleware('auth')->group(function (): void {
     Route::get('financial-reports/statistics', [FinancialReportController::class, 'statistics'])->name('financial-reports.statistics');
     Route::get('financial-reports/revenues-weekly', [FinancialReportController::class, 'revenuesWeekly'])->name('financial-reports.revenues-weekly');
     Route::get('financial-reports/revenues-weekly/print', [FinancialReportController::class, 'revenuesWeeklyPrint'])->name('financial-reports.revenues-weekly-print');
-    Route::post('financial-reports/revenues-weekly/pdf', [FinancialReportController::class, 'downloadRevenuesWeeklyPdf'])->name('financial-reports.revenues-weekly-pdf');
+    Route::match(['get', 'post'], 'financial-reports/revenues-weekly/pdf', [FinancialReportController::class, 'downloadRevenuesWeeklyPdf'])->name('financial-reports.revenues-weekly-pdf');
     Route::get('financial-reports/popote', [FinancialReportController::class, 'popoteReport'])->name('financial-reports.popote');
     Route::get('financial-reports/popote/print', [FinancialReportController::class, 'popotePrint'])->name('financial-reports.popote-print');
     Route::post('financial-reports/popote/pdf', [FinancialReportController::class, 'downloadPopotePdf'])->name('financial-reports.popote-pdf');

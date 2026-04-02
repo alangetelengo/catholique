@@ -1,11 +1,26 @@
 @php
     $navBase = 'flex items-center gap-3 px-5 py-3 rounded-xl text-white/85 hover:bg-[rgba(212,168,75,0.12)] hover:text-white transition-all border border-transparent hover:border-[rgba(212,168,75,0.15)]';
-    $isFinanceRoute = request()->routeIs('revenues.*', 'revenue-reports.*', 'charges-fixes-reports.*', 'reports.quete.*', 'expenses.*');
     $isInventoryRoute = request()->routeIs('inventories.*', 'inventaire-magasin.*', 'inventaire-patrimoine.*');
-    $isRevenueRoute = request()->routeIs('revenues.*', 'revenue-reports.*');
-    $isExpenseRoute = request()->routeIs('expenses.*');
+    // Recettes : saisie uniquement ; les rapports recettes (resource) ouvrent le menu « Rapports ».
+    $isRevenueRoute = request()->routeIs('revenues.*');
+    $isExpenseRoute = request()->routeIs('expenses.*', 'charges-fixes-reports.*');
     $isSettingsRoute = request()->routeIs('revenue-categories.*', 'revenue-types.*');
-    $isReportsRoute = request()->routeIs('revenue-reports.*', 'reports.quete.*', 'popote-reports.*', 'charges-fixes-reports.*');
+    $isReportsRoute = request()->routeIs('financial-reports.*', 'revenue-reports.*', 'popote-reports.*', 'charges-fixes-reports.*');
+    $isFinancialHub = request()->routeIs(
+        'financial-reports.index',
+        'financial-reports.popote',
+        'financial-reports.popote-print',
+        'financial-reports.popote-pdf',
+        'financial-reports.charges-fixes',
+        'financial-reports.revenues-by-category',
+        'financial-reports.revenues-by-category.store',
+        'financial-reports.revenues-by-category.pdf',
+    );
+    $isFinancialList = request()->routeIs('financial-reports.list', 'financial-reports.show', 'financial-reports.download-pdf');
+    $isFinancialStats = request()->routeIs('financial-reports.statistics');
+    $isFinancialQueteWeekly = request()->routeIs('financial-reports.revenues-weekly', 'financial-reports.revenues-weekly-print', 'financial-reports.revenues-weekly-pdf');
+    $isRevenueReportsResource = request()->routeIs('revenue-reports.index', 'revenue-reports.show', 'revenue-reports.edit', 'revenue-reports.print');
+    $isRevenueReportCreate = request()->routeIs('revenue-reports.create');
     $isStatsRoute = request()->routeIs('financial-statistics.*');
     $isDashboardRoute = request()->routeIs('home');
     $isParoisseRoute = request()->routeIs('paroisses.*');
@@ -43,45 +58,34 @@
             @endcan
 
             <li class="pt-2">
-                <details class="group sidebar-submenu" @if($isFinanceRoute) open @endif>
-                    <summary class="{{ $isFinanceRoute ? $navBase . ' nav-link-active' : $navBase }} cursor-pointer list-none">
-                        <span>💰</span>
-                        <span class="nav-text">Finances</span>
+                <details class="group" @if($isRevenueRoute) open @endif>
+                    <summary class="{{ $isRevenueRoute ? $navBase . ' nav-link-active' : $navBase }} cursor-pointer list-none">
+                        <span>💵</span>
+                        <span class="nav-text">Recettes</span>
                         <span class="sidebar-chevron" aria-hidden="true"></span>
                     </summary>
-                    <ul class="sidebar-sub-menu mt-1" role="list" data-accordion-group="finances">
-                        <li class="sidebar-sub-item">
-                            <details class="sidebar-sub-nested" data-accordion-item="finances" @if($isRevenueRoute) open @endif>
-                                <summary class="sidebar-sub-summary {{ $isRevenueRoute ? 'is-active' : '' }}">
-                                    <span>Recettes</span>
-                                    <span class="sidebar-chevron sidebar-chevron-nested" aria-hidden="true"></span>
-                                </summary>
-                                <ul class="sidebar-sub-menu sidebar-sub-menu-nested mt-0.5" role="list">
-                                    <li class="sidebar-sub-item"><a href="{{ route('revenues.index') }}" class="sidebar-sub-link {{ request()->routeIs('revenues.index') ? 'is-active' : '' }}">Toutes les recettes</a></li>
-                                    <li class="sidebar-sub-item"><a href="{{ route('revenues.create') }}" class="sidebar-sub-link {{ request()->routeIs('revenues.create') ? 'is-active' : '' }}">Ajouter une recette</a></li>
-                                    <li class="sidebar-sub-item"><a href="{{ route('reports.quete.index') }}" class="sidebar-sub-link {{ request()->routeIs('reports.quete.*') ? 'is-active' : '' }}">Rapport quête ordinaire</a></li>
-                                    <li class="sidebar-sub-item"><a href="{{ route('revenue-reports.index') }}" class="sidebar-sub-link {{ request()->routeIs('revenue-reports.*') ? 'is-active' : '' }}">Rapports recettes</a></li>
-                                </ul>
-                            </details>
-                        </li>
-                        <li class="sidebar-sub-item">
-                            <details class="sidebar-sub-nested" data-accordion-item="finances" @if($isExpenseRoute) open @endif>
-                                <summary class="sidebar-sub-summary {{ $isExpenseRoute ? 'is-active' : '' }}">
-                                    <span>Dépenses</span>
-                                    <span class="sidebar-chevron sidebar-chevron-nested" aria-hidden="true"></span>
-                                </summary>
-                                <ul class="sidebar-sub-menu sidebar-sub-menu-nested mt-0.5" role="list">
-                                    <li class="sidebar-sub-item"><a href="{{ route('expenses.index') }}" class="sidebar-sub-link {{ request()->routeIs('expenses.index') ? 'is-active' : '' }}">Toutes les dépenses</a></li>
-                                    <li class="sidebar-sub-item"><a href="{{ route('expenses.create') }}" class="sidebar-sub-link {{ request()->routeIs('expenses.create') ? 'is-active' : '' }}">Ajouter une dépense</a></li>
-                                    <li class="sidebar-sub-item"><a href="{{ route('charges-fixes-reports.index') }}" class="sidebar-sub-link {{ request()->routeIs('charges-fixes-reports.*') ? 'is-active' : '' }}">Rapports charges fixes</a></li>
-                                </ul>
-                            </details>
-                        </li>
+                    <ul class="sidebar-sub-menu mt-1" role="list">
+                        <li class="sidebar-sub-item"><a href="{{ route('revenues.index') }}" class="sidebar-sub-link {{ request()->routeIs('revenues.index') ? 'is-active' : '' }}">Toutes les recettes</a></li>
+                        <li class="sidebar-sub-item"><a href="{{ route('revenues.create') }}" class="sidebar-sub-link {{ request()->routeIs('revenues.create') ? 'is-active' : '' }}">Ajouter une recette</a></li>
+                        <li class="sidebar-sub-item"><a href="{{ route('revenue-reports.index') }}" class="sidebar-sub-link {{ $isRevenueReportsResource || $isRevenueReportCreate ? 'is-active' : '' }}">Rapports recettes</a></li>
+                    </ul>
+                </details>
+            </li>
+            <li>
+                <details class="group" @if($isExpenseRoute) open @endif>
+                    <summary class="{{ $isExpenseRoute ? $navBase . ' nav-link-active' : $navBase }} cursor-pointer list-none">
+                        <span>🧾</span>
+                        <span class="nav-text">Dépenses</span>
+                        <span class="sidebar-chevron" aria-hidden="true"></span>
+                    </summary>
+                    <ul class="sidebar-sub-menu mt-1" role="list">
+                        <li class="sidebar-sub-item"><a href="{{ route('expenses.index') }}" class="sidebar-sub-link {{ request()->routeIs('expenses.index') ? 'is-active' : '' }}">Toutes les dépenses</a></li>
+                        <li class="sidebar-sub-item"><a href="{{ route('expenses.create') }}" class="sidebar-sub-link {{ request()->routeIs('expenses.create') ? 'is-active' : '' }}">Ajouter une dépense</a></li>
+                        <li class="sidebar-sub-item"><a href="{{ route('charges-fixes-reports.index') }}" class="sidebar-sub-link {{ request()->routeIs('charges-fixes-reports.*') ? 'is-active' : '' }}">Rapports charges fixes</a></li>
                     </ul>
                 </details>
             </li>
 
-            {{-- Inventaires et paramètres recettes : hors du bloc Finances (Recettes / Dépenses uniquement) --}}
             <li>
                 <details class="group" @if($isInventoryRoute) open @endif>
                     <summary class="{{ $isInventoryRoute ? $navBase . ' nav-link-active' : $navBase }} cursor-pointer list-none">
@@ -120,13 +124,13 @@
                     </summary>
                     <ul class="sidebar-sub-menu mt-1">
                         @can('view_financial_reports')
-                        <li class="sidebar-sub-item"><a href="{{ route('financial-reports.index') }}" class="sidebar-sub-link {{ request()->routeIs('financial-reports.index') ? 'is-active' : '' }}">Hub rapports financiers</a></li>
-                        <li class="sidebar-sub-item"><a href="{{ route('financial-reports.list') }}" class="sidebar-sub-link {{ request()->routeIs('financial-reports.list') ? 'is-active' : '' }}">Liste des rapports</a></li>
-                        <li class="sidebar-sub-item"><a href="{{ route('financial-reports.statistics') }}" class="sidebar-sub-link {{ request()->routeIs('financial-reports.statistics') ? 'is-active' : '' }}">Stats rapports</a></li>
+                        <li class="sidebar-sub-item"><a href="{{ route('financial-reports.index') }}" class="sidebar-sub-link {{ $isFinancialHub ? 'is-active' : '' }}">Hub rapports financiers</a></li>
+                        <li class="sidebar-sub-item"><a href="{{ route('financial-reports.list') }}" class="sidebar-sub-link {{ $isFinancialList ? 'is-active' : '' }}">Liste des rapports</a></li>
+                        <li class="sidebar-sub-item"><a href="{{ route('financial-reports.statistics') }}" class="sidebar-sub-link {{ $isFinancialStats ? 'is-active' : '' }}">Stats rapports</a></li>
+                        <li class="sidebar-sub-item"><a href="{{ route('financial-reports.revenues-weekly') }}" class="sidebar-sub-link {{ $isFinancialQueteWeekly ? 'is-active' : '' }}">Rapport quête ordinaire</a></li>
                         @endcan
-                        <li class="sidebar-sub-item"><a href="{{ route('revenue-reports.create') }}" class="sidebar-sub-link {{ request()->routeIs('revenue-reports.create') ? 'is-active' : '' }}">Générer un rapport</a></li>
-                        <li class="sidebar-sub-item"><a href="{{ route('revenue-reports.index') }}" class="sidebar-sub-link {{ request()->routeIs('revenue-reports.index', 'revenue-reports.show', 'revenue-reports.edit') ? 'is-active' : '' }}">Rapports enregistrés</a></li>
-                        <li class="sidebar-sub-item"><a href="{{ route('reports.quete.index') }}" class="sidebar-sub-link {{ request()->routeIs('reports.quete.*') ? 'is-active' : '' }}">Rapport Quête ordinaire</a></li>
+                        <li class="sidebar-sub-item"><a href="{{ route('revenue-reports.create') }}" class="sidebar-sub-link {{ $isRevenueReportCreate ? 'is-active' : '' }}">Générer un rapport</a></li>
+                        <li class="sidebar-sub-item"><a href="{{ route('revenue-reports.index') }}" class="sidebar-sub-link {{ $isRevenueReportsResource ? 'is-active' : '' }}">Rapports enregistrés</a></li>
                         <li class="sidebar-sub-item"><a href="{{ route('popote-reports.index') }}" class="sidebar-sub-link {{ request()->routeIs('popote-reports.*') ? 'is-active' : '' }}">Rapport Subvention Popote</a></li>
                         <li class="sidebar-sub-item"><a href="{{ route('charges-fixes-reports.index') }}" class="sidebar-sub-link {{ request()->routeIs('charges-fixes-reports.*') ? 'is-active' : '' }}">Rapport Charges fixes</a></li>
                     </ul>
@@ -223,44 +227,6 @@
     background: rgba(212, 168, 75, 0.2);
     border-color: rgba(212, 168, 75, 0.7);
 }
-.sidebar .sidebar-submenu > .sidebar-sub-menu {
-    margin-left: 0.5rem;
-    border-left: 1px solid rgba(212, 168, 75, 0.25);
-    padding-left: 0.5rem;
-}
-.sidebar .sidebar-sub-nested > summary::-webkit-details-marker {
-    display: none;
-}
-.sidebar .sidebar-sub-summary {
-    list-style: none;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    color: rgba(255, 255, 255, 0.78);
-    font-size: 0.84rem;
-    padding: 0.35rem 0.75rem;
-    border-radius: 0.5rem;
-}
-.sidebar .sidebar-chevron-nested {
-    width: 1rem;
-    height: 1rem;
-    font-size: 0.8rem;
-}
-.sidebar .sidebar-sub-summary:hover {
-    color: #ffffff;
-    background: rgba(212, 168, 75, 0.1);
-}
-.sidebar .sidebar-sub-summary.is-active {
-    color: #ffffff;
-    background: rgba(212, 168, 75, 0.16);
-    border: 1px solid rgba(212, 168, 75, 0.35);
-}
-.sidebar .sidebar-sub-menu-nested {
-    margin-left: 0.25rem;
-    border-left: 1px dashed rgba(212, 168, 75, 0.2);
-    padding-left: 0.35rem;
-}
 .sidebar .sidebar-sub-item + .sidebar-sub-item {
     margin-top: 0.125rem;
 }
@@ -299,24 +265,3 @@
     display: none !important;
 }
 </style>
-
-<script>
-    (function () {
-        const group = document.querySelector('[data-accordion-group="finances"]');
-        if (!group) return;
-
-        const items = Array.from(group.querySelectorAll('details[data-accordion-item="finances"]'));
-        if (!items.length) return;
-
-        items.forEach((item) => {
-            item.addEventListener('toggle', function () {
-                if (!item.open) return;
-                items.forEach((other) => {
-                    if (other !== item) {
-                        other.open = false;
-                    }
-                });
-            });
-        });
-    })();
-</script>

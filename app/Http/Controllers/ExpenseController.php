@@ -87,6 +87,14 @@ class ExpenseController extends Controller
         }
     }
 
+    /**
+     * Pas de fiche détail : les liens GET /expenses/{id} (favoris, anciennes URL) redirigent vers l’édition.
+     */
+    public function show(Expense $expense): RedirectResponse
+    {
+        return redirect()->route('expenses.edit', $expense);
+    }
+
     public function edit(Expense $expense): View
     {
         return view('expenses.edit', compact('expense'));
@@ -173,6 +181,4 @@ class ExpenseController extends Controller
 
         return $weekdayMap[Carbon::parse($date)->dayOfWeek] ?? 'lundi';
     }
-
 }
-

@@ -2,24 +2,27 @@
 
 namespace App\Http\Controllers;
 
-use Throwable;
-use Carbon\Carbon;
-use Illuminate\Validation\ValidationException;
-use App\Models\Expense;
-use App\Models\Revenue;
-use App\Models\Paroisse;
-use Illuminate\View\View;
-use App\Traits\LogsErrors;
 use App\Helpers\FlashAlert;
+use App\Helpers\ParoisseConfig;
+use App\Models\Expense;
+use App\Models\FinancialReport;
+use App\Models\Paroisse;
+use App\Models\Revenue;
+use App\Models\RevenueCategory;
+use App\Traits\LogsErrors;
+use Barryvdh\DomPDF\Facade\Pdf;
+use Carbon\Carbon;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
-use App\Helpers\ParoisseConfig;
-use App\Models\FinancialReport;
-use App\Models\RevenueCategory;
-use Barryvdh\DomPDF\Facade\Pdf;
-use Illuminate\Http\RedirectResponse;
 use Illuminate\Routing\Controllers\HasMiddleware;
 use Illuminate\Routing\Controllers\Middleware;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
+use Illuminate\View\View;
+use Throwable;
 
 class FinancialReportController extends Controller implements HasMiddleware
 {
@@ -96,7 +99,7 @@ class FinancialReportController extends Controller implements HasMiddleware
             ]);
 
             if (! $user->hasRole('super_admin') && (int) $validated['paroisse_id'] !== (int) $user->paroisse_id) {
-                \Illuminate\Support\Facades\Log::channel('paroisse')->warning('Rapport financier refusé : paroisse non autorisée', [
+                Log::channel('paroisse')->warning('Rapport financier refusé : paroisse non autorisée', [
                     'user_id' => $user->id,
                     'user_paroisse_id' => $user->paroisse_id,
                     'request_paroisse_id' => $validated['paroisse_id'],
@@ -164,11 +167,12 @@ class FinancialReportController extends Controller implements HasMiddleware
 
         $totalDepenses = $expenses->sum('montant');
 
-        // Détails par catégories de dépenses
+        // Détails par catégories de dépenses (alimentation_popote = dépenses popote / subvention)
         $detailsDepenses = [
             'charge_fixe' => $expenses->where('categorie_charge', 'charge_fixe')->sum('montant'),
             'charge_variable' => $expenses->where('categorie_charge', 'charge_variable')->sum('montant'),
             'charge_exceptionnelle' => $expenses->where('categorie_charge', 'charge_exceptionnelle')->sum('montant'),
+            'alimentation_popote' => $expenses->where('categorie_charge', 'alimentation_popote')->sum('montant'),
         ];
 
         // Détails des recettes popote/subvention par type
@@ -422,7 +426,7 @@ class FinancialReportController extends Controller implements HasMiddleware
                     'selectedCategoryId' => $categoryId,
                 ])->setPaper('a4', 'landscape');
 
-                $filename = 'rapport-recettes-par-categorie-' . \Illuminate\Support\Str::slug($paroisse->nom) . '-' . $dateDebut->format('Y-m-d') . '-' . $dateFin->format('Y-m-d') . '.pdf';
+                $filename = 'rapport-recettes-par-categorie-'.Str::slug($paroisse->nom).'-'.$dateDebut->format('Y-m-d').'-'.$dateFin->format('Y-m-d').'.pdf';
 
                 return $pdf->download($filename);
             }
@@ -592,7 +596,7 @@ class FinancialReportController extends Controller implements HasMiddleware
             ]);
 
             if (! $user->hasRole('super_admin') && (int) $validated['paroisse_id'] !== (int) $user->paroisse_id) {
-                \Illuminate\Support\Facades\Log::channel('paroisse')->warning('Rapport revenus (Quête ordinaire) refusé : paroisse non autorisée', [
+                Log::channel('paroisse')->warning('Rapport revenus (Quête ordinaire) refusé : paroisse non autorisée', [
                     'user_id' => $user->id,
                     'user_paroisse_id' => $user->paroisse_id,
                     'request_paroisse_id' => $validated['paroisse_id'],
@@ -644,7 +648,6 @@ class FinancialReportController extends Controller implements HasMiddleware
      */
     public function calculateRevenuesWeeklyReport(int $paroisseId, Carbon $dateDebut, Carbon $dateFin): array
     {
-        // Récupérer toutes les recettes de quête ordinaire pour la période (catégorie de la paroisse)
         $queteCategory = RevenueCategory::where('paroisse_id', $paroisseId)->where('code', 'quete_ordinaire')->first();
 
         $revenues = Revenue::query()
@@ -657,28 +660,38 @@ class FinancialReportController extends Controller implements HasMiddleware
             })
             ->get();
 
-        // Séparer par période
-        $revenuesSemaine = $revenues->filter(function ($revenue) {
-            return $revenue->periode_messe === 'semaine' ||
-                   ($revenue->jour_semaine && in_array($revenue->jour_semaine, ['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi']));
+        $split = $this->splitRevenuesSemaineDimanche($revenues);
+
+        return array_merge($split, [
+            'revenues_all' => $revenues,
+        ]);
+    }
+
+    /**
+     * Découpe des recettes : lundi–samedi vs dimanche (période messe ou jour de la semaine).
+     *
+     * @return array<string, mixed>
+     */
+    private function splitRevenuesSemaineDimanche(Collection $revenues): array
+    {
+        $revenuesSemaine = $revenues->filter(function (Revenue $revenue): bool {
+            return $revenue->periode_messe === 'semaine'
+                || ($revenue->jour_semaine && in_array($revenue->jour_semaine, ['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'], true));
         });
 
-        $revenuesDimanche = $revenues->filter(function ($revenue) {
-            return $revenue->periode_messe === 'dimanche' ||
-                   $revenue->jour_semaine === 'dimanche';
+        $revenuesDimanche = $revenues->filter(function (Revenue $revenue): bool {
+            return $revenue->periode_messe === 'dimanche'
+                || $revenue->jour_semaine === 'dimanche';
         });
 
         $totalSemaine = $revenuesSemaine->sum('montant');
         $totalDimanche = $revenuesDimanche->sum('montant');
         $totalGeneral = $totalSemaine + $totalDimanche;
 
-        // Détails par jour de la semaine
         $detailsSemaine = [];
         $jours = ['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'];
         foreach ($jours as $jour) {
-            $revenusJour = $revenuesSemaine->filter(function ($r) use ($jour) {
-                return $r->jour_semaine === $jour;
-            });
+            $revenusJour = $revenuesSemaine->filter(fn (Revenue $r): bool => $r->jour_semaine === $jour);
             $detailsSemaine[$jour] = [
                 'montant' => $revenusJour->sum('montant'),
                 'count' => $revenusJour->count(),
@@ -700,7 +713,6 @@ class FinancialReportController extends Controller implements HasMiddleware
             'details_dimanche' => $detailsDimanche,
             'revenues_semaine' => $revenuesSemaine,
             'revenues_dimanche' => $revenuesDimanche,
-            'revenues_all' => $revenues,
         ];
     }
 
@@ -850,7 +862,7 @@ class FinancialReportController extends Controller implements HasMiddleware
             $periodLabel = $validated['period_type'] === 'year'
                 ? $dateDebut->format('Y')
                 : $dateDebut->format('Y-m');
-            $filename = 'rapport-popote-'.\Illuminate\Support\Str::slug($paroisse->nom).'-'.$periodLabel.'.pdf';
+            $filename = 'rapport-popote-'.Str::slug($paroisse->nom).'-'.$periodLabel.'.pdf';
 
             return $pdf->download($filename);
         } catch (Throwable $e) {
@@ -1091,16 +1103,24 @@ class FinancialReportController extends Controller implements HasMiddleware
             $paroisse = Paroisse::find($validated['paroisse_id']);
             $headerConfig = $this->getHeaderConfig($validated['paroisse_id']);
 
+            $selectedCategoryId = isset($validated['revenue_category_id'])
+                ? (int) $validated['revenue_category_id']
+                : null;
+            $pdfCategoryNom = $selectedCategoryId
+                ? RevenueCategory::query()->whereKey($selectedCategoryId)->value('nom')
+                : null;
+
             $pdf = Pdf::loadView('financial-reports.revenues-by-category-pdf', [
                 'report' => $report,
                 'paroisse' => $paroisse,
                 'headerConfig' => $headerConfig,
                 'dateDebut' => $dateDebut,
                 'dateFin' => $dateFin,
-                'selectedCategoryId' => $validated['revenue_category_id'] ?? null,
-            ])->setPaper('a4', 'landscape');
+                'selectedCategoryId' => $selectedCategoryId,
+                'pdfCategoryNom' => $pdfCategoryNom,
+            ])->setPaper('a4', 'portrait');
 
-            $filename = 'rapport-recettes-par-categorie-' . \Illuminate\Support\Str::slug($paroisse->nom) . '-' . $dateDebut->format('Y-m-d') . '-' . $dateFin->format('Y-m-d') . '.pdf';
+            $filename = 'rapport-recettes-par-categorie-'.Str::slug($paroisse->nom).'-'.$dateDebut->format('Y-m-d').'-'.$dateFin->format('Y-m-d').'.pdf';
 
             return $pdf->download($filename);
         } catch (Throwable $e) {
@@ -1139,6 +1159,8 @@ class FinancialReportController extends Controller implements HasMiddleware
         }
 
         $totalGeneral = $revenues->sum('montant');
+        $weekly = $this->splitRevenuesSemaineDimanche($revenues);
+        $weekly['revenues_all'] = $revenues;
 
         return [
             'revenues' => $revenues,
@@ -1146,6 +1168,7 @@ class FinancialReportController extends Controller implements HasMiddleware
             'total_general' => $totalGeneral,
             'date_debut' => $dateDebut,
             'date_fin' => $dateFin,
+            'weekly' => $weekly,
         ];
     }
 

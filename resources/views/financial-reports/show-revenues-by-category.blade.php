@@ -157,10 +157,30 @@
 @push('styles')
 <style>
 @media print {
-    body * { visibility: hidden; }
-    #report-content, #report-content * { visibility: visible; }
-    #report-content { position: absolute; left: 0; top: 0; width: 100%; }
-    .card-header .btn, .card-header a.btn { display: none !important; }
+    @page { margin: 1.5cm; }
+    body { background: #fff !important; }
+    #navHeader,
+    #mainHeader,
+    aside.sidebar,
+    #preloader,
+    .footer.theme-footer-bar,
+    #flashAlertModal,
+    #mainContent > header {
+        display: none !important;
+    }
+    .ged-flash { display: none !important; }
+    .main-content,
+    #main-wrapper.menu-toggle .main-content {
+        margin-left: 0 !important;
+        margin-top: 0 !important;
+    }
+    #mainContent main { padding-top: 0 !important; padding-bottom: 0 !important; }
+    .card > .card-header { display: none !important; }
+    #report-content {
+        position: static !important;
+        width: 100% !important;
+    }
+    .card { border: none !important; box-shadow: none !important; }
 }
 </style>
 @endpush

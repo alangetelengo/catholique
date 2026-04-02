@@ -1,166 +1,151 @@
 @extends('layouts.app')
 
-@section('title', 'Statistiques financières')
+@section('title', 'Statistiques financières — Catholique')
 @section('page-title', 'Statistiques financières')
+@section('page-title-info', 'Vue annuelle : recettes, dépenses popote (déduites du solde) et autres charges (information hiérarchie), avec détail par mois.')
+
+@section('btn-create')
+    <div class="flex flex-wrap items-center gap-2">
+        <a href="{{ route('financial-reports.list') }}" class="adventiste-btn-secondary text-sm">Rapports enregistrés</a>
+        <a href="{{ route('financial-reports.index') }}" class="adventiste-btn-primary text-sm">Générer un rapport</a>
+    </div>
+@endsection
 
 @section('content')
-@php
-    $currency = \App\Helpers\ParoisseConfig::get(null, 'monnaie', 'FCFA');
-    $fmt = fn($n) => \App\Helpers\ParoisseConfig::formatMontant($n);
-@endphp
-<div class="row">
-    <div class="col-12">
-        <div class="card">
-            <div class="card-header d-flex flex-wrap align-items-center justify-content-between gap-3">
-                <h4 class="card-title mb-0">
-                    <i class="fas fa-calculator me-2"></i>
-                    Vue d'ensemble annuelle
-                </h4>
-                <div class="card-action d-flex align-items-center gap-2 flex-wrap">
-                    <a href="{{ route('financial-reports.index') }}" class="btn btn-secondary">
-                        Générer un rapport
-                    </a>
-                    <a href="{{ route('financial-reports.list') }}" class="btn btn-outline-secondary">
-                        Rapports enregistrés
-                    </a>
+    @php
+        $fmt = static fn ($n) => \App\Helpers\ParoisseConfig::formatMontant($n);
+    @endphp
+
+    <div class="adventiste-card-pro-static p-4 sm:p-5 mb-6">
+        <h2 class="text-base font-semibold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
+            <i class="fas fa-sliders-h text-emerald-600 dark:text-emerald-400" aria-hidden="true"></i>
+            Période analysée
+        </h2>
+        <form method="GET" action="{{ route('financial-reports.statistics') }}" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
+            @if (auth()->user()->hasRole('super_admin') && $paroisses->count() > 0)
+                <div class="md:col-span-2 lg:col-span-1">
+                    <label for="stat_paroisse" class="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-300">Paroisse <span class="text-red-500">*</span></label>
+                    <select id="stat_paroisse" name="paroisse_id" class="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2.5 text-sm" required>
+                        <option value="">Sélectionner…</option>
+                        @foreach ($paroisses as $paroisse)
+                            <option value="{{ $paroisse->id }}" @selected($selectedParoisseId == $paroisse->id)>{{ $paroisse->nom }}</option>
+                        @endforeach
+                    </select>
                 </div>
+            @else
+                <input type="hidden" name="paroisse_id" value="{{ auth()->user()->paroisse_id }}">
+            @endif
+            <div>
+                <label for="stat_year" class="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-300">Année <span class="text-red-500">*</span></label>
+                <select id="stat_year" name="year" class="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2.5 text-sm" required>
+                    @for ($y = now()->year; $y >= now()->year - 10; $y--)
+                        <option value="{{ $y }}" @selected($selectedYear == $y)>{{ $y }}</option>
+                    @endfor
+                </select>
             </div>
-            <div class="card-body">
-                <form method="GET" action="{{ route('financial-reports.statistics') }}" class="mb-4">
-                    <div class="row g-3 align-items-end">
-                        @if(auth()->user()->hasRole('super_admin') && $paroisses->count() > 0)
-                            <div class="col-md-6">
-                                <label class="form-label">Paroisse <span class="text-danger">*</span></label>
-                                <select name="paroisse_id" class="form-control" required>
-                                    <option value="">Sélectionner...</option>
-                                    @foreach($paroisses as $paroisse)
-                                        <option value="{{ $paroisse->id }}" @selected($selectedParoisseId == $paroisse->id)>
-                                            {{ $paroisse->nom }}
-                                        </option>
-                                    @endforeach
-                                </select>
-                            </div>
-                        @else
-                            <input type="hidden" name="paroisse_id" value="{{ auth()->user()->paroisse_id }}">
-                        @endif
+            <div>
+                <button type="submit" class="adventiste-btn-primary w-full md:w-auto">Actualiser</button>
+            </div>
+        </form>
+    </div>
 
-                        <div class="col-md-4">
-                            <label class="form-label">Année <span class="text-danger">*</span></label>
-                            <select name="year" class="form-control" required>
-                                @for($y = now()->year; $y >= now()->year - 10; $y--)
-                                    <option value="{{ $y }}" @selected($selectedYear == $y)>{{ $y }}</option>
-                                @endfor
-                            </select>
-                        </div>
+    @if ($stats)
+        <div class="rounded-xl border border-sky-200/90 dark:border-sky-800/50 bg-sky-50/90 dark:bg-sky-950/25 px-4 py-3 mb-6 text-sm text-sky-950 dark:text-sky-100 leading-relaxed">
+            <p class="m-0 flex gap-2">
+                <i class="fas fa-info-circle mt-0.5 shrink-0 text-sky-600 dark:text-sky-400" aria-hidden="true"></i>
+                <span>
+                    <strong class="font-semibold">Règle comptable :</strong>
+                    seules les dépenses <strong>Popote / Alimentation</strong> (subvention) sont déduites des recettes pour le solde.
+                    Les charges fixes, variables et exceptionnelles sont suivies pour <strong>informer la hiérarchie</strong> ; elles ne sont pas déduites des revenus.
+                </span>
+            </p>
+        </div>
 
-                        <div class="col-md-2">
-                            <button type="submit" class="btn btn-primary w-100">Actualiser</button>
-                        </div>
-                    </div>
-                </form>
-
-                @if($stats)
-                    <div class="alert alert-info mb-4">
-                        <i class="fas fa-info-circle me-2"></i>
-                        <strong>Règle comptable :</strong> Seules les dépenses <strong>Popote / Alimentation</strong> (subvention) sont déduites des recettes pour le solde.
-                        Les charges fixes, variables et exceptionnelles sont enregistrées pour <strong>informer la hiérarchie</strong> ; elles ne sont pas déduites d'aucun revenu.
-                    </div>
-                    <div class="row mb-4 g-3">
-                        <div class="col-md-4">
-                            <div class="card bg-success text-white h-100">
-                                <div class="card-body text-center">
-                                    <h5>Total Recettes {{ $selectedYear }}</h5>
-                                    <h3>{{ $fmt($stats['total_recettes']) }}</h3>
-                                    <small>Toutes catégories</small>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-md-4">
-                            <div class="card bg-danger text-white h-100">
-                                <div class="card-body text-center">
-                                    <h5>Dépenses Popote / Alimentation</h5>
-                                    <h3>{{ $fmt($stats['depenses_popote']) }}</h3>
-                                    <small>Déduites des recettes</small>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-md-4">
-                            <div class="card {{ $stats['solde'] >= 0 ? 'bg-info' : 'bg-warning' }} text-white h-100">
-                                <div class="card-body text-center">
-                                    <h5>Solde {{ $selectedYear }}</h5>
-                                    <h3>{{ $fmt($stats['solde']) }}</h3>
-                                    <small>{{ $stats['solde'] >= 0 ? 'Excédent' : 'Déficit' }} (Recettes − Popote)</small>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-12">
-                            <div class="card bg-light">
-                                <div class="card-body d-flex align-items-center gap-2">
-                                    <i class="fas fa-file-alt text-secondary"></i>
-                                    <span><strong>Autres dépenses</strong> (charges fixes, variables, exceptionnelles) :</span>
-                                    <strong>{{ $fmt($stats['depenses_autres']) }}</strong>
-                                    <small class="text-muted">— Pour rapports hiérarchie (non déduites des recettes)</small>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="card">
-                        <div class="card-header">
-                            <h5>Répartition par mois</h5>
-                            <small class="text-muted">Solde = Recettes − Dépenses Popote/Alimentation</small>
-                        </div>
-                        <div class="card-body">
-                            <div class="table-responsive">
-                                <table class="table table-striped table-bordered table-hover">
-                                    <thead>
-                                        <tr>
-                                            <th>Mois</th>
-                                            <th class="text-end">Recettes</th>
-                                            <th class="text-end">Dép. Popote</th>
-                                            <th class="text-end">Autres dép.</th>
-                                            <th class="text-end">Solde</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        @foreach($byMonth ?? [] as $m => $row)
-                                            <tr>
-                                                <td>{{ $row['nom'] }}</td>
-                                                <td class="text-end">{{ $fmt($row['recettes']) }}</td>
-                                                <td class="text-end">{{ $fmt($row['depenses_popote']) }}</td>
-                                                <td class="text-end text-muted">{{ $fmt($row['depenses_autres']) }}</td>
-                                                <td class="text-end {{ $row['solde'] >= 0 ? 'text-success' : 'text-danger' }}">
-                                                    {{ $fmt($row['solde']) }}
-                                                </td>
-                                            </tr>
-                                        @endforeach
-                                    </tbody>
-                                    @if(!empty($byMonth))
-                                        <tfoot class="fw-bold">
-                                            <tr>
-                                                <td>Total {{ $selectedYear }}</td>
-                                                <td class="text-end">{{ $fmt($stats['total_recettes']) }}</td>
-                                                <td class="text-end">{{ $fmt($stats['depenses_popote']) }}</td>
-                                                <td class="text-end text-muted">{{ $fmt($stats['depenses_autres']) }}</td>
-                                                <td class="text-end {{ $stats['solde'] >= 0 ? 'text-success' : 'text-danger' }}">
-                                                    {{ $fmt($stats['solde']) }}
-                                                </td>
-                                            </tr>
-                                        </tfoot>
-                                    @endif
-                                </table>
-                            </div>
-                        </div>
-                    </div>
-                @else
-                    <div class="text-center py-5">
-                        <i class="fas fa-calculator" style="font-size:64px;color:#ccc;margin-bottom:20px;"></i>
-                        <h5 class="text-muted">Sélectionnez une paroisse et une année</h5>
-                        <p class="text-muted">Les statistiques afficheront le total des recettes, des dépenses et le solde sur l'année, avec la répartition par mois.</p>
-                    </div>
-                @endif
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+            <div class="adventiste-card-pro-static p-4 border-t-4 border-t-emerald-500">
+                <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Total recettes {{ $selectedYear }}</p>
+                <p class="mt-1 text-xl font-bold text-emerald-700 dark:text-emerald-400">{{ $fmt($stats['total_recettes']) }}</p>
+                <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">Toutes catégories</p>
+            </div>
+            <div class="adventiste-card-pro-static p-4 border-t-4 border-t-rose-500">
+                <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Dépenses popote / alimentation</p>
+                <p class="mt-1 text-xl font-bold text-rose-700 dark:text-rose-400">{{ $fmt($stats['depenses_popote']) }}</p>
+                <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">Déduites des recettes</p>
+            </div>
+            <div class="adventiste-card-pro-static p-4 border-t-4 {{ $stats['solde'] >= 0 ? 'border-t-sky-500' : 'border-t-amber-500' }}">
+                <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Solde {{ $selectedYear }}</p>
+                <p class="mt-1 text-xl font-bold {{ $stats['solde'] >= 0 ? 'text-sky-700 dark:text-sky-300' : 'text-amber-700 dark:text-amber-400' }}">{{ $fmt($stats['solde']) }}</p>
+                <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">{{ $stats['solde'] >= 0 ? 'Excédent' : 'Déficit' }} (recettes − popote)</p>
             </div>
         </div>
-    </div>
-</div>
+
+        <div class="adventiste-card-pro-static p-4 mb-6 flex flex-wrap items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
+            <i class="fas fa-file-alt text-slate-400" aria-hidden="true"></i>
+            <span><strong class="font-semibold text-slate-900 dark:text-white">Autres dépenses</strong> (fixes, variables, exceptionnelles) :</span>
+            <span class="font-bold text-slate-900 dark:text-white">{{ $fmt($stats['depenses_autres']) }}</span>
+            <span class="text-xs text-slate-500 dark:text-slate-400">— Rapports hiérarchie (non déduites des recettes)</span>
+        </div>
+
+        <div class="adventiste-card-pro-static overflow-hidden">
+            <div class="px-4 py-3 border-b border-slate-200/80 dark:border-slate-600/80 bg-slate-50/80 dark:bg-slate-800/50">
+                <h3 class="text-sm font-semibold text-slate-900 dark:text-white m-0">Répartition par mois</h3>
+                <p class="text-xs text-slate-500 dark:text-slate-400 m-0 mt-1">Solde = recettes − dépenses popote / alimentation</p>
+            </div>
+            <div class="adventiste-table-shell border-0 rounded-none shadow-none">
+                <div class="overflow-x-auto">
+                    <table class="min-w-full text-sm">
+                        <thead>
+                            <tr class="text-left text-slate-700 dark:text-slate-200">
+                                <th class="px-4 py-3 font-semibold">Mois</th>
+                                <th class="px-4 py-3 font-semibold text-right">Recettes</th>
+                                <th class="px-4 py-3 font-semibold text-right">Dép. popote</th>
+                                <th class="px-4 py-3 font-semibold text-right">Autres dép.</th>
+                                <th class="px-4 py-3 font-semibold text-right">Solde</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-200/70 dark:divide-slate-700/70">
+                            @foreach ($byMonth ?? [] as $m => $row)
+                                <tr class="text-slate-700 dark:text-slate-200">
+                                    <td class="px-4 py-3 font-medium">{{ $row['nom'] }}</td>
+                                    <td class="px-4 py-3 text-right">{{ $fmt($row['recettes']) }}</td>
+                                    <td class="px-4 py-3 text-right">{{ $fmt($row['depenses_popote']) }}</td>
+                                    <td class="px-4 py-3 text-right text-slate-500 dark:text-slate-400">{{ $fmt($row['depenses_autres']) }}</td>
+                                    <td class="px-4 py-3 text-right font-semibold {{ $row['solde'] >= 0 ? 'text-sky-700 dark:text-sky-300' : 'text-amber-700 dark:text-amber-400' }}">
+                                        {{ $fmt($row['solde']) }}
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                        @if (! empty($byMonth))
+                            <tfoot>
+                                <tr class="bg-slate-100/90 dark:bg-slate-800/80 font-bold text-slate-900 dark:text-white">
+                                    <td class="px-4 py-3">Total {{ $selectedYear }}</td>
+                                    <td class="px-4 py-3 text-right">{{ $fmt($stats['total_recettes']) }}</td>
+                                    <td class="px-4 py-3 text-right">{{ $fmt($stats['depenses_popote']) }}</td>
+                                    <td class="px-4 py-3 text-right text-slate-600 dark:text-slate-300">{{ $fmt($stats['depenses_autres']) }}</td>
+                                    <td class="px-4 py-3 text-right {{ $stats['solde'] >= 0 ? 'text-sky-700 dark:text-sky-300' : 'text-amber-700 dark:text-amber-400' }}">
+                                        {{ $fmt($stats['solde']) }}
+                                    </td>
+                                </tr>
+                            </tfoot>
+                        @endif
+                    </table>
+                </div>
+            </div>
+        </div>
+    @else
+        <div class="adventiste-card-pro-static p-12 text-center">
+            <div class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-100 dark:bg-slate-800 text-slate-400">
+                <i class="fas fa-chart-line text-2xl" aria-hidden="true"></i>
+            </div>
+            <h3 class="text-lg font-semibold text-slate-800 dark:text-slate-100">Sélectionnez une paroisse et une année</h3>
+            <p class="mt-2 text-sm text-slate-600 dark:text-slate-400 max-w-lg mx-auto">
+                @if (auth()->user()->hasRole('super_admin'))
+                    Choisissez une paroisse dans la liste, une année, puis cliquez sur « Actualiser » pour afficher les totaux et le détail mensuel.
+                @else
+                    Choisissez une année et cliquez sur « Actualiser » pour afficher les statistiques de votre paroisse.
+                @endif
+            </p>
+        </div>
+    @endif
 @endsection

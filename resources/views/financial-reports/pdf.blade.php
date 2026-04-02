@@ -358,6 +358,10 @@
                             <td>Charges exceptionnelles</td>
                             <td class="text-right">{{ \App\Helpers\ParoisseConfig::formatMontant($report['details_depenses']['charge_exceptionnelle']) }}</td>
                         </tr>
+                        <tr>
+                            <td>Alimentation popote</td>
+                            <td class="text-right">{{ \App\Helpers\ParoisseConfig::formatMontant($report['details_depenses']['alimentation_popote'] ?? 0) }}</td>
+                        </tr>
                         <tr class="total-row">
                             <td>TOTAL</td>
                             <td class="text-right">{{ \App\Helpers\ParoisseConfig::formatMontant($report['total_depenses']) }}</td>
@@ -422,6 +426,7 @@
                                         'charge_fixe' => 'Charge fixe',
                                         'charge_variable' => 'Charge variable',
                                         'charge_exceptionnelle' => 'Charge exceptionnelle',
+                                        'alimentation_popote' => 'Alimentation popote',
                                     ];
                                 @endphp
                                 {{ $cats[$expense->categorie_charge] ?? $expense->categorie_charge }}
@@ -439,6 +444,7 @@
                                         'jardinage' => 'Jardinage',
                                         'salaire_ouvrier' => 'Salaire ouvrier',
                                         'autre' => 'Autre',
+                                        'alimentation' => 'Alimentation',
                                     ];
                                 @endphp
                                 {{ $types[$expense->type_charge] ?? $expense->type_charge }}
