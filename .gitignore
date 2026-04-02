@@ -28,3 +28,8 @@ Thumbs.db
 
 # Cursor (optionnel)
 .cursor/
+
+# Hébergement mutualisé (LWS / Apache)
+/error_log
+error_log
+.env---
