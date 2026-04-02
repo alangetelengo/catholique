@@ -19,7 +19,7 @@
         .muted { color: #64748b; margin-bottom: 18px; font-size: .95rem; }
         .group { margin-bottom: 14px; }
         label { display: block; margin-bottom: 6px; font-size: .85rem; font-weight: 700; color: #334155; }
-        input[type="email"], input[type="password"] { width: 100%; border: 1px solid #cbd5e1; border-radius: 10px; padding: 12px; font-size: .95rem; }
+        input[type="text"], input[type="email"], input[type="password"] { width: 100%; border: 1px solid #cbd5e1; border-radius: 10px; padding: 12px; font-size: .95rem; }
         input:focus { outline: none; border-color: #00a86b; box-shadow: 0 0 0 3px rgba(0,168,107,.15); }
         .remember { display: flex; align-items: center; gap: 8px; margin: 8px 0 16px; color: #475569; font-size: .9rem; }
         .btn { width: 100%; border: 0; border-radius: 10px; padding: 12px; background: linear-gradient(135deg, #00b464, #009d58); color: #fff; font-weight: 700; cursor: pointer; }
@@ -48,8 +48,8 @@
             <form method="POST" action="{{ route('login') }}" data-loading-text="Connexion...">
                 @csrf
                 <div class="group">
-                    <label for="email">Adresse email</label>
-                    <input id="email" type="email" name="email" value="{{ old('email') }}" required autofocus autocomplete="username">
+                    <label for="login">E-mail ou nom d&rsquo;utilisateur</label>
+                    <input id="login" type="text" name="login" value="{{ old('login') }}" required autofocus autocomplete="username" placeholder="ex. nom@domaine.com ou mon.identifiant">
                 </div>
                 <div class="group">
                     <label for="password">Mot de passe</label>
