@@ -44,6 +44,8 @@ Route::middleware('auth')->group(function (): void {
     Route::resource('paroisses', ParoisseController::class)
         ->except(['show'])
         ->parameters(['paroisses' => 'paroisse']);
+    Route::resource('events', EventController::class);
+    Route::resource('groups', GroupController::class);
     Route::resource('revenues', RevenueController::class)->except(['show']);
     Route::resource('expenses', ExpenseController::class)->except(['show']);
     Route::resource('inventories', InventoryController::class)->except(['show']);
@@ -86,7 +88,8 @@ Route::middleware('auth')->group(function (): void {
     Route::get('financial-reports/{financialReport}', [FinancialReportController::class, 'show'])->name('financial-reports.show');
     Route::post('financial-reports', [FinancialReportController::class, 'store'])->name('financial-reports.store');
 
-
+    Route::post('configurations/update-bulk', [ConfigurationController::class, 'updateBulk'])->name('configurations.update-bulk');
+    Route::resource('configurations', ConfigurationController::class)->except(['show']);
 
     Route::resource('roles', RoleController::class)->except(['show']);
     Route::resource('permissions', PermissionController::class)->except(['show']);
