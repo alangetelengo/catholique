@@ -34,6 +34,10 @@ Route::get('/connexion', fn () => redirect()->route('login'))->name('connexion')
 Route::middleware('auth')->group(function (): void {
     Route::get('/', [DashboardController::class, 'index'])->name('home');
 
+    Route::get('profile', [ProfileController::class, 'edit'])->name('profile.edit');
+    Route::put('profile', [ProfileController::class, 'update'])->name('profile.update');
+    Route::put('profile/password', [ProfileController::class, 'updatePassword'])->name('profile.password');
+
     Route::resource('users', UserController::class)->except(['show']);
     Route::resource('members', MemberController::class);
     Route::resource('sacraments', SacramentController::class);
