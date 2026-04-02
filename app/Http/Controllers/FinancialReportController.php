@@ -454,7 +454,7 @@ class FinancialReportController extends Controller implements HasMiddleware
     /**
      * Récupère la configuration de l'en-tête pour le PDF
      */
-    private function getHeaderConfig(?int $paroisseId): array
+    public function getHeaderConfig(?int $paroisseId): array
     {
         return [
             'logo_path' => ParoisseConfig::get($paroisseId, 'pdf_header_logo', null),
@@ -642,7 +642,7 @@ class FinancialReportController extends Controller implements HasMiddleware
     /**
      * Calcule un rapport des revenus hebdomadaire (semaine/dimanche/total)
      */
-    private function calculateRevenuesWeeklyReport(int $paroisseId, Carbon $dateDebut, Carbon $dateFin): array
+    public function calculateRevenuesWeeklyReport(int $paroisseId, Carbon $dateDebut, Carbon $dateFin): array
     {
         // Récupérer toutes les recettes de quête ordinaire pour la période (catégorie de la paroisse)
         $queteCategory = RevenueCategory::where('paroisse_id', $paroisseId)->where('code', 'quete_ordinaire')->first();

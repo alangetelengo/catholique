@@ -3,14 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Models\Paroisse;
-use App\Models\Revenue;
-use App\Models\RevenueCategory;
 use App\Traits\LogsErrors;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\View\View;
-use Throwable;
 
 class QueteOrdinaireReportController extends Controller
 {
@@ -45,17 +42,17 @@ class QueteOrdinaireReportController extends Controller
             $reportYear = (int) $dateDebut->year;
         }
 
-        $report = $this->calculate($selectedParoisseId, $dateDebut, $dateFin);
+        $financial = app(FinancialReportController::class);
+        $report = $financial->calculateRevenuesWeeklyReport($selectedParoisseId, $dateDebut, $dateFin);
+        $periodType = $periode === 'mois' ? 'month' : 'week';
 
         return view('financial-reports.revenues-weekly', [
             'paroisses' => $paroisses,
             'selectedParoisseId' => $selectedParoisseId,
-            'selectedPeriode' => $periode,
             'selectedWeekStart' => $weekStart,
-            'selectedReportMonth' => $reportMonth,
-            'selectedReportYear' => $reportYear,
-            'dateDebut' => $dateDebut,
-            'dateFin' => $dateFin,
+            'selectedMonth' => $reportMonth,
+            'selectedYear' => $reportYear,
+            'periodType' => $periodType,
             'report' => $report,
         ]);
     }
@@ -64,22 +61,40 @@ class QueteOrdinaireReportController extends Controller
     {
         $payload = $this->validatedPayload($request);
         [$dateDebut, $dateFin] = $this->datesFromPayload($payload);
-        $report = $this->calculate($payload['paroisse_id'], $dateDebut, $dateFin);
+        $financial = app(FinancialReportController::class);
+        $report = $financial->calculateRevenuesWeeklyReport($payload['paroisse_id'], $dateDebut, $dateFin);
         $paroisse = Paroisse::query()->find($payload['paroisse_id']);
+        $headerConfig = $financial->getHeaderConfig($payload['paroisse_id']);
+        $periodType = $payload['periode'] === 'mois' ? 'month' : 'week';
 
-        return view('financial-reports.revenues-weekly-print', compact('report', 'paroisse', 'dateDebut', 'dateFin'));
+        return view('financial-reports.revenues-weekly-print', [
+            'report' => $report,
+            'paroisse' => $paroisse,
+            'dateDebut' => $dateDebut,
+            'dateFin' => $dateFin,
+            'headerConfig' => $headerConfig,
+            'periodType' => $periodType,
+        ]);
     }
 
     public function exportPdf(Request $request): Response
     {
         $payload = $this->validatedPayload($request);
         [$dateDebut, $dateFin] = $this->datesFromPayload($payload);
-        $report = $this->calculate($payload['paroisse_id'], $dateDebut, $dateFin);
+        $financial = app(FinancialReportController::class);
+        $report = $financial->calculateRevenuesWeeklyReport($payload['paroisse_id'], $dateDebut, $dateFin);
         $paroisse = Paroisse::query()->find($payload['paroisse_id']);
+        $headerConfig = $financial->getHeaderConfig($payload['paroisse_id']);
+        $periodType = $payload['periode'] === 'mois' ? 'month' : 'week';
 
-        // On utilise le conteneur dompdf.wrapper pour éviter la dépendance directe à une Facade.
-        $pdf = app('dompdf.wrapper')->loadView('financial-reports.revenues-weekly-pdf', compact('report', 'paroisse', 'dateDebut', 'dateFin'))
-            ->setPaper('a4', 'landscape');
+        $pdf = app('dompdf.wrapper')->loadView('financial-reports.revenues-weekly-pdf', [
+            'report' => $report,
+            'paroisse' => $paroisse,
+            'headerConfig' => $headerConfig,
+            'dateDebut' => $dateDebut,
+            'dateFin' => $dateFin,
+            'periodType' => $periodType,
+        ])->setPaper('a4', 'landscape');
 
         $suffix = $payload['periode'] === 'mois'
             ? $dateDebut->format('Y-m')
@@ -131,59 +146,6 @@ class QueteOrdinaireReportController extends Controller
         }
 
         return array_merge($base, $extra);
-    }
-
-    private function calculate(int $paroisseId, Carbon $dateDebut, Carbon $dateFin): array
-    {
-        $queteCategory = RevenueCategory::query()
-            ->where('paroisse_id', $paroisseId)
-            ->where('code', 'quete_ordinaire')
-            ->first();
-
-        $revenues = Revenue::query()
-            ->with('type')
-            ->where('paroisse_id', $paroisseId)
-            ->where('statut', 'valide')
-            ->when($queteCategory, fn ($q) => $q->where('revenue_category_id', $queteCategory->id))
-            ->whereDate('date_recette', '>=', $dateDebut)
-            ->whereDate('date_recette', '<=', $dateFin)
-            ->orderBy('date_recette')
-            ->orderBy('id')
-            ->get();
-
-        $revenuesSemaine = $revenues->filter(fn ($r) => $r->jour_semaine !== 'dimanche');
-        $revenuesDimanche = $revenues->filter(fn ($r) => $r->jour_semaine === 'dimanche');
-
-        $totalSemaine = (float) $revenuesSemaine->sum('montant');
-        $totalDimanche = (float) $revenuesDimanche->sum('montant');
-        $totalGeneral = $totalSemaine + $totalDimanche;
-
-        $jours = ['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'];
-        $short = ['lundi' => 'Lun', 'mardi' => 'Mar', 'mercredi' => 'Mer', 'jeudi' => 'Jeu', 'vendredi' => 'Ven', 'samedi' => 'Sam', 'dimanche' => 'Dim'];
-
-        $detailsSemaine = [];
-        foreach ($jours as $jour) {
-            $items = $revenuesSemaine->where('jour_semaine', $jour);
-            $detailsSemaine[] = [
-                'jour' => $short[$jour],
-                'montant' => (float) $items->sum('montant'),
-                'nb' => $items->count(),
-            ];
-        }
-
-        $detailsDimanche = [
-            ['jour' => 'Dimanche', 'montant' => $totalDimanche, 'nb' => $revenuesDimanche->count()],
-        ];
-
-        return [
-            'total_semaine' => $totalSemaine,
-            'total_dimanche' => $totalDimanche,
-            'total_general' => $totalGeneral,
-            'details_semaine' => $detailsSemaine,
-            'details_dimanche' => $detailsDimanche,
-            'revenues_all' => $revenues,
-            'jours_short' => $short,
-        ];
     }
 }
 
