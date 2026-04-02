@@ -45,7 +45,7 @@ Route::middleware('auth')->group(function (): void {
         ->except(['show'])
         ->parameters(['paroisses' => 'paroisse']);
     Route::resource('events', EventController::class);
-    Route::resource('groups', GroupController::class);
+    Route::resource('groups', GroupController::class)->except(['show']);
     Route::resource('revenues', RevenueController::class)->except(['show']);
     Route::resource('expenses', ExpenseController::class)->except(['show']);
     Route::resource('inventories', InventoryController::class)->except(['show']);

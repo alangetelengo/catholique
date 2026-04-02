@@ -9,6 +9,7 @@ use App\Models\Paroisse;
 use App\Traits\LogsErrors;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Routing\Controllers\HasMiddleware;
 use Illuminate\Routing\Controllers\Middleware;
 use Illuminate\View\View;
@@ -74,8 +75,14 @@ class GroupController extends Controller implements HasMiddleware
             $this->logError($e, 'Erreur lors du chargement de la liste des groupes');
             FlashAlert::error('Une erreur est survenue lors du chargement de la liste des groupes.');
 
+            $emptyPage = (int) $request->input('page', 1);
+            $groups = new LengthAwarePaginator([], 0, 15, max(1, $emptyPage), [
+                'path' => $request->url(),
+                'query' => $request->query(),
+            ]);
+
             return view('groups.index', [
-                'groups' => collect(),
+                'groups' => $groups,
                 'paroisses' => collect(),
             ]);
         }
