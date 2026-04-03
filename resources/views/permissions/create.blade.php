@@ -4,10 +4,8 @@
 @section('page-title', 'Créer une permission')
 @section('page-title-info', 'Une permission Spatie contrôle une action précise (ex. voir les membres, modifier les recettes).')
 
-@section('btn-create')
-    <a href="{{ route('application-configuration.index', ['tab' => 'permissions']) }}" class="adventiste-btn-secondary text-sm no-underline">
-        <i class="fas fa-arrow-left me-1.5" aria-hidden="true"></i> Retour
-    </a>
+@section('header-back')
+    <x-back-link :href="route('application-configuration.index', ['tab' => 'permissions'])" />
 @endsection
 
 @section('content')

@@ -3,6 +3,11 @@
 @section('title', 'Modifier rapport Subvention Popote - Catholique')
 @section('page-title', 'Modifier rapport Subvention Popote')
 @section('page-title-info', 'Mettre à jour la période du rapport puis régénérer.')
+
+@section('header-back')
+    <x-back-link :href="route('popote-reports.index')" />
+@endsection
+
 @section('content-container-class', 'w-full max-w-none px-4 sm:px-6 lg:px-8')
 
 @section('content')

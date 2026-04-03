@@ -4,6 +4,10 @@
 @section('page-title', 'Ajouter un article alimentaire')
 @section('page-title-info', 'Enregistrement d’un produit dans l’inventaire magasin (quantité, unité, péremption, alerte stock).')
 
+@section('header-back')
+    <x-back-link :href="route('inventaire-magasin.index')" />
+@endsection
+
 @section('content')
     <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div class="lg:col-span-2">

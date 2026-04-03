@@ -3,6 +3,10 @@
 @section('title', 'Événements')
 @section('page-title', 'Détail de l\'événement')
 
+@section('header-back')
+    <x-back-link :href="route('events.index')" />
+@endsection
+
 @section('content')
 @php
     $subtitleParts = [];
@@ -122,8 +126,5 @@
         <div class="px-6 py-4 text-sm text-slate-800 dark:text-slate-100 whitespace-pre-wrap">{{ $event->description ?? '—' }}</div>
     </div>
 
-    <div class="lg:col-span-2 flex justify-end">
-        <a href="{{ route('events.index') }}" class="adventiste-btn-secondary no-underline">Retour</a>
-    </div>
 </div>
 @endsection

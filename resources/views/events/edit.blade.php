@@ -3,6 +3,10 @@
 @section('title', 'Événements')
 @section('page-title', 'Modifier un événement')
 
+@section('header-back')
+    <x-back-link :href="route('events.index')" />
+@endsection
+
 @section('content')
 <div class="rounded-2xl border border-slate-200/80 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-sm overflow-hidden">
     <div class="px-6 py-4 border-b border-slate-200/80 dark:border-slate-600/60 bg-slate-50/80 dark:bg-slate-900/40">

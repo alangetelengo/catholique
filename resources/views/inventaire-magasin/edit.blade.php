@@ -4,6 +4,10 @@
 @section('page-title', 'Modifier l\'article alimentaire')
 @section('page-title-info', 'Mise à jour du stock, des dates et des informations du produit.')
 
+@section('header-back')
+    <x-back-link :href="route('inventaire-magasin.index')" />
+@endsection
+
 @section('content')
     <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div class="lg:col-span-2">

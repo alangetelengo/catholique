@@ -3,6 +3,11 @@
 @section('title', 'Modifier inventaire - Catholique')
 @section('page-title', 'Modifier l’article')
 @section('page-title-info', 'Mise à jour de la fiche inventaire.')
+
+@section('header-back')
+    <x-back-link :href="route('inventories.index')" />
+@endsection
+
 @section('content-container-class', 'w-full max-w-none px-4 sm:px-6 lg:px-8')
 
 @section('content')

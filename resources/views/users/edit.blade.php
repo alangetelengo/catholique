@@ -4,6 +4,10 @@
 @section('page-title', 'Modifier utilisateur')
 @section('page-title-info', 'Mets à jour les informations et le rôle du compte.')
 
+@section('header-back')
+    <x-back-link :href="route('users.index')" />
+@endsection
+
 @section('content')
     <div class="adventiste-card-pro-static p-6">
         <form method="post" action="{{ route('users.update', $user) }}">

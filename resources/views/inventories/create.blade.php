@@ -3,6 +3,11 @@
 @section('title', 'Nouvel inventaire - Catholique')
 @section('page-title', 'Nouvel article d’inventaire')
 @section('page-title-info', 'Ajout d’un bien ou d’une ligne matérielle pour la paroisse.')
+
+@section('header-back')
+    <x-back-link :href="route('inventories.index')" />
+@endsection
+
 @section('content-container-class', 'w-full max-w-none px-4 sm:px-6 lg:px-8')
 
 @section('content')

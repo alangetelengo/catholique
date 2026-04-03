@@ -4,6 +4,10 @@
 @section('page-title', 'Créer un utilisateur')
 @section('page-title-info', 'Ajoute un compte utilisateur et assigne un rôle.')
 
+@section('header-back')
+    <x-back-link :href="route('users.index')" />
+@endsection
+
 @section('content')
     <div class="adventiste-card-pro-static p-6">
         <form method="post" action="{{ route('users.store') }}">

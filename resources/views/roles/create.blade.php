@@ -4,10 +4,8 @@
 @section('page-title', 'Créer un rôle')
 @section('page-title-info', 'Définissez un libellé, un nom technique (slug Spatie) et les permissions associées.')
 
-@section('btn-create')
-    <a href="{{ route('application-configuration.index', ['tab' => 'roles']) }}" class="adventiste-btn-secondary text-sm no-underline">
-        <i class="fas fa-arrow-left me-1.5" aria-hidden="true"></i> Retour
-    </a>
+@section('header-back')
+    <x-back-link :href="route('application-configuration.index', ['tab' => 'roles'])" />
 @endsection
 
 @section('content')

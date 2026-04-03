@@ -2,6 +2,11 @@
 
 @section('title', 'Créer une configuration')
 @section('page-title', 'Créer une configuration')
+
+@section('header-back')
+    <x-back-link :href="route('configurations.workspace')" />
+@endsection
+
 @section('breadcrumb')
     <li class="breadcrumb-item"><a href="{{ route('home') }}">Accueil</a></li>
     <li class="breadcrumb-item"><a href="{{ route('configurations.workspace') }}">Configurations</a></li>

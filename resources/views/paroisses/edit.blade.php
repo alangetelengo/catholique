@@ -2,7 +2,13 @@
 
 @section('title', 'Modifier la paroisse - Catholique')
 @section('page-title', 'Modifier la paroisse')
-@section('page-title-info', 'Mettre à jour les informations de : ' . $paroisse->nom)
+@section('page-title-info')
+    Mettre à jour les informations de : {{ $paroisse->nom }}
+@endsection
+
+@section('header-back')
+    <x-back-link :href="route('paroisses.index')" />
+@endsection
 
 @section('content')
     <div class="adventiste-card-pro-static p-6">

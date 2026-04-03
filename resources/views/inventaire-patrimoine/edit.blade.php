@@ -4,6 +4,10 @@
 @section('page-title', 'Modifier le bien patrimonial')
 @section('page-title-info', 'Mise à jour des informations et de la valeur estimée du bien.')
 
+@section('header-back')
+    <x-back-link :href="route('inventaire-patrimoine.index')" />
+@endsection
+
 @section('content')
     <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div class="lg:col-span-2">

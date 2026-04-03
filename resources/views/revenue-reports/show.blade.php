@@ -4,6 +4,10 @@
 @section('page-title', 'Détail du rapport de recettes')
 @section('page-title-info', 'Vue détaillée du rapport enregistré.')
 
+@section('header-back')
+    <x-back-link :href="route('revenue-reports.index')" />
+@endsection
+
 @section('btn-create')
     <a href="{{ route('revenue-reports.print', $report) }}" target="_blank" class="adventiste-btn-secondary">Imprimer</a>
     <a href="{{ route('revenue-reports.edit', $report) }}" class="adventiste-btn-secondary">Modifier</a>

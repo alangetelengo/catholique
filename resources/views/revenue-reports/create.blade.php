@@ -3,6 +3,11 @@
 @section('title', 'Nouveau rapport recettes - Catholique')
 @section('page-title', 'Nouveau rapport de recettes')
 @section('page-title-info', 'Générez et enregistrez un rapport global ou par catégorie.')
+
+@section('header-back')
+    <x-back-link :href="route('revenue-reports.index')" />
+@endsection
+
 @section('content-container-class', 'w-full max-w-none px-4 sm:px-6 lg:px-8')
 
 @section('content')

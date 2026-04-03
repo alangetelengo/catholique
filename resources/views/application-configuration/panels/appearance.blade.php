@@ -12,7 +12,7 @@
         </a>
     </div>
 
-    @can('manage_paroisses')
+    @can('view_configuration')
         <div class="adventiste-card-pro-static p-6 sm:p-8 max-w-2xl">
             <h2 class="text-lg font-semibold text-slate-900 dark:text-white mb-2">Liste des paroisses</h2>
             <p class="text-sm text-slate-600 dark:text-slate-400 leading-relaxed mb-6">

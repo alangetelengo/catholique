@@ -4,6 +4,10 @@
 @section('page-title', 'Détail rapport Subvention Popote')
 @section('page-title-info', 'Subvention reçue comparée aux dépenses alimentation.')
 
+@section('header-back')
+    <x-back-link :href="route('popote-reports.index')" />
+@endsection
+
 @section('btn-create')
     <a target="_blank" href="{{ route('popote-reports.print', $report) }}" class="adventiste-btn-secondary">Imprimer</a>
     <a href="{{ route('popote-reports.pdf', $report) }}" class="adventiste-btn-secondary">Exporter PDF</a>

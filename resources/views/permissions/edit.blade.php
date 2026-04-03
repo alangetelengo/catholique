@@ -2,12 +2,12 @@
 
 @section('title', 'Modifier une permission — Catholique')
 @section('page-title', 'Modifier une permission')
-@section('page-title-info', 'Ajustez le libellé ou le nom technique de la permission « {{ $permission->name }} ».')
+@section('page-title-info')
+    Ajustez le libellé ou le nom technique de la permission « {{ $permission->name }} ».
+@endsection
 
-@section('btn-create')
-    <a href="{{ route('application-configuration.index', ['tab' => 'permissions']) }}" class="adventiste-btn-secondary text-sm no-underline">
-        <i class="fas fa-arrow-left me-1.5" aria-hidden="true"></i> Retour
-    </a>
+@section('header-back')
+    <x-back-link :href="route('application-configuration.index', ['tab' => 'permissions'])" />
 @endsection
 
 @section('content')

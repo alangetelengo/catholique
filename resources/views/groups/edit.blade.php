@@ -3,6 +3,10 @@
 @section('title', 'Modifier le groupe')
 @section('page-title', 'Modifier le groupe')
 
+@section('header-back')
+    <x-back-link :href="route('groups.index')" />
+@endsection
+
 @section('content-container-class', 'max-w-[960px] mx-auto px-4 sm:px-6 lg:px-8')
 
 @section('content')

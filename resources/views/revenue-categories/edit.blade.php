@@ -4,6 +4,10 @@
 @section('page-title', 'Modifier catégorie')
 @section('page-title-info', 'Mise à jour des paramètres de la catégorie de revenu.')
 
+@section('header-back')
+    <x-back-link :href="route('revenue-categories.index')" />
+@endsection
+
 @section('content')
     <div class="adventiste-card-pro-static p-6">
         <form method="post" action="{{ route('revenue-categories.update', $category) }}" class="grid grid-cols-1 md:grid-cols-2 gap-5">

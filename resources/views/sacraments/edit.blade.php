@@ -3,6 +3,10 @@
 @section('title', 'Modifier - ' . $sacrament->type_label)
 @section('page-title', 'Modifier le ' . $sacrament->type_label)
 
+@section('header-back')
+    <x-back-link :href="route('sacraments.index', ['type' => $sacrament->type])" />
+@endsection
+
 @section('content-container-class', 'max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8')
 
 @section('content')

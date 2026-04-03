@@ -3,6 +3,11 @@
 @section('title', 'Modifier rapport recettes - Catholique')
 @section('page-title', 'Modifier rapport de recettes')
 @section('page-title-info', 'Mettez à jour les paramètres du rapport puis régénérez.')
+
+@section('header-back')
+    <x-back-link :href="route('revenue-reports.index')" />
+@endsection
+
 @section('content-container-class', 'w-full max-w-none px-4 sm:px-6 lg:px-8')
 
 @section('content')

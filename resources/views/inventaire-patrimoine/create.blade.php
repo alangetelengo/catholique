@@ -4,6 +4,10 @@
 @section('page-title', 'Ajouter un bien au patrimoine')
 @section('page-title-info', 'Fiche d’un bien : identification, lieu, valeur estimée et état.')
 
+@section('header-back')
+    <x-back-link :href="route('inventaire-patrimoine.index')" />
+@endsection
+
 @section('content')
     <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div class="lg:col-span-2">

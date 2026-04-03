@@ -4,6 +4,10 @@
 @section('page-title', 'Nouveau type de revenu')
 @section('page-title-info', 'Créer un type de recette rattaché à une catégorie.')
 
+@section('header-back')
+    <x-back-link :href="route('revenue-types.index')" />
+@endsection
+
 @section('content')
     <div class="adventiste-card-pro-static p-6">
         <form method="post" action="{{ route('revenue-types.store') }}" class="grid grid-cols-1 md:grid-cols-2 gap-5">

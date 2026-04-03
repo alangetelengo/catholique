@@ -3,6 +3,10 @@
 @section('title', 'Membres')
 @section('page-title', 'Détail du membre')
 
+@section('header-back')
+    <x-back-link :href="route('members.index')" />
+@endsection
+
 @section('content-container-class', 'max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8')
 
 @section('content')
@@ -120,9 +124,5 @@
             <div class="px-6 py-4 text-sm text-slate-700 dark:text-slate-200 whitespace-pre-wrap">{{ $member->notes ?? '—' }}</div>
         </div>
     </div>
-</div>
-
-<div class="mt-6 flex justify-end">
-    <a href="{{ route('members.index') }}" class="adventiste-btn-secondary no-underline">Retour</a>
 </div>
 @endsection

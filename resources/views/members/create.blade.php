@@ -3,6 +3,10 @@
 @section('title', 'Créer un membre')
 @section('page-title', 'Créer un membre')
 
+@section('header-back')
+    <x-back-link :href="route('members.index')" />
+@endsection
+
 @section('content-container-class', 'max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8')
 
 @section('content')

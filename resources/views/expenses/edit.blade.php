@@ -3,6 +3,11 @@
 @section('title', 'Modifier dépense - Catholique')
 @section('page-title', 'Modifier une dépense')
 @section('page-title-info', 'Mise à jour des informations d\'une dépense existante.')
+
+@section('header-back')
+    <x-back-link :href="route('expenses.index')" />
+@endsection
+
 @section('content-container-class', 'w-full max-w-none px-4 sm:px-6 lg:px-8')
 
 @section('content')

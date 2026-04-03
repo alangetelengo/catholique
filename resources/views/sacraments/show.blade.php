@@ -3,6 +3,10 @@
 @section('title', $sacrament->type_label . ' - ' . ($sacrament->beneficiary_name ?: optional($sacrament->beneficiary)->prenom . ' ' . optional($sacrament->beneficiary)->nom))
 @section('page-title', $sacrament->type_label)
 
+@section('header-back')
+    <x-back-link :href="route('sacraments.index', ['type' => $sacrament->type])" />
+@endsection
+
 @section('content-container-class', 'max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8')
 
 @section('content')
@@ -16,7 +20,6 @@
             @can(\App\Http\Controllers\SacramentController::TYPE_PERMISSIONS[$sacrament->type]['edit'] ?? 'edit_baptisms')
             <x-action-button variant="edit" href="{{ route('sacraments.edit', $sacrament) }}" />
             @endcan
-            <a href="{{ route('sacraments.index', ['type' => $sacrament->type]) }}" class="adventiste-btn-secondary no-underline">Retour à la liste</a>
         </div>
     </div>
     <div class="p-6">

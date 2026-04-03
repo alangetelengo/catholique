@@ -23,9 +23,13 @@
     $isStatsRoute = request()->routeIs('financial-statistics.*');
     $isDashboardRoute = request()->routeIs('home');
     $isAppConfigRoute = request()->routeIs('application-configuration.*');
+    $isConfigWorkspaceRoute = request()->routeIs('configurations.workspace');
     $isEventsRoute = request()->routeIs('events.*');
     $isGroupsRoute = request()->routeIs('groups.*');
     $isLegacyAdminRoute = request()->routeIs('paroisses.*', 'users.*', 'roles.*', 'permissions.*', 'revenue-categories.*', 'revenue-types.*', 'configurations.*');
+    $isConfigurationNavOpen = $isAppConfigRoute || $isConfigWorkspaceRoute || $isLegacyAdminRoute;
+    $isConfigParoissesTab = request()->routeIs('application-configuration.index') && request()->query('tab') === 'paroisses';
+    $isConfigOverviewSubActive = $isAppConfigRoute && ! $isConfigParoissesTab;
     $isMembersRoute = request()->routeIs('members.*');
     $isSacramentsRoute = request()->routeIs('sacraments.*');
     $canSacramentsNav = auth()->check() && (
@@ -128,12 +132,35 @@
                 </a>
             </li>
 
+            @auth
             <li>
-                <a href="{{ route('application-configuration.index') }}" class="{{ ($isAppConfigRoute || $isLegacyAdminRoute) ? $navBase . ' nav-link-active' : $navBase }}">
-                    <span>⚙️</span>
-                    <span class="nav-text">Configuration</span>
-                </a>
+                <details class="group" @if($isConfigurationNavOpen) open @endif>
+                    <summary class="{{ $isConfigurationNavOpen ? $navBase . ' nav-link-active' : $navBase }} cursor-pointer list-none">
+                        <span>⚙️</span>
+                        <span class="nav-text">Configuration</span>
+                        <span class="sidebar-chevron" aria-hidden="true"></span>
+                    </summary>
+                    <ul class="sidebar-sub-menu mt-1" role="list">
+                        <li class="sidebar-sub-item"><a href="{{ route('application-configuration.index') }}" class="sidebar-sub-link {{ $isConfigOverviewSubActive ? 'is-active' : '' }}">Vue d'ensemble</a></li>
+                        @if(auth()->user()->can('view_configuration') || auth()->user()->can('manage_paroisses'))
+                        <li class="sidebar-sub-item"><a href="{{ route('application-configuration.index', ['tab' => 'paroisses']) }}" class="sidebar-sub-link {{ $isConfigParoissesTab ? 'is-active' : '' }}">Liste des paroisses</a></li>
+                        @endif
+                        @if(auth()->user()->can('view_configuration'))
+                        <li class="sidebar-sub-item"><a href="{{ route('configurations.workspace') }}" class="sidebar-sub-link {{ $isConfigWorkspaceRoute ? 'is-active' : '' }}">Identité &amp; logo</a></li>
+                        @endif
+                    </ul>
+                </details>
             </li>
+            <li class="pt-2 mt-1 border-t border-[rgba(212,168,75,0.28)]">
+                <form method="POST" action="{{ route('logout') }}" class="m-0">
+                    @csrf
+                    <button type="submit" class="{{ $navBase }} w-full text-left font-sans cursor-pointer appearance-none bg-transparent">
+                        <span aria-hidden="true">🔑</span>
+                        <span class="nav-text">Déconnexion</span>
+                    </button>
+                </form>
+            </li>
+            @endauth
         </ul>
     </nav>
 
@@ -149,7 +176,7 @@
                     }
                 @endphp
                 @if($sidebarParoisse)
-                    <span class="block mt-2 text-sm font-bold text-white leading-tight drop-shadow-[0_1px_2px_rgba(0,0,0,0.45)] muted">{{ $sidebarParoisse }}</span>
+                    <span class="block mt-2 text-sm font-bold text-white leading-tight drop-shadow-[0_1px_2px_rgba(0,0,0,0.45)]">{{ $sidebarParoisse }}</span>
                 @endif
             @endauth
         </p>

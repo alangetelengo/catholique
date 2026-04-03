@@ -26,7 +26,7 @@ class ApplicationConfigurationController extends Controller
 
         $tabs = [];
 
-        if ($user->can('manage_paroisses')) {
+        if ($user->can('manage_paroisses') || $user->can('view_configuration')) {
             $tabs['paroisses'] = 'Paroisses';
         }
         if ($user->can('manage_users')) {
@@ -93,7 +93,7 @@ class ApplicationConfigurationController extends Controller
         abort_unless($user, 403);
 
         $allowed = match ($tab) {
-            'paroisses' => $user->can('manage_paroisses'),
+            'paroisses' => $user->can('manage_paroisses') || $user->can('view_configuration'),
             'users' => $user->can('manage_users'),
             'roles' => $user->can('manage_roles'),
             'permissions' => $user->can('manage_permissions'),

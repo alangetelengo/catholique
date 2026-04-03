@@ -3,6 +3,10 @@
 @section('title', 'Ajouter - ' . (\App\Models\Sacrament::TYPES[$type] ?? $type))
 @section('page-title', 'Ajouter un ' . (\App\Models\Sacrament::TYPES[$type] ?? $type))
 
+@section('header-back')
+    <x-back-link :href="route('sacraments.index', ['type' => $type])" />
+@endsection
+
 @section('content-container-class', 'max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8')
 
 @section('content')

@@ -3,6 +3,11 @@
 @section('title', 'Nouveau rapport Subvention Popote - Catholique')
 @section('page-title', 'Nouveau rapport Subvention Popote')
 @section('page-title-info', 'Comparer la subvention reçue aux dépenses alimentation (mensuel/annuel).')
+
+@section('header-back')
+    <x-back-link :href="route('popote-reports.index')" />
+@endsection
+
 @section('content-container-class', 'w-full max-w-none px-4 sm:px-6 lg:px-8')
 
 @section('content')

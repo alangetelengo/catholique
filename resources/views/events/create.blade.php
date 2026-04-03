@@ -2,6 +2,11 @@
 
 @section('title', 'Créer un événement')
 @section('page-title', 'Créer un événement')
+
+@section('header-back')
+    <x-back-link :href="route('events.index')" />
+@endsection
+
 @section('breadcrumb')
     <li class="breadcrumb-item"><a href="{{ route('home') }}" class="text-emerald-600 dark:text-emerald-400 hover:underline">Accueil</a></li>
     <li class="breadcrumb-item"><a href="{{ route('events.index') }}" class="text-emerald-600 dark:text-emerald-400 hover:underline">Événements</a></li>

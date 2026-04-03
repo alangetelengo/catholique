@@ -4,6 +4,10 @@
 @section('page-title', 'Nouvelle paroisse')
 @section('page-title-info', 'Créer une paroisse : identifiants, contact et rattachement éventuel d’un curé (membre actif).')
 
+@section('header-back')
+    <x-back-link :href="route('paroisses.index')" />
+@endsection
+
 @section('content')
     <div class="adventiste-card-pro-static p-6">
         <form method="post" action="{{ route('paroisses.store') }}" class="space-y-6">

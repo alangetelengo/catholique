@@ -4,10 +4,8 @@
 @section('page-title', 'Paramètres paroisse')
 @section('page-title-info', 'Identité affichée dans l’application, chemin du logo et nom du responsable (curé, vicaire, etc.).')
 
-@section('btn-create')
-    <a href="{{ route('application-configuration.index', ['tab' => 'appearance']) }}" class="adventiste-btn-secondary text-sm no-underline">
-        <i class="fas fa-arrow-left me-1.5" aria-hidden="true"></i> Retour configuration
-    </a>
+@section('header-back')
+    <x-back-link :href="route('application-configuration.index', ['tab' => 'appearance'])" label="Retour configuration" />
 @endsection
 
 @section('content')

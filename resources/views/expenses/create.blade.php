@@ -3,6 +3,11 @@
 @section('title', 'Nouvelle dépense - Catholique')
 @section('page-title', 'Nouvelle dépense')
 @section('page-title-info', 'Saisie d\'une nouvelle dépense.')
+
+@section('header-back')
+    <x-back-link :href="route('expenses.index')" />
+@endsection
+
 @section('content-container-class', 'w-full max-w-none px-4 sm:px-6 lg:px-8')
 
 @section('content')

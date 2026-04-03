@@ -4,6 +4,10 @@
 @section('page-title', 'Détail rapport charges fixes')
 @section('page-title-info', 'Rapport hiérarchique des charges fixes (sans déduction des recettes).')
 
+@section('header-back')
+    <x-back-link :href="route('charges-fixes-reports.index')" />
+@endsection
+
 @section('btn-create')
     <a target="_blank" href="{{ route('charges-fixes-reports.print', $report) }}" class="adventiste-btn-secondary">Imprimer</a>
     <a href="{{ route('charges-fixes-reports.pdf', $report) }}" class="adventiste-btn-secondary">Exporter PDF</a>

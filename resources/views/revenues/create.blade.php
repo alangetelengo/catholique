@@ -3,6 +3,11 @@
 @section('title', 'Nouvelle recette - Catholique')
 @section('page-title', 'Nouvelle recette')
 @section('page-title-info', 'Saisie d\'une nouvelle entrée de revenu.')
+
+@section('header-back')
+    <x-back-link :href="route('revenues.index')" />
+@endsection
+
 @section('content-container-class', 'w-full max-w-none px-4 sm:px-6 lg:px-8')
 
 @section('content')

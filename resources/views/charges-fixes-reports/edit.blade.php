@@ -3,6 +3,11 @@
 @section('title', 'Modifier rapport charges fixes - Catholique')
 @section('page-title', 'Modifier rapport charges fixes')
 @section('page-title-info', 'Mettez à jour la période puis régénérez le rapport.')
+
+@section('header-back')
+    <x-back-link :href="route('charges-fixes-reports.index')" />
+@endsection
+
 @section('content-container-class', 'w-full max-w-none px-4 sm:px-6 lg:px-8')
 
 @section('content')
