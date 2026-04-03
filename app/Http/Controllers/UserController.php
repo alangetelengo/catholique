@@ -9,6 +9,7 @@ use App\Traits\LogsErrors;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
@@ -42,6 +43,13 @@ class UserController extends Controller
 
             $data = $request->validate([
                 'name' => ['required', 'string', 'max:255'],
+                'username' => [
+                    'required',
+                    'string',
+                    'max:80',
+                    'regex:/^[a-zA-Z0-9_.-]+$/',
+                    Rule::unique('users', 'username'),
+                ],
                 'email' => ['required', 'string', 'email', 'max:255', 'unique:users,email'],
                 'password' => ['required', 'string', 'min:8', 'confirmed'],
                 'role' => ['nullable', 'exists:roles,name'],
@@ -53,8 +61,11 @@ class UserController extends Controller
                 ],
             ]);
 
+            $username = Str::lower(trim($data['username']));
+
             $user = User::query()->create([
                 'name' => $data['name'],
+                'username' => $username,
                 'email' => $data['email'],
                 'password' => Hash::make($data['password']),
                 'paroisse_id' => $data['paroisse_id'] ?? null,
@@ -85,12 +96,22 @@ class UserController extends Controller
     public function update(Request $request, User $user): RedirectResponse
     {
         try {
+            $usernameInput = trim((string) $request->input('username', ''));
+
             $request->merge([
                 'paroisse_id' => $request->filled('paroisse_id') ? (int) $request->input('paroisse_id') : null,
+                'username' => $usernameInput !== '' ? $usernameInput : null,
             ]);
 
             $data = $request->validate([
                 'name' => ['required', 'string', 'max:255'],
+                'username' => [
+                    'nullable',
+                    'string',
+                    'max:80',
+                    'regex:/^[a-zA-Z0-9_.-]+$/',
+                    Rule::unique('users', 'username')->ignore($user->id),
+                ],
                 'email' => ['required', 'string', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user->id)],
                 'password' => ['nullable', 'string', 'min:8', 'confirmed'],
                 'role' => ['nullable', 'exists:roles,name'],
@@ -102,8 +123,13 @@ class UserController extends Controller
                 ],
             ]);
 
+            $username = filled($data['username'])
+                ? Str::lower(trim((string) $data['username']))
+                : null;
+
             $user->update([
                 'name' => $data['name'],
+                'username' => $username,
                 'email' => $data['email'],
                 'password' => ! empty($data['password']) ? Hash::make($data['password']) : $user->password,
                 'paroisse_id' => $data['paroisse_id'] ?? null,

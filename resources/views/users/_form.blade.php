@@ -5,6 +5,12 @@
         @error('name')<p class="text-xs text-red-600 mt-1">{{ $message }}</p>@enderror
     </div>
     <div>
+        <label class="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-2">Nom d’utilisateur</label>
+        <input type="text" name="username" value="{{ old('username', $user->username) }}" class="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2.5 text-sm font-mono" {{ $isEdit ? '' : 'required' }} autocomplete="username" inputmode="text" placeholder="ex. jean.dupont">
+        <p class="text-xs text-slate-500 dark:text-slate-400 mt-1.5">Identifiant unique : connexion possible avec ce nom ou l’adresse e-mail (lettres, chiffres, <span class="font-mono">._-</span>).@if ($isEdit) <span class="block mt-1">Laisser vide pour ne conserver que la connexion par e-mail.</span>@endif</p>
+        @error('username')<p class="text-xs text-red-600 dark:text-slate-400 mt-1">{{ $message }}</p>@enderror
+    </div>
+    <div>
         <label class="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-2">Email</label>
         <input type="email" name="email" value="{{ old('email', $user->email) }}" class="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2.5 text-sm" required>
         @error('email')<p class="text-xs text-red-600 mt-1">{{ $message }}</p>@enderror
