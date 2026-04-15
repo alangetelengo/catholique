@@ -157,7 +157,16 @@ return [
     'url' => 'Le format de l\'URL de :attribute n\'est pas valide.',
     'uuid' => 'Le champ :attribute doit être un UUID valide',
     'custom' => [
+        'login' => [
+            'required' => 'Veuillez saisir votre e-mail ou votre nom d’utilisateur.',
+            'max' => 'L’e-mail ou le nom d’utilisateur ne peut pas dépasser :max caractères.',
+        ],
+        'password' => [
+            'required' => 'Veuillez saisir votre mot de passe.',
+        ],
     ],
     'attributes' => [
+        'login' => 'e-mail ou nom d’utilisateur',
+        'password' => 'mot de passe',
     ],
 ];

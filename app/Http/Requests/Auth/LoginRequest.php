@@ -2,9 +2,11 @@
 
 namespace App\Http\Requests\Auth;
 
+use App\Models\User;
 use Illuminate\Auth\Events\Lockout;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -33,20 +35,31 @@ class LoginRequest extends FormRequest
 
         $login = $this->string('login')->trim()->value();
         $password = $this->string('password')->value();
-        $field = filter_var($login, FILTER_VALIDATE_EMAIL) ? 'email' : 'username';
+        $isEmail = (bool) filter_var($login, FILTER_VALIDATE_EMAIL);
 
-        if (! Auth::attempt(
-            [$field => $login, 'password' => $password],
-            $this->boolean('remember')
-        )) {
+        $user = User::query()
+            ->when($isEmail, fn ($q) => $q->where('email', $login), fn ($q) => $q->where('username', $login))
+            ->first();
+
+        if (! $user) {
             RateLimiter::hit($this->throttleKey());
 
             throw ValidationException::withMessages([
-                'login' => __('auth.failed'),
+                'login' => $isEmail ? __('auth.unknown_email') : __('auth.unknown_username'),
+            ]);
+        }
+
+        if (! Hash::check($password, $user->password)) {
+            RateLimiter::hit($this->throttleKey());
+
+            throw ValidationException::withMessages([
+                'password' => __('auth.wrong_password'),
             ]);
         }
 
         RateLimiter::clear($this->throttleKey());
+
+        Auth::login($user, $this->boolean('remember'));
     }
 
     /**
@@ -72,6 +85,6 @@ class LoginRequest extends FormRequest
 
     public function throttleKey(): string
     {
-        return Str::transliterate(Str::lower($this->string('login')->value()) . '|' . $this->ip());
+        return Str::transliterate(Str::lower($this->string('login')->value()).'|'.$this->ip());
     }
 }

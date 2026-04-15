@@ -17,6 +17,13 @@
         if ($categoryLabel) {
             $pdfTitle .= ' — '.$categoryLabel;
         }
+        $typeLabel = $pdfTypeNom ?? null;
+        if ($typeLabel === null && ($selectedTypeId ?? null)) {
+            $typeLabel = \App\Models\RevenueType::query()->whereKey((int) $selectedTypeId)->value('nom');
+        }
+        if ($typeLabel) {
+            $pdfTitle .= ' — '.$typeLabel;
+        }
         if ($paroisse) {
             $pdfTitle .= ' — '.$paroisse->nom;
         }
@@ -58,7 +65,6 @@
         .summary-row { display: table; width: 100%; }
         .summary-box {
             display: table-cell;
-            width: 33.33%;
             padding: 6px 8px;
             text-align: center;
             vertical-align: top;
@@ -72,7 +78,7 @@
         .summary-box .amount { font-size: 11px; font-weight: bold; }
         .summary-box .label { font-size: 7px; color: #666; }
         .details-grid { display: table; width: 100%; margin-bottom: 8px; }
-        .details-col { display: table-cell; width: 50%; padding: 0 6px; vertical-align: top; }
+        .details-col { display: table-cell; padding: 0 6px; vertical-align: top; }
         .section { margin: 6px 0; page-break-inside: avoid; }
         .section-title {
             font-size: 9px;
@@ -157,91 +163,116 @@
     <div class="report-title">
         <h3>Rapport par catégories de recettes</h3>
         <p>Période : {{ $dateDebut->format('d/m/Y') }} au {{ $dateFin->format('d/m/Y') }} — Généré le {{ now()->format('d/m/Y H:i') }}</p>
+        @php
+            $pdfCat = $pdfCategoryNom ?? null;
+            $pdfTyp = $pdfTypeNom ?? null;
+        @endphp
+        @if ($pdfCat || $pdfTyp)
+            <p style="margin-top:4px;">
+                @if ($pdfCat)<span>Filtre catégorie : <strong>{{ $pdfCat }}</strong></span>@endif
+                @if ($pdfCat && $pdfTyp) — @endif
+                @if ($pdfTyp)<span>Filtre type : <strong>{{ $pdfTyp }}</strong></span>@endif
+            </p>
+        @endif
     </div>
 
     @php
         $w = $report['weekly'] ?? null;
+        $showRptSemaine = $showRptSemaine ?? true;
+        $showRptDimanche = $showRptDimanche ?? true;
+        $rptTotalSubtitle = $rptTotalSubtitle ?? 'Semaine + dimanche';
+        $rptSummaryCols = 1 + (int) $showRptSemaine + (int) $showRptDimanche;
+        $pdfSummaryBoxWidth = $rptSummaryCols === 3 ? '33.33%' : '50%';
+        $pdfDetailsColWidth = ($showRptSemaine && $showRptDimanche) ? '50%' : '100%';
     @endphp
 
     @if ($w)
         <div class="summary">
             <div class="summary-row">
-                <div class="summary-box primary">
-                    <h4>Total Semaine</h4>
-                    <div class="amount">{{ \App\Helpers\ParoisseConfig::formatMontant($w['total_semaine']) }}</div>
-                    <div class="label">Lundi - Samedi</div>
-                </div>
-                <div class="summary-box success">
-                    <h4>Total Dimanche</h4>
-                    <div class="amount">{{ \App\Helpers\ParoisseConfig::formatMontant($w['total_dimanche']) }}</div>
-                    <div class="label">Dimanche</div>
-                </div>
-                <div class="summary-box info">
+                @if ($showRptSemaine)
+                    <div class="summary-box primary" style="width: {{ $pdfSummaryBoxWidth }};">
+                        <h4>Total Semaine</h4>
+                        <div class="amount">{{ \App\Helpers\ParoisseConfig::formatMontant($w['total_semaine']) }}</div>
+                        <div class="label">Lundi - Samedi</div>
+                    </div>
+                @endif
+                @if ($showRptDimanche)
+                    <div class="summary-box success" style="width: {{ $pdfSummaryBoxWidth }};">
+                        <h4>Total Dimanche</h4>
+                        <div class="amount">{{ \App\Helpers\ParoisseConfig::formatMontant($w['total_dimanche']) }}</div>
+                        <div class="label">Dimanche</div>
+                    </div>
+                @endif
+                <div class="summary-box info" style="width: {{ $pdfSummaryBoxWidth }};">
                     <h4>Total Général</h4>
                     <div class="amount">{{ \App\Helpers\ParoisseConfig::formatMontant($w['total_general']) }}</div>
-                    <div class="label">Semaine + Dimanche</div>
+                    <div class="label">{{ $rptTotalSubtitle }}</div>
                 </div>
             </div>
         </div>
 
         <div class="details-grid">
-            <div class="details-col">
-                <div class="section">
-                    <div class="section-title">Semaine (Lundi - Samedi)</div>
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Jour</th>
-                                <th class="text-right">Montant</th>
-                                <th class="text-center">Nb</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @php
-                                $joursLabels = ['lundi' => 'Lun', 'mardi' => 'Mar', 'mercredi' => 'Mer', 'jeudi' => 'Jeu', 'vendredi' => 'Ven', 'samedi' => 'Sam'];
-                            @endphp
-                            @foreach (['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'] as $jour)
+            @if ($showRptSemaine)
+                <div class="details-col" style="width: {{ $pdfDetailsColWidth }};">
+                    <div class="section">
+                        <div class="section-title">Semaine (Lundi - Samedi)</div>
+                        <table>
+                            <thead>
                                 <tr>
-                                    <td>{{ $joursLabels[$jour] }}</td>
-                                    <td class="text-right">{{ \App\Helpers\ParoisseConfig::formatMontant($w['details_semaine'][$jour]['montant'] ?? 0) }}</td>
-                                    <td class="text-center">{{ $w['details_semaine'][$jour]['count'] ?? 0 }}</td>
+                                    <th>Jour</th>
+                                    <th class="text-right">Montant</th>
+                                    <th class="text-center">Nb</th>
                                 </tr>
-                            @endforeach
-                            <tr class="total-row">
-                                <td>TOTAL</td>
-                                <td class="text-right">{{ \App\Helpers\ParoisseConfig::formatMontant($w['total_semaine']) }}</td>
-                                <td class="text-center">{{ $w['revenues_semaine']->count() }}</td>
-                            </tr>
-                        </tbody>
-                    </table>
+                            </thead>
+                            <tbody>
+                                @php
+                                    $joursLabels = ['lundi' => 'Lun', 'mardi' => 'Mar', 'mercredi' => 'Mer', 'jeudi' => 'Jeu', 'vendredi' => 'Ven', 'samedi' => 'Sam'];
+                                @endphp
+                                @foreach (['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'] as $jour)
+                                    <tr>
+                                        <td>{{ $joursLabels[$jour] }}</td>
+                                        <td class="text-right">{{ \App\Helpers\ParoisseConfig::formatMontant($w['details_semaine'][$jour]['montant'] ?? 0) }}</td>
+                                        <td class="text-center">{{ $w['details_semaine'][$jour]['count'] ?? 0 }}</td>
+                                    </tr>
+                                @endforeach
+                                <tr class="total-row">
+                                    <td>TOTAL</td>
+                                    <td class="text-right">{{ \App\Helpers\ParoisseConfig::formatMontant($w['total_semaine']) }}</td>
+                                    <td class="text-center">{{ $w['revenues_semaine']->count() }}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
-            </div>
-            <div class="details-col">
-                <div class="section">
-                    <div class="section-title">Dimanche</div>
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Jour</th>
-                                <th class="text-right">Montant</th>
-                                <th class="text-center">Nb</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td>Dimanche</td>
-                                <td class="text-right">{{ \App\Helpers\ParoisseConfig::formatMontant($w['total_dimanche']) }}</td>
-                                <td class="text-center">{{ $w['details_dimanche']['count'] }}</td>
-                            </tr>
-                            <tr class="total-row">
-                                <td>TOTAL</td>
-                                <td class="text-right">{{ \App\Helpers\ParoisseConfig::formatMontant($w['total_dimanche']) }}</td>
-                                <td class="text-center">{{ $w['details_dimanche']['count'] }}</td>
-                            </tr>
-                        </tbody>
-                    </table>
+            @endif
+            @if ($showRptDimanche)
+                <div class="details-col" style="width: {{ $pdfDetailsColWidth }};">
+                    <div class="section">
+                        <div class="section-title">Dimanche</div>
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Jour</th>
+                                    <th class="text-right">Montant</th>
+                                    <th class="text-center">Nb</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>Dimanche</td>
+                                    <td class="text-right">{{ \App\Helpers\ParoisseConfig::formatMontant($w['total_dimanche']) }}</td>
+                                    <td class="text-center">{{ $w['details_dimanche']['count'] }}</td>
+                                </tr>
+                                <tr class="total-row">
+                                    <td>TOTAL</td>
+                                    <td class="text-right">{{ \App\Helpers\ParoisseConfig::formatMontant($w['total_dimanche']) }}</td>
+                                    <td class="text-center">{{ $w['details_dimanche']['count'] }}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
-            </div>
+            @endif
         </div>
     @else
         <div class="summary">
@@ -255,7 +286,7 @@
         </div>
     @endif
 
-    @if (count($report['by_category']) > 0)
+    @if (! ($selectedCategoryId ?? null) && count($report['by_category']) > 0)
         <div class="section">
             <div class="section-title">Répartition par catégorie</div>
             <table>
@@ -287,20 +318,22 @@
     @endif
 
     @php
-        $revenuesAll = $w['revenues_all'] ?? $report['revenues'];
-        $revenuesForPdf = $revenuesAll->take(12);
+        $revenuesAll = data_get($w, 'revenues_all', $report['revenues']);
+        $revenuesForPdf = $revenuesAll;
         $totalRevenues = $revenuesAll->count();
+        $pdfJoursComplet = [
+            'lundi' => 'Lundi', 'mardi' => 'Mardi', 'mercredi' => 'Mercredi', 'jeudi' => 'Jeudi',
+            'vendredi' => 'Vendredi', 'samedi' => 'Samedi', 'dimanche' => 'Dimanche',
+        ];
     @endphp
     @if ($totalRevenues > 0)
         <div class="section">
-            <div class="section-title">Liste des recettes ({{ $totalRevenues > 12 ? '12 premières sur '.$totalRevenues : $totalRevenues }})</div>
+            <div class="section-title">Liste des recettes ({{ $totalRevenues }})</div>
             <table>
                 <thead>
                     <tr>
                         <th>Date</th>
                         <th>Jour</th>
-                        <th>Pér.</th>
-                        <th>Méth.</th>
                         <th class="text-right">Montant</th>
                     </tr>
                 </thead>
@@ -308,28 +341,17 @@
                     @foreach ($revenuesForPdf as $revenue)
                         <tr>
                             <td>{{ $revenue->date_recette?->format('d/m/Y') }}</td>
-                            <td>{{ ['lundi' => 'Lun', 'mardi' => 'Mar', 'mercredi' => 'Mer', 'jeudi' => 'Jeu', 'vendredi' => 'Ven', 'samedi' => 'Sam', 'dimanche' => 'Dim'][$revenue->jour_semaine] ?? '—' }}</td>
-                            <td>{{ ($revenue->periode_messe === 'semaine' || in_array($revenue->jour_semaine, ['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'])) ? 'Sem.' : 'Dim.' }}</td>
-                            <td>{{ $revenue->methode_paiement ?? '—' }}</td>
+                            <td>{{ $pdfJoursComplet[$revenue->jour_semaine] ?? '—' }}</td>
                             <td class="text-right">{{ \App\Helpers\ParoisseConfig::formatMontant($revenue->montant) }}</td>
                         </tr>
                     @endforeach
                 </tbody>
-                @if ($totalRevenues > 12)
-                    <tfoot>
-                        <tr class="total-row">
-                            <td colspan="4">… ({{ $totalRevenues }} recettes) — TOTAL</td>
-                            <td class="text-right">{{ \App\Helpers\ParoisseConfig::formatMontant($report['total_general']) }}</td>
-                        </tr>
-                    </tfoot>
-                @else
-                    <tfoot>
-                        <tr class="total-row">
-                            <td colspan="4">TOTAL GÉNÉRAL</td>
-                            <td class="text-right">{{ \App\Helpers\ParoisseConfig::formatMontant($report['total_general']) }}</td>
-                        </tr>
-                    </tfoot>
-                @endif
+                <tfoot>
+                    <tr class="total-row">
+                        <td colspan="2">TOTAL GÉNÉRAL</td>
+                        <td class="text-right">{{ \App\Helpers\ParoisseConfig::formatMontant($report['total_general']) }}</td>
+                    </tr>
+                </tfoot>
             </table>
         </div>
     @endif

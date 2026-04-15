@@ -69,7 +69,7 @@
                     <ul class="sidebar-sub-menu mt-1" role="list">
                         <li class="sidebar-sub-item"><a href="{{ route('revenues.index') }}" class="sidebar-sub-link {{ request()->routeIs('revenues.index') ? 'is-active' : '' }}">Toutes les recettes</a></li>
                         <li class="sidebar-sub-item"><a href="{{ route('revenues.create') }}" class="sidebar-sub-link {{ request()->routeIs('revenues.create') ? 'is-active' : '' }}">Ajouter une recette</a></li>
-                        <li class="sidebar-sub-item"><a href="{{ route('revenue-reports.index') }}" class="sidebar-sub-link {{ $isRevenueReportsResource || $isRevenueReportCreate ? 'is-active' : '' }}">Rapports recettes</a></li>
+                        {{-- <li class="sidebar-sub-item"><a href="{{ route('revenue-reports.index') }}" class="sidebar-sub-link {{ $isRevenueReportsResource || $isRevenueReportCreate ? 'is-active' : '' }}">Rapports recettes</a></li> --}}
                     </ul>
                 </details>
             </li>
@@ -83,7 +83,7 @@
                     <ul class="sidebar-sub-menu mt-1" role="list">
                         <li class="sidebar-sub-item"><a href="{{ route('expenses.index') }}" class="sidebar-sub-link {{ request()->routeIs('expenses.index') ? 'is-active' : '' }}">Toutes les dépenses</a></li>
                         <li class="sidebar-sub-item"><a href="{{ route('expenses.create') }}" class="sidebar-sub-link {{ request()->routeIs('expenses.create') ? 'is-active' : '' }}">Ajouter une dépense</a></li>
-                        <li class="sidebar-sub-item"><a href="{{ route('charges-fixes-reports.index') }}" class="sidebar-sub-link {{ request()->routeIs('charges-fixes-reports.*') ? 'is-active' : '' }}">Rapports charges fixes</a></li>
+                        {{-- <li class="sidebar-sub-item"><a href="{{ route('charges-fixes-reports.index') }}" class="sidebar-sub-link {{ request()->routeIs('charges-fixes-reports.*') ? 'is-active' : '' }}">Rapports charges fixes</a></li> --}}
                     </ul>
                 </details>
             </li>
@@ -115,12 +115,12 @@
                         <li class="sidebar-sub-item"><a href="{{ route('financial-reports.index') }}" class="sidebar-sub-link {{ $isFinancialHub ? 'is-active' : '' }}">Hub rapports financiers</a></li>
                         <li class="sidebar-sub-item"><a href="{{ route('financial-reports.list') }}" class="sidebar-sub-link {{ $isFinancialList ? 'is-active' : '' }}">Liste des rapports</a></li>
                         <li class="sidebar-sub-item"><a href="{{ route('financial-reports.statistics') }}" class="sidebar-sub-link {{ $isFinancialStats ? 'is-active' : '' }}">Stats rapports</a></li>
-                        <li class="sidebar-sub-item"><a href="{{ route('financial-reports.revenues-weekly') }}" class="sidebar-sub-link {{ $isFinancialQueteWeekly ? 'is-active' : '' }}">Rapport quête ordinaire</a></li>
+                        {{-- <li class="sidebar-sub-item"><a href="{{ route('financial-reports.revenues-weekly') }}" class="sidebar-sub-link {{ $isFinancialQueteWeekly ? 'is-active' : '' }}">Rapport quête ordinaire</a></li> --}}
                         @endcan
-                        <li class="sidebar-sub-item"><a href="{{ route('revenue-reports.create') }}" class="sidebar-sub-link {{ $isRevenueReportCreate ? 'is-active' : '' }}">Générer un rapport</a></li>
+                        {{-- <li class="sidebar-sub-item"><a href="{{ route('revenue-reports.create') }}" class="sidebar-sub-link {{ $isRevenueReportCreate ? 'is-active' : '' }}">Générer un rapport</a></li>
                         <li class="sidebar-sub-item"><a href="{{ route('revenue-reports.index') }}" class="sidebar-sub-link {{ $isRevenueReportsResource ? 'is-active' : '' }}">Rapports enregistrés</a></li>
                         <li class="sidebar-sub-item"><a href="{{ route('popote-reports.index') }}" class="sidebar-sub-link {{ request()->routeIs('popote-reports.*') ? 'is-active' : '' }}">Rapport Subvention Popote</a></li>
-                        <li class="sidebar-sub-item"><a href="{{ route('charges-fixes-reports.index') }}" class="sidebar-sub-link {{ request()->routeIs('charges-fixes-reports.*') ? 'is-active' : '' }}">Rapport Charges fixes</a></li>
+                        <li class="sidebar-sub-item"><a href="{{ route('charges-fixes-reports.index') }}" class="sidebar-sub-link {{ request()->routeIs('charges-fixes-reports.*') ? 'is-active' : '' }}">Rapport Charges fixes</a></li> --}}
                     </ul>
                 </details>
             </li>

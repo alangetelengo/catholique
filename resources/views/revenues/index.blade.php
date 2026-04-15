@@ -10,15 +10,10 @@
 
 @section('content')
     @php
-        $countPage = $revenues->count();
         $formatFcfa = static fn (float $value): string => number_format($value, 0, ',', ' ') . ' fcfa';
     @endphp
 
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-5">
-        <div class="adventiste-card-pro-static p-4">
-            <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Recettes (page)</p>
-            <p class="mt-1 text-2xl font-bold text-slate-900 dark:text-slate-100">{{ $countPage }}</p>
-        </div>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-5">
         <div class="adventiste-card-pro-static p-4">
             <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Total des recettes</p>
             <p class="mt-1 text-2xl font-bold text-emerald-700 dark:text-emerald-400">{{ $formatFcfa($totalMontantRecettes) }}</p>
@@ -91,7 +86,6 @@
                         <th class="px-4 py-3 font-semibold">Type</th>
                         <th class="px-4 py-3 font-semibold">Montant</th>
                         <th class="px-4 py-3 font-semibold">Paiement</th>
-                        <th class="px-4 py-3 font-semibold">Référence</th>
                         <th class="px-4 py-3 font-semibold text-right">Actions</th>
                     </tr>
                 </thead>
@@ -107,7 +101,6 @@
                                     {{ str_replace('_', ' ', ucfirst($revenue->methode_paiement)) }}
                                 </span>
                             </td>
-                            <td class="px-4 py-3">{{ $revenue->reference_paiement ?? '-' }}</td>
                             <td class="px-4 py-3">
                                 <div class="flex items-center justify-end gap-2">
                                     <x-action-button
@@ -126,7 +119,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="7" class="px-4 py-8 text-center text-slate-500">Aucune recette trouvée.</td>
+                            <td colspan="6" class="px-4 py-8 text-center text-slate-500">Aucune recette trouvée.</td>
                         </tr>
                     @endforelse
                 </tbody>

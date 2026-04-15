@@ -27,6 +27,8 @@
         .form-submit-loading { opacity: .78; cursor: not-allowed; }
         @keyframes form-submit-spin { to { transform: rotate(360deg); } }
         .err { background: #fff1f2; border: 1px solid #fecdd3; color: #be123c; padding: 10px 12px; border-radius: 10px; margin-bottom: 12px; font-size: .88rem; }
+        .field-err { margin-top: 6px; font-size: .82rem; color: #be123c; line-height: 1.35; }
+        input.field-invalid { border-color: #f43f5e; box-shadow: 0 0 0 3px rgba(244, 63, 94, .12); }
         @media (max-width: 860px) { .shell { grid-template-columns: 1fr; } }
     </style>
 </head>
@@ -41,19 +43,31 @@
             <h2>Connexion</h2>
             <p class="muted">Saisissez vos identifiants.</p>
 
-            @if ($errors->any())
-                <div class="err">{{ $errors->first() }}</div>
+            @php
+                $firstOtherFormError = collect($errors->getMessages())
+                    ->except(['login', 'password'])
+                    ->flatten()
+                    ->first();
+            @endphp
+            @if ($firstOtherFormError)
+                <div class="err">{{ $firstOtherFormError }}</div>
             @endif
 
             <form method="POST" action="{{ route('login') }}" data-loading-text="Connexion...">
                 @csrf
                 <div class="group">
                     <label for="login">E-mail ou nom d&rsquo;utilisateur</label>
-                    <input id="login" type="text" name="login" value="{{ old('login') }}" required autofocus autocomplete="username" placeholder="ex. nom@domaine.com ou mon.identifiant">
+                    <input id="login" type="text" name="login" value="{{ old('login') }}" required autofocus autocomplete="username" placeholder="ex. nom@domaine.com ou mon.identifiant" @class(['field-invalid' => $errors->has('login')]) aria-invalid="{{ $errors->has('login') ? 'true' : 'false' }}" @if ($errors->has('login')) aria-describedby="login-error" @endif>
+                    @error('login')
+                        <p id="login-error" class="field-err" role="alert">{{ $message }}</p>
+                    @enderror
                 </div>
                 <div class="group">
                     <label for="password">Mot de passe</label>
-                    <input id="password" type="password" name="password" required autocomplete="current-password">
+                    <input id="password" type="password" name="password" required autocomplete="current-password" @class(['field-invalid' => $errors->has('password')]) aria-invalid="{{ $errors->has('password') ? 'true' : 'false' }}" @if ($errors->has('password')) aria-describedby="password-error" @endif>
+                    @error('password')
+                        <p id="password-error" class="field-err" role="alert">{{ $message }}</p>
+                    @enderror
                 </div>
                 <label class="remember">
                     <input type="checkbox" name="remember" value="1">

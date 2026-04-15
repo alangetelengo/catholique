@@ -13,7 +13,10 @@ return [
     |
     */
 
-    'failed' => 'These credentials do not match our records.',
+    'failed' => 'Invalid email, username, or password.',
+    'unknown_email' => 'No account matches this email address.',
+    'unknown_username' => 'No account matches this username.',
+    'wrong_password' => 'The password you entered is incorrect.',
     'password' => 'The provided password is incorrect.',
     'throttle' => 'Too many login attempts. Please try again in :seconds seconds.',
 

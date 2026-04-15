@@ -86,6 +86,18 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Locale pour les écrans d’authentification invité (login, etc.)
+    |--------------------------------------------------------------------------
+    |
+    | Les messages d’erreur de connexion utilisent cette locale lorsqu’elle
+    | est définie. Par défaut : français, indépendamment de APP_LOCALE.
+    |
+    */
+
+    'guest_auth_locale' => env('APP_GUEST_AUTH_LOCALE', 'fr'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Encryption Key
     |--------------------------------------------------------------------------
     |

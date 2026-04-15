@@ -6,6 +6,10 @@
     $filteredCategoryNom = $filteredCategoryId
         ? (\App\Models\RevenueCategory::query()->whereKey($filteredCategoryId)->value('nom'))
         : null;
+    $filteredTypeId = $detailsCat['revenue_type_id'] ?? null;
+    $filteredTypeNom = $filteredTypeId
+        ? (\App\Models\RevenueType::query()->whereKey($filteredTypeId)->value('nom'))
+        : null;
 @endphp
 
 @section('title', 'Rapport par catégories de recettes — Catholique')
@@ -17,6 +21,9 @@
     <span>Période du {{ $financialReport->date_debut->format('d/m/Y') }} au {{ $financialReport->date_fin->format('d/m/Y') }}</span>
     @if ($filteredCategoryNom)
         <span class="block mt-1 text-slate-600 dark:text-slate-400">Filtre catégorie : <strong class="font-semibold text-slate-800 dark:text-slate-200">{{ $filteredCategoryNom }}</strong></span>
+    @endif
+    @if ($filteredTypeNom)
+        <span class="block mt-1 text-slate-600 dark:text-slate-400">Filtre type : <strong class="font-semibold text-slate-800 dark:text-slate-200">{{ $filteredTypeNom }}</strong></span>
     @endif
     <span class="block mt-1 text-slate-600 dark:text-slate-400">Enregistré le {{ $financialReport->created_at->format('d/m/Y à H:i') }}@if ($financialReport->createdBy) par {{ $financialReport->createdBy->name }}@endif</span>
 @endsection
@@ -66,6 +73,9 @@
             @if ($filteredCategoryNom)
                 <p class="text-sm text-slate-600">Catégorie : {{ $filteredCategoryNom }}</p>
             @endif
+            @if ($filteredTypeNom)
+                <p class="text-sm text-slate-600">Type : {{ $filteredTypeNom }}</p>
+            @endif
             <p class="text-sm text-slate-600">
                 Généré le {{ $financialReport->created_at->format('d/m/Y à H:i') }}
                 @if ($financialReport->createdBy)
@@ -75,7 +85,7 @@
             <hr class="mt-4 border-slate-200">
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <div class="grid grid-cols-1 gap-4 mb-6 @if ($filteredCategoryId) md:grid-cols-2 @else md:grid-cols-3 @endif">
             <div class="adventiste-card-pro-static p-4 sm:p-5 border-t-4 border-t-emerald-500">
                 <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400 flex items-center gap-2">
                     <i class="fas fa-coins text-emerald-600 dark:text-emerald-400" aria-hidden="true"></i>
@@ -90,16 +100,18 @@
                 </p>
                 <p class="mt-1 text-xl font-bold text-slate-900 dark:text-white tabular-nums">{{ $report['revenues']->count() }}</p>
             </div>
-            <div class="adventiste-card-pro-static p-4 sm:p-5 border-t-4 border-t-violet-500">
-                <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400 flex items-center gap-2">
-                    <i class="fas fa-folder text-violet-600 dark:text-violet-400" aria-hidden="true"></i>
-                    Catégories
-                </p>
-                <p class="mt-1 text-xl font-bold text-violet-800 dark:text-violet-300 tabular-nums">{{ count($report['by_category']) }}</p>
-            </div>
+            @if (! $filteredCategoryId)
+                <div class="adventiste-card-pro-static p-4 sm:p-5 border-t-4 border-t-violet-500">
+                    <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400 flex items-center gap-2">
+                        <i class="fas fa-folder text-violet-600 dark:text-violet-400" aria-hidden="true"></i>
+                        Catégories
+                    </p>
+                    <p class="mt-1 text-xl font-bold text-violet-800 dark:text-violet-300 tabular-nums">{{ count($report['by_category']) }}</p>
+                </div>
+            @endif
         </div>
 
-        @if (count($report['by_category']) > 0)
+        @if (! $filteredCategoryId && count($report['by_category']) > 0)
             <div class="adventiste-card-pro-static overflow-hidden mb-6">
                 <div class="px-4 py-3 border-b border-slate-200/80 dark:border-slate-600/80 bg-slate-50/80 dark:bg-slate-800/50">
                     <h3 class="text-sm font-semibold text-slate-900 dark:text-white m-0 flex items-center gap-2">

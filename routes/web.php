@@ -82,6 +82,9 @@ Route::middleware('auth')->group(function (): void {
     Route::get('financial-reports/popote/print', [FinancialReportController::class, 'popotePrint'])->name('financial-reports.popote-print');
     Route::post('financial-reports/popote/pdf', [FinancialReportController::class, 'downloadPopotePdf'])->name('financial-reports.popote-pdf');
     Route::get('financial-reports/charges-fixes', [FinancialReportController::class, 'chargesFixesReport'])->name('financial-reports.charges-fixes');
+    Route::get('financial-reports/revenues-by-category/revenue-categories', [FinancialReportController::class, 'revenueCategoriesForParoisse'])->name('financial-reports.revenues-by-category.revenue-categories');
+    Route::get('financial-reports/revenues-by-category/revenue-types', [FinancialReportController::class, 'revenueTypesForCategory'])->name('financial-reports.revenues-by-category.revenue-types');
+    Route::post('financial-reports/revenues-by-category/calculate', [FinancialReportController::class, 'revenuesByCategoryCalculate'])->name('financial-reports.revenues-by-category.calculate');
     Route::get('financial-reports/revenues-by-category', [FinancialReportController::class, 'revenuesByCategory'])->name('financial-reports.revenues-by-category');
     Route::post('financial-reports/revenues-by-category/store', [FinancialReportController::class, 'storeRevenuesByCategory'])->name('financial-reports.revenues-by-category.store');
     Route::get('financial-reports/revenues-by-category/pdf', [FinancialReportController::class, 'downloadRevenuesByCategoryPdf'])->name('financial-reports.revenues-by-category.pdf');

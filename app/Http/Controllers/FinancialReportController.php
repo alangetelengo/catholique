@@ -9,10 +9,12 @@ use App\Models\FinancialReport;
 use App\Models\Paroisse;
 use App\Models\Revenue;
 use App\Models\RevenueCategory;
+use App\Models\RevenueType;
 use App\Support\PaginationPerPage;
 use App\Traits\LogsErrors;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -38,6 +40,7 @@ class FinancialReportController extends Controller implements HasMiddleware
             new Middleware('permission:view_financial_reports', only: [
                 'index', 'list', 'show', 'statistics', 'revenuesWeekly', 'revenuesWeeklyPrint',
                 'popoteReport', 'popotePrint', 'chargesFixesReport', 'revenuesByCategory',
+                'revenueCategoriesForParoisse', 'revenueTypesForCategory', 'revenuesByCategoryCalculate',
             ]),
             new Middleware('permission:generate_financial_reports', only: [
                 'store', 'downloadPdf', 'downloadRevenuesWeeklyPdf', 'downloadPopotePdf',
@@ -374,7 +377,8 @@ class FinancialReportController extends Controller implements HasMiddleware
             if ($financialReport->periode_type === 'revenues_by_category') {
                 $details = $financialReport->details_recettes ?? [];
                 $categoryId = $details['revenue_category_id'] ?? null;
-                $report = $this->calculateRevenuesByCategoryReport($financialReport->paroisse_id, $dateDebut, $dateFin, $categoryId);
+                $typeId = isset($details['revenue_type_id']) ? (int) $details['revenue_type_id'] : null;
+                $report = $this->calculateRevenuesByCategoryReport($financialReport->paroisse_id, $dateDebut, $dateFin, $categoryId, $typeId);
 
                 return view('financial-reports.show-revenues-by-category', [
                     'financialReport' => $financialReport,
@@ -414,9 +418,14 @@ class FinancialReportController extends Controller implements HasMiddleware
             if ($financialReport->periode_type === 'revenues_by_category') {
                 $details = $financialReport->details_recettes ?? [];
                 $categoryId = $details['revenue_category_id'] ?? null;
-                $report = $this->calculateRevenuesByCategoryReport($financialReport->paroisse_id, $dateDebut, $dateFin, $categoryId);
+                $typeId = isset($details['revenue_type_id']) ? (int) $details['revenue_type_id'] : null;
+                $report = $this->calculateRevenuesByCategoryReport($financialReport->paroisse_id, $dateDebut, $dateFin, $categoryId, $typeId);
                 $paroisse = $financialReport->paroisse;
                 $headerConfig = $this->getHeaderConfig($financialReport->paroisse_id);
+
+                $pdfCategoryNom = $categoryId ? RevenueCategory::query()->whereKey($categoryId)->value('nom') : null;
+                $pdfTypeNom = $typeId ? RevenueType::query()->whereKey($typeId)->value('nom') : null;
+                $layout = $this->revenuesByCategoryReportLayout($typeId);
 
                 $pdf = Pdf::loadView('financial-reports.revenues-by-category-pdf', [
                     'report' => $report,
@@ -425,6 +434,10 @@ class FinancialReportController extends Controller implements HasMiddleware
                     'dateDebut' => $dateDebut,
                     'dateFin' => $dateFin,
                     'selectedCategoryId' => $categoryId,
+                    'selectedTypeId' => $typeId,
+                    'pdfCategoryNom' => $pdfCategoryNom,
+                    'pdfTypeNom' => $pdfTypeNom,
+                    ...$layout,
                 ])->setPaper('a4', 'landscape');
 
                 $filename = 'rapport-recettes-par-categorie-'.Str::slug($paroisse->nom).'-'.$dateDebut->format('Y-m-d').'-'.$dateFin->format('Y-m-d').'.pdf';
@@ -960,7 +973,7 @@ class FinancialReportController extends Controller implements HasMiddleware
     }
 
     /**
-     * Rapport par catégories de recettes — Filtres : paroisse, période, catégorie.
+     * Rapport par catégories de recettes — page initiale (sans requête GET longue) ; calcul via AJAX.
      */
     public function revenuesByCategory(Request $request): View
     {
@@ -971,34 +984,41 @@ class FinancialReportController extends Controller implements HasMiddleware
                 ? Paroisse::orderBy('nom')->get()
                 : Paroisse::whereKey($user->paroisse_id)->get();
 
-            $selectedParoisseId = $request->integer('paroisse_id', $user->hasRole('super_admin') ? null : $user->paroisse_id);
-            $dateDebut = $request->filled('date_debut') ? Carbon::parse($request->date_debut)->startOfDay() : null;
-            $dateFin = $request->filled('date_fin') ? Carbon::parse($request->date_fin)->endOfDay() : null;
-            $selectedCategoryId = $request->filled('revenue_category_id') ? (int) $request->revenue_category_id : null;
+            $selectedParoisseId = $user->hasRole('super_admin')
+                ? null
+                : (int) $user->paroisse_id;
+
+            $now = now();
+            $dateDebut = $now->copy()->startOfMonth()->format('Y-m-d');
+            $dateFin = $now->copy()->endOfMonth()->format('Y-m-d');
 
             $categories = collect();
-            $report = null;
+            $types = collect();
+
             if ($selectedParoisseId) {
-                $categories = RevenueCategory::with('types')
+                $categories = RevenueCategory::query()
                     ->where('paroisse_id', $selectedParoisseId)
                     ->where('actif', true)
                     ->orderBy('ordre')
                     ->orderBy('nom')
                     ->get();
-
-                if ($dateDebut && $dateFin) {
-                    $report = $this->calculateRevenuesByCategoryReport($selectedParoisseId, $dateDebut, $dateFin, $selectedCategoryId);
-                }
             }
 
             return view('financial-reports.revenues-by-category', [
                 'paroisses' => $paroisses,
                 'categories' => $categories,
+                'types' => $types,
                 'selectedParoisseId' => $selectedParoisseId,
-                'dateDebut' => $dateDebut?->format('Y-m-d'),
-                'dateFin' => $dateFin?->format('Y-m-d'),
-                'selectedCategoryId' => $selectedCategoryId,
-                'report' => $report,
+                'dateDebut' => $dateDebut,
+                'dateFin' => $dateFin,
+                'selectedCategoryId' => null,
+                'selectedTypeId' => null,
+                'report' => null,
+                'ajaxRoutes' => [
+                    'categories' => route('financial-reports.revenues-by-category.revenue-categories'),
+                    'types' => route('financial-reports.revenues-by-category.revenue-types'),
+                    'calculate' => route('financial-reports.revenues-by-category.calculate'),
+                ],
             ]);
         } catch (Throwable $e) {
             $this->logError($e, 'Erreur rapport par catégories de recettes');
@@ -1007,12 +1027,146 @@ class FinancialReportController extends Controller implements HasMiddleware
             return view('financial-reports.revenues-by-category', [
                 'paroisses' => collect(),
                 'categories' => collect(),
+                'types' => collect(),
                 'selectedParoisseId' => null,
-                'dateDebut' => null,
-                'dateFin' => null,
+                'dateDebut' => now()->startOfMonth()->format('Y-m-d'),
+                'dateFin' => now()->endOfMonth()->format('Y-m-d'),
                 'selectedCategoryId' => null,
+                'selectedTypeId' => null,
                 'report' => null,
+                'ajaxRoutes' => [
+                    'categories' => route('financial-reports.revenues-by-category.revenue-categories'),
+                    'types' => route('financial-reports.revenues-by-category.revenue-types'),
+                    'calculate' => route('financial-reports.revenues-by-category.calculate'),
+                ],
             ]);
+        }
+    }
+
+    public function revenueCategoriesForParoisse(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        $validated = $request->validate([
+            'paroisse_id' => ['required', 'integer', 'exists:paroisses,id'],
+        ]);
+        $paroisseId = (int) $validated['paroisse_id'];
+
+        if (! $user->hasRole('super_admin') && (int) $user->paroisse_id !== $paroisseId) {
+            return response()->json(['message' => 'Accès non autorisé.'], 403);
+        }
+
+        $categories = RevenueCategory::query()
+            ->where('paroisse_id', $paroisseId)
+            ->where('actif', true)
+            ->orderBy('ordre')
+            ->orderBy('nom')
+            ->get(['id', 'nom']);
+
+        return response()->json(['categories' => $categories]);
+    }
+
+    public function revenueTypesForCategory(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        $validated = $request->validate([
+            'paroisse_id' => ['required', 'integer', 'exists:paroisses,id'],
+            'revenue_category_id' => ['required', 'integer', 'exists:revenue_categories,id'],
+        ]);
+        $paroisseId = (int) $validated['paroisse_id'];
+        $categoryId = (int) $validated['revenue_category_id'];
+
+        if (! $user->hasRole('super_admin') && (int) $user->paroisse_id !== $paroisseId) {
+            return response()->json(['message' => 'Accès non autorisé.'], 403);
+        }
+
+        $categoryOk = RevenueCategory::query()
+            ->whereKey($categoryId)
+            ->where('paroisse_id', $paroisseId)
+            ->exists();
+
+        if (! $categoryOk) {
+            return response()->json(['message' => 'Catégorie invalide pour cette paroisse.'], 422);
+        }
+
+        $types = RevenueType::query()
+            ->where('paroisse_id', $paroisseId)
+            ->where('revenue_category_id', $categoryId)
+            ->where('actif', true)
+            ->orderBy('ordre')
+            ->orderBy('nom')
+            ->get(['id', 'nom']);
+
+        return response()->json(['types' => $types]);
+    }
+
+    public function revenuesByCategoryCalculate(Request $request): JsonResponse
+    {
+        try {
+            $user = $request->user();
+
+            $validated = $request->validate([
+                'paroisse_id' => ['required', 'integer', 'exists:paroisses,id'],
+                'date_debut' => ['required', 'date'],
+                'date_fin' => ['required', 'date', 'after_or_equal:date_debut'],
+                'revenue_category_id' => ['nullable', 'exists:revenue_categories,id', 'required_with:revenue_type_id'],
+                'revenue_type_id' => ['nullable', 'integer', 'exists:revenue_types,id'],
+            ]);
+
+            if (! $user->hasRole('super_admin') && (int) $validated['paroisse_id'] !== (int) $user->paroisse_id) {
+                return response()->json(['message' => 'Vous ne pouvez consulter que les rapports de votre paroisse.'], 403);
+            }
+
+            $dateDebut = Carbon::parse($validated['date_debut'])->startOfDay();
+            $dateFin = Carbon::parse($validated['date_fin'])->endOfDay();
+            $categoryId = isset($validated['revenue_category_id']) ? (int) $validated['revenue_category_id'] : null;
+            $requestedTypeId = isset($validated['revenue_type_id']) ? (int) $validated['revenue_type_id'] : null;
+            $typeId = $this->resolveRevenueTypeIdForReport($requestedTypeId, (int) $validated['paroisse_id'], $categoryId);
+
+            if ($requestedTypeId !== null && $typeId === null) {
+                return response()->json([
+                    'message' => 'Le type de recette est invalide ou ne correspond pas à la catégorie.',
+                ], 422);
+            }
+
+            $report = $this->calculateRevenuesByCategoryReport(
+                (int) $validated['paroisse_id'],
+                $dateDebut,
+                $dateFin,
+                $categoryId,
+                $typeId
+            );
+
+            $layout = $this->revenuesByCategoryReportLayout($typeId);
+
+            $html = view('financial-reports.partials.revenues-by-category-report-body', [
+                'report' => $report,
+                'dateDebut' => $validated['date_debut'],
+                'dateFin' => $validated['date_fin'],
+                'selectedCategoryId' => $categoryId,
+                'selectedTypeId' => $typeId,
+                'selectedParoisseId' => (int) $validated['paroisse_id'],
+                ...$layout,
+            ])->render();
+
+            $pdfUrl = route('financial-reports.revenues-by-category.pdf', array_filter([
+                'paroisse_id' => (int) $validated['paroisse_id'],
+                'date_debut' => $validated['date_debut'],
+                'date_fin' => $validated['date_fin'],
+                'revenue_category_id' => $categoryId,
+                'revenue_type_id' => $typeId,
+            ], fn ($v) => $v !== null && $v !== ''));
+
+            return response()->json([
+                'html' => $html,
+                'pdf_url' => $pdfUrl,
+                'period_label' => $dateDebut->format('d/m/Y').' → '.$dateFin->format('d/m/Y'),
+            ]);
+        } catch (ValidationException $e) {
+            throw $e;
+        } catch (Throwable $e) {
+            $this->logError($e, 'Erreur calcul AJAX rapport recettes par catégorie', ['data' => $request->all()]);
+
+            return response()->json(['message' => 'Une erreur est survenue lors du calcul du rapport.'], 500);
         }
     }
 
@@ -1025,7 +1179,8 @@ class FinancialReportController extends Controller implements HasMiddleware
                 'paroisse_id' => ['required', 'exists:paroisses,id'],
                 'date_debut' => ['required', 'date'],
                 'date_fin' => ['required', 'date', 'after_or_equal:date_debut'],
-                'revenue_category_id' => ['nullable', 'exists:revenue_categories,id'],
+                'revenue_category_id' => ['nullable', 'exists:revenue_categories,id', 'required_with:revenue_type_id'],
+                'revenue_type_id' => ['nullable', 'integer', 'exists:revenue_types,id'],
             ]);
 
             if (! $user->hasRole('super_admin') && (int) $validated['paroisse_id'] !== (int) $user->paroisse_id) {
@@ -1036,9 +1191,17 @@ class FinancialReportController extends Controller implements HasMiddleware
 
             $dateDebut = Carbon::parse($validated['date_debut'])->startOfDay();
             $dateFin = Carbon::parse($validated['date_fin'])->endOfDay();
-            $categoryId = $validated['revenue_category_id'] ?? null;
+            $categoryId = isset($validated['revenue_category_id']) ? (int) $validated['revenue_category_id'] : null;
+            $requestedTypeId = isset($validated['revenue_type_id']) ? (int) $validated['revenue_type_id'] : null;
+            $typeId = $this->resolveRevenueTypeIdForReport($requestedTypeId, (int) $validated['paroisse_id'], $categoryId);
 
-            $report = $this->calculateRevenuesByCategoryReport((int) $validated['paroisse_id'], $dateDebut, $dateFin, $categoryId);
+            if ($requestedTypeId !== null && $typeId === null) {
+                FlashAlert::error('Le type de recette est invalide ou ne correspond pas à la catégorie (une catégorie est obligatoire pour filtrer par type).');
+
+                return redirect()->back()->withInput();
+            }
+
+            $report = $this->calculateRevenuesByCategoryReport((int) $validated['paroisse_id'], $dateDebut, $dateFin, $categoryId, $typeId);
 
             FinancialReport::create([
                 'paroisse_id' => $validated['paroisse_id'],
@@ -1050,6 +1213,7 @@ class FinancialReportController extends Controller implements HasMiddleware
                 'solde' => $report['total_general'],
                 'details_recettes' => [
                     'revenue_category_id' => $categoryId,
+                    'revenue_type_id' => $typeId,
                     'by_category' => $report['by_category'],
                     'revenues' => $report['revenues']->map(fn ($r) => [
                         'id' => $r->id,
@@ -1083,7 +1247,8 @@ class FinancialReportController extends Controller implements HasMiddleware
                 'paroisse_id' => ['required', 'exists:paroisses,id'],
                 'date_debut' => ['required', 'date'],
                 'date_fin' => ['required', 'date', 'after_or_equal:date_debut'],
-                'revenue_category_id' => ['nullable', 'exists:revenue_categories,id'],
+                'revenue_category_id' => ['nullable', 'exists:revenue_categories,id', 'required_with:revenue_type_id'],
+                'revenue_type_id' => ['nullable', 'integer', 'exists:revenue_types,id'],
             ]);
 
             if (! $user->hasRole('super_admin') && (int) $validated['paroisse_id'] !== (int) $user->paroisse_id) {
@@ -1094,22 +1259,34 @@ class FinancialReportController extends Controller implements HasMiddleware
 
             $dateDebut = Carbon::parse($validated['date_debut'])->startOfDay();
             $dateFin = Carbon::parse($validated['date_fin'])->endOfDay();
+            $selectedCategoryId = isset($validated['revenue_category_id']) ? (int) $validated['revenue_category_id'] : null;
+            $requestedTypeId = isset($validated['revenue_type_id']) ? (int) $validated['revenue_type_id'] : null;
+            $selectedTypeId = $this->resolveRevenueTypeIdForReport($requestedTypeId, (int) $validated['paroisse_id'], $selectedCategoryId);
+
+            if ($requestedTypeId !== null && $selectedTypeId === null) {
+                FlashAlert::error('Le type de recette est invalide ou ne correspond pas à la catégorie (une catégorie est obligatoire pour filtrer par type).');
+
+                return redirect()->back();
+            }
+
             $report = $this->calculateRevenuesByCategoryReport(
                 (int) $validated['paroisse_id'],
                 $dateDebut,
                 $dateFin,
-                $validated['revenue_category_id'] ?? null
+                $selectedCategoryId,
+                $selectedTypeId
             );
 
             $paroisse = Paroisse::find($validated['paroisse_id']);
             $headerConfig = $this->getHeaderConfig($validated['paroisse_id']);
 
-            $selectedCategoryId = isset($validated['revenue_category_id'])
-                ? (int) $validated['revenue_category_id']
-                : null;
             $pdfCategoryNom = $selectedCategoryId
                 ? RevenueCategory::query()->whereKey($selectedCategoryId)->value('nom')
                 : null;
+            $pdfTypeNom = $selectedTypeId
+                ? RevenueType::query()->whereKey($selectedTypeId)->value('nom')
+                : null;
+            $layout = $this->revenuesByCategoryReportLayout($selectedTypeId);
 
             $pdf = Pdf::loadView('financial-reports.revenues-by-category-pdf', [
                 'report' => $report,
@@ -1118,7 +1295,10 @@ class FinancialReportController extends Controller implements HasMiddleware
                 'dateDebut' => $dateDebut,
                 'dateFin' => $dateFin,
                 'selectedCategoryId' => $selectedCategoryId,
+                'selectedTypeId' => $selectedTypeId,
                 'pdfCategoryNom' => $pdfCategoryNom,
+                'pdfTypeNom' => $pdfTypeNom,
+                ...$layout,
             ])->setPaper('a4', 'portrait');
 
             $filename = 'rapport-recettes-par-categorie-'.Str::slug($paroisse->nom).'-'.$dateDebut->format('Y-m-d').'-'.$dateFin->format('Y-m-d').'.pdf';
@@ -1132,7 +1312,69 @@ class FinancialReportController extends Controller implements HasMiddleware
         }
     }
 
-    private function calculateRevenuesByCategoryReport(int $paroisseId, Carbon $dateDebut, Carbon $dateFin, ?int $categoryId = null): array
+    private function resolveRevenueTypeIdForReport(?int $typeId, int $paroisseId, ?int $categoryId): ?int
+    {
+        if ($typeId === null) {
+            return null;
+        }
+
+        if ($categoryId === null) {
+            return null;
+        }
+
+        $type = RevenueType::query()
+            ->whereKey($typeId)
+            ->where('paroisse_id', $paroisseId)
+            ->first();
+
+        if (! $type) {
+            return null;
+        }
+
+        if ($categoryId !== null && (int) $type->revenue_category_id !== $categoryId) {
+            return null;
+        }
+
+        return (int) $type->id;
+    }
+
+    /**
+     * Affichage semaine / dimanche du rapport selon le code du type de recette filtré.
+     *
+     * @return array{showRptSemaine: bool, showRptDimanche: bool, rptTotalSubtitle: string}
+     */
+    private function revenuesByCategoryReportLayout(?int $typeId): array
+    {
+        if ($typeId === null) {
+            return [
+                'showRptSemaine' => true,
+                'showRptDimanche' => true,
+                'rptTotalSubtitle' => 'Semaine + dimanche',
+            ];
+        }
+
+        $code = RevenueType::query()->whereKey($typeId)->value('code');
+
+        return match ($code) {
+            'messe_dimanche' => [
+                'showRptSemaine' => false,
+                'showRptDimanche' => true,
+                'rptTotalSubtitle' => 'Messes du dimanche (période)',
+            ],
+            'messe_semaine' => [
+                'showRptSemaine' => true,
+                'showRptDimanche' => false,
+                'rptTotalSubtitle' => 'Messes de semaine (période)',
+            ],
+            default => [
+                'showRptSemaine' => true,
+                'showRptDimanche' => true,
+                'rptTotalSubtitle' => 'Semaine + dimanche',
+            ],
+        };
+    }
+
+    private function calculateRevenuesByCategoryReport(int $paroisseId, Carbon $dateDebut, Carbon $dateFin, ?int $categoryId = null, ?int $typeId = null): array
     {
         $query = Revenue::query()
             ->with(['category', 'type'])
@@ -1143,6 +1385,10 @@ class FinancialReportController extends Controller implements HasMiddleware
 
         if ($categoryId) {
             $query->where('revenue_category_id', $categoryId);
+        }
+
+        if ($typeId) {
+            $query->where('revenue_type_id', $typeId);
         }
 
         $revenues = $query->orderBy('date_recette')->orderBy('id')->get();

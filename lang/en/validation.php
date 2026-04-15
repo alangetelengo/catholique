@@ -179,8 +179,12 @@ return [
     */
 
     'custom' => [
-        'attribute-name' => [
-            'rule-name' => 'custom-message',
+        'login' => [
+            'required' => 'Please enter your email or username.',
+            'max' => 'The email or username may not be greater than :max characters.',
+        ],
+        'password' => [
+            'required' => 'Please enter your password.',
         ],
     ],
 
@@ -195,6 +199,9 @@ return [
     |
     */
 
-    'attributes' => [],
+    'attributes' => [
+        'login' => 'email or username',
+        'password' => 'password',
+    ],
 
 ];

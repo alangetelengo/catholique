@@ -97,9 +97,15 @@ class RevenueController extends Controller
             }
 
             $revenue->update($validated);
+            $revenue->refresh(['category', 'type']);
             $this->logInfo('Recette mise à jour', ['revenue_id' => $revenue->id, 'montant' => $revenue->montant]);
 
-            return redirect()->route('revenues.index')->with('success', 'Recette mise à jour.');
+            $catNom = $revenue->category?->nom ?? '—';
+            $typeNom = $revenue->type?->nom ?? '—';
+            $dateStr = $revenue->date_recette?->format('d/m/Y') ?? '—';
+            $successMessage = "Recette catégorie({$catNom}) du type({$typeNom}) du {$dateStr} mise à jour.";
+
+            return redirect()->route('revenues.index')->with('success', $successMessage);
         } catch (Throwable $e) {
             $this->logError($e, 'Erreur lors de la mise à jour de la recette', ['revenue_id' => $revenue->id]);
             throw $e;
