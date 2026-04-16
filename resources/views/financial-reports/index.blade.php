@@ -2,19 +2,37 @@
 
 @section('title', 'Rapports financiers — Catholique')
 @section('page-title', 'Rapports financiers')
-@section('page-title-info', 'Hub : calculez le rapport mensuel de justification (recettes popote/subvention, dépenses, solde), puis enregistrez-le si vous en avez le droit.')
+@section('page-title-info', 'Choisissez paroisse, mois et année, puis calculez le rapport de justification (recettes popote/subvention, dépenses, solde). Vous pouvez l’enregistrer si votre rôle le permet.')
 
 @section('btn-create')
-    <div class="flex flex-wrap items-center gap-2">
-        <button type="button" class="adventiste-btn-secondary text-sm" onclick="document.getElementById('financialReportHelpModal').showModal()" title="Aide">
-            <i class="fas fa-info-circle me-1.5" aria-hidden="true"></i>Aide
+    <nav class="inline-flex min-w-0 max-w-full flex-wrap items-center justify-end gap-2" aria-label="Navigation rapports financiers">
+        <button type="button" class="adventiste-btn-secondary text-sm inline-flex items-center gap-1.5" onclick="document.getElementById('financialReportHelpModal').showModal()" title="Aide sur ce hub">
+            <i class="fas fa-question-circle text-slate-500 dark:text-slate-400" aria-hidden="true"></i>
+            <span>Aide</span>
         </button>
-        <a href="{{ route('financial-reports.statistics') }}" class="adventiste-btn-secondary text-sm">Stats rapports</a>
-        <a href="{{ route('financial-reports.list') }}" class="adventiste-btn-secondary text-sm">Rapports enregistrés</a>
-        <a href="{{ route('financial-reports.revenues-by-category') }}" class="adventiste-btn-secondary text-sm">Par catégories</a>
-        <a href="{{ route('financial-reports.popote') }}" class="adventiste-btn-secondary text-sm">Subvention Popote</a>
-        <a href="{{ route('financial-reports.charges-fixes') }}" class="adventiste-btn-secondary text-sm">Charges fixes</a>
-    </div>
+        <span class="mx-0.5 hidden h-6 w-px shrink-0 self-center bg-slate-200 dark:bg-slate-600 sm:block" role="presentation" aria-hidden="true"></span>
+        <a href="{{ route('financial-reports.statistics') }}" class="adventiste-btn-secondary text-sm no-underline inline-flex items-center gap-1.5">
+            <i class="fas fa-chart-line text-slate-500 dark:text-slate-400" aria-hidden="true"></i>
+            <span>Stats rapports</span>
+        </a>
+        <a href="{{ route('financial-reports.list') }}" class="adventiste-btn-primary text-sm no-underline inline-flex items-center gap-1.5 shadow-sm">
+            <i class="fas fa-folder-open" aria-hidden="true"></i>
+            <span>Rapports enregistrés</span>
+        </a>
+        <span class="mx-0.5 hidden h-6 w-px shrink-0 self-center bg-slate-200 dark:bg-slate-600 sm:block" role="presentation" aria-hidden="true"></span>
+        <a href="{{ route('financial-reports.revenues-by-category') }}" class="adventiste-btn-secondary text-sm no-underline inline-flex items-center gap-1.5">
+            <i class="fas fa-layer-group text-slate-500 dark:text-slate-400" aria-hidden="true"></i>
+            <span>Par catégories</span>
+        </a>
+        <a href="{{ route('financial-reports.popote') }}" class="adventiste-btn-secondary text-sm no-underline inline-flex items-center gap-1.5">
+            <i class="fas fa-utensils text-slate-500 dark:text-slate-400" aria-hidden="true"></i>
+            <span>Subvention Popote</span>
+        </a>
+        <a href="{{ route('financial-reports.charges-fixes') }}" class="adventiste-btn-secondary text-sm no-underline inline-flex items-center gap-1.5">
+            <i class="fas fa-file-invoice-dollar text-slate-500 dark:text-slate-400" aria-hidden="true"></i>
+            <span>Charges fixes</span>
+        </a>
+    </nav>
 @endsection
 
 @section('content')

@@ -38,7 +38,7 @@
                             <h1 class="@yield('page-title-class', 'text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 dark:text-white')">@yield('page-title')</h1>
                             @hasSection('page-title-info')<div class="@yield('page-title-info-class', 'mt-2 text-sm sm:text-base text-slate-600 dark:text-slate-400 leading-relaxed max-w-3xl')">@yield('page-title-info')</div>@endif
                         </div>
-                        <div class="flex shrink-0 flex-wrap items-center gap-2">
+                        <div class="flex w-full min-w-0 shrink-0 flex-wrap items-center justify-end gap-2 sm:w-auto">
                             @unless(request()->routeIs('home'))
                                 @hasSection('header-back')
                                     @yield('header-back')
