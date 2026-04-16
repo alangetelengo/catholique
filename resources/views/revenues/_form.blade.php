@@ -92,6 +92,21 @@
         @error('date_recette')<p class="mt-1.5 text-sm text-red-600 dark:text-red-400">{{ $message }}</p>@enderror
     </div>
 
+    <div id="jourSemaineWrapper">
+        <label class="block text-sm font-semibold text-slate-800 dark:text-slate-200 mb-1.5" for="jour_semaine_auto">Jour de la semaine (auto)</label>
+        <input
+            type="text"
+            id="jour_semaine_auto"
+            class="{{ $field }} bg-slate-50 dark:bg-slate-800/70"
+            value=""
+            readonly
+            tabindex="-1"
+            aria-live="polite"
+            autocomplete="off"
+        >
+        <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Déduit de la date de recette ; la même valeur est enregistrée en base pour les rapports.</p>
+    </div>
+
     <div>
         <label class="block text-sm font-semibold text-slate-800 dark:text-slate-200 mb-1.5">Montant (FCFA) <span class="text-red-600">*</span></label>
         <input
@@ -117,19 +132,6 @@
             @endforeach
         </select>
         @error('methode_paiement')<p class="mt-1.5 text-sm text-red-600 dark:text-red-400">{{ $message }}</p>@enderror
-    </div>
-
-    <div id="jourSemaineWrapper">
-        <label class="block text-sm font-semibold text-slate-800 dark:text-slate-200 mb-1.5">Jour de la semaine (auto)</label>
-        <input type="hidden" name="jour_semaine" id="jour_semaine_hidden" value="{{ old('jour_semaine', $revenue->jour_semaine) }}">
-        <input
-            type="text"
-            id="jour_semaine_auto"
-            class="{{ $field }} bg-slate-50 dark:bg-slate-800/70"
-            value=""
-            readonly
-        >
-        @error('jour_semaine')<p class="mt-1.5 text-sm text-red-600 dark:text-red-400">{{ $message }}</p>@enderror
     </div>
 
     <div id="moisLocationWrapper">
@@ -183,8 +185,6 @@
             const typeSelect = document.getElementById('revenue_type_id');
             const dateInput = document.getElementById('date_recette');
             const dayAutoInput = document.getElementById('jour_semaine_auto');
-            const dayHiddenInput = document.getElementById('jour_semaine_hidden');
-            const dayWrapper = document.getElementById('jourSemaineWrapper');
             const monthWrapper = document.getElementById('moisLocationWrapper');
             const donorNomWrapper = document.getElementById('donateurNomWrapper');
             const donorTelephoneWrapper = document.getElementById('donateurTelephoneWrapper');
@@ -217,21 +217,23 @@
             }
 
             function computeWeekdayLabel(dateValue) {
-                if (!dateValue) return '';
+                if (!dateValue) {
+                    return '';
+                }
                 const date = new Date(dateValue + 'T00:00:00');
-                if (Number.isNaN(date.getTime())) return '';
+                if (Number.isNaN(date.getTime())) {
+                    return '';
+                }
                 const names = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'];
                 return names[date.getDay()] || '';
             }
 
             function syncAutoWeekday() {
+                if (!dayAutoInput) {
+                    return;
+                }
                 const day = computeWeekdayLabel(dateInput ? dateInput.value : '');
-                if (dayAutoInput) {
-                    dayAutoInput.value = day ? day.charAt(0).toUpperCase() + day.slice(1) : '';
-                }
-                if (dayHiddenInput) {
-                    dayHiddenInput.value = day;
-                }
+                dayAutoInput.value = day ? day.charAt(0).toUpperCase() + day.slice(1) : '';
             }
 
             function toggleConditionalFields() {
@@ -240,17 +242,12 @@
                 const selectedType = typeSelect.options[typeSelect.selectedIndex];
                 const typeCode = selectedType ? selectedType.getAttribute('data-type-code') : '';
 
-                const isQueteOrdinaire = categoryCode === 'quete_ordinaire';
                 const isLocationBoutique = categoryCode === 'location' && (typeCode === 'loyer-boutique' || typeCode === 'loyer_boutique');
                 const isProcure = categoryCode === 'procure';
 
-                dayWrapper.style.display = isQueteOrdinaire ? '' : 'none';
                 monthWrapper.style.display = isLocationBoutique ? '' : 'none';
                 if (donorNomWrapper) donorNomWrapper.style.display = isProcure ? '' : 'none';
                 if (donorTelephoneWrapper) donorTelephoneWrapper.style.display = isProcure ? '' : 'none';
-                if (isQueteOrdinaire) {
-                    syncAutoWeekday();
-                }
             }
 
             categorySelect.addEventListener('change', function () {

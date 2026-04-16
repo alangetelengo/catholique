@@ -13,7 +13,7 @@
 @section('content')
     <div class="adventiste-card-pro-static w-full p-5 sm:p-6">
         <p class="text-sm text-slate-600 dark:text-slate-400 mb-6 leading-relaxed border-b border-slate-200/80 dark:border-slate-600/60 pb-6">
-            Enregistrez la recette avec la catégorie et le type exacts. Le jour de la semaine est calculé automatiquement selon la date choisie.
+            Enregistrez la recette avec la catégorie et le type exacts. Le jour de la semaine (affiché sous la date) et la période (semaine ou dimanche) sont dérivés de la date de recette et enregistrés pour les rapports.
         </p>
         <form method="post" action="{{ route('revenues.store') }}" class="space-y-8">
             @csrf

@@ -173,32 +173,17 @@ class RevenueController extends Controller
             'notes' => ['nullable', 'string'],
             'donateur_nom' => ['nullable', 'string', 'max:255'],
             'donateur_telephone' => ['nullable', 'string', 'max:50'],
-            'jour_semaine' => ['nullable', 'in:lundi,mardi,mercredi,jeudi,vendredi,samedi,dimanche'],
             'mois_location' => ['nullable', 'in:01,02,03,04,05,06,07,08,09,10,11,12'],
         ]);
 
         $category = RevenueCategory::find($validated['revenue_category_id']);
         $revenueType = RevenueType::find($validated['revenue_type_id']);
 
-        if ($category && $category->code === 'quete_ordinaire') {
-            $weekdayMap = [
-                0 => 'dimanche',
-                1 => 'lundi',
-                2 => 'mardi',
-                3 => 'mercredi',
-                4 => 'jeudi',
-                5 => 'vendredi',
-                6 => 'samedi',
-            ];
-            $autoDay = $weekdayMap[Carbon::parse($validated['date_recette'])->dayOfWeek] ?? null;
-            if ($autoDay === null) {
-                throw ValidationException::withMessages([
-                    'date_recette' => 'Impossible de déterminer le jour de la semaine pour cette date.',
-                ]);
-            }
+        $jourDepuisDate = $this->jourSemaineKeyFromDate($validated['date_recette']);
+        $validated['jour_semaine'] = $jourDepuisDate;
+        $validated['periode_messe'] = $jourDepuisDate === 'dimanche' ? 'dimanche' : 'semaine';
 
-            $validated['jour_semaine'] = $autoDay;
-            $validated['periode_messe'] = $autoDay === 'dimanche' ? 'dimanche' : 'semaine';
+        if ($category && $category->code === 'quete_ordinaire') {
             $validated['mois_location'] = null;
         } elseif ($category && $category->code === 'location' && $revenueType && in_array($revenueType->code, ['loyer-boutique', 'loyer_boutique'], true)) {
             if (empty($validated['mois_location'])) {
@@ -206,12 +191,7 @@ class RevenueController extends Controller
                     'mois_location' => 'Le mois de location est obligatoire pour un loyer boutique.',
                 ]);
             }
-
-            $validated['jour_semaine'] = null;
-            $validated['periode_messe'] = null;
         } else {
-            $validated['jour_semaine'] = null;
-            $validated['periode_messe'] = null;
             $validated['mois_location'] = null;
         }
 
@@ -228,6 +208,30 @@ class RevenueController extends Controller
         }
 
         return $validated;
+    }
+
+    /**
+     * Clé jour de la semaine (lundi…dimanche) dérivée de la date — toujours persistée pour les rapports.
+     */
+    private function jourSemaineKeyFromDate(string|\DateTimeInterface $date): string
+    {
+        $weekdayMap = [
+            0 => 'dimanche',
+            1 => 'lundi',
+            2 => 'mardi',
+            3 => 'mercredi',
+            4 => 'jeudi',
+            5 => 'vendredi',
+            6 => 'samedi',
+        ];
+        $autoDay = $weekdayMap[Carbon::parse($date)->dayOfWeek] ?? null;
+        if ($autoDay === null) {
+            throw ValidationException::withMessages([
+                'date_recette' => 'Impossible de déterminer le jour de la semaine pour cette date.',
+            ]);
+        }
+
+        return $autoDay;
     }
 
     private function normalizePhone242(string $phone): string
