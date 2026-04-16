@@ -121,7 +121,6 @@
                                 <th class="px-4 py-3 font-semibold">Catégorie</th>
                             @endif
                             <th class="px-4 py-3 font-semibold">Méthode</th>
-                            <th class="px-4 py-3 font-semibold">Référence</th>
                             <th class="px-4 py-3 font-semibold text-right">Montant</th>
                         </tr>
                     </thead>
@@ -147,19 +146,18 @@
                                     <td class="px-4 py-3">{{ $revenue->category?->nom ?? '—' }}</td>
                                 @endif
                                 <td class="px-4 py-3">{{ $revenue->methode_paiement ? ucfirst(str_replace('_', ' ', (string) $revenue->methode_paiement)) : '—' }}</td>
-                                <td class="px-4 py-3 text-slate-600 dark:text-slate-300 break-all max-w-[12rem]">{{ $revenue->reference_paiement ?? '—' }}</td>
                                 <td class="px-4 py-3 text-right font-semibold text-emerald-700 dark:text-emerald-400">{{ $fmt($revenue->montant) }}</td>
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="{{ $selectedCategoryId ? 6 : 7 }}" class="px-4 py-12 text-center text-slate-500 dark:text-slate-400">Aucune recette sur cette période.</td>
+                                <td colspan="{{ $selectedCategoryId ? 5 : 6 }}" class="px-4 py-12 text-center text-slate-500 dark:text-slate-400">Aucune recette sur cette période.</td>
                             </tr>
                         @endforelse
                     </tbody>
                     @if ($w['revenues_all']->count() > 0)
                         <tfoot>
                             <tr class="bg-slate-100/90 dark:bg-slate-800/80 font-bold text-slate-900 dark:text-white">
-                                <td class="px-4 py-3" colspan="{{ $selectedCategoryId ? 5 : 6 }}">Total général</td>
+                                <td class="px-4 py-3" colspan="{{ $selectedCategoryId ? 4 : 5 }}">Total général</td>
                                 <td class="px-4 py-3 text-right">{{ $fmt($report['total_general']) }}</td>
                             </tr>
                         </tfoot>

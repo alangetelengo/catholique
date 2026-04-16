@@ -217,7 +217,6 @@
                                     <th class="px-4 py-3 font-semibold">Catégorie</th>
                                     <th class="px-4 py-3 font-semibold">Type</th>
                                     <th class="px-4 py-3 font-semibold">Méthode</th>
-                                    <th class="px-4 py-3 font-semibold">Référence</th>
                                     <th class="px-4 py-3 font-semibold text-right">Montant</th>
                                 </tr>
                             </thead>
@@ -230,14 +229,13 @@
                                         <td class="px-4 py-3">
                                             <span class="inline-flex rounded-full bg-slate-100 dark:bg-slate-700 px-2.5 py-0.5 text-xs font-medium text-slate-700 dark:text-slate-200">{{ $payLabel($revenue->methode_paiement ?? '') ?: '—' }}</span>
                                         </td>
-                                        <td class="px-4 py-3 font-mono text-xs">{{ $revenue->reference_paiement ?? '—' }}</td>
                                         <td class="px-4 py-3 text-right font-semibold text-emerald-700 dark:text-emerald-400 tabular-nums">{{ $fmt($revenue->montant) }}</td>
                                     </tr>
                                 @endforeach
                             </tbody>
                             <tfoot>
                                 <tr class="bg-slate-50/90 dark:bg-slate-800/50 font-bold text-slate-900 dark:text-slate-100">
-                                    <td class="px-4 py-3 text-right" colspan="5">Total recettes</td>
+                                    <td class="px-4 py-3 text-right" colspan="4">Total recettes</td>
                                     <td class="px-4 py-3 text-right tabular-nums">{{ $fmt($report['total_recettes']) }}</td>
                                 </tr>
                             </tfoot>

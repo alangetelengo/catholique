@@ -78,7 +78,6 @@
                         <th class="px-4 py-3 font-semibold">Date</th>
                         <th class="px-4 py-3 font-semibold">Catégorie</th>
                         <th class="px-4 py-3 font-semibold">Type</th>
-                        <th class="px-4 py-3 font-semibold">Référence</th>
                         <th class="px-4 py-3 font-semibold">Montant</th>
                     </tr>
                 </thead>
@@ -88,11 +87,10 @@
                             <td class="px-4 py-3">{{ \Illuminate\Support\Carbon::parse($row['date'])->format('d/m/Y') }}</td>
                             <td class="px-4 py-3">{{ $row['category'] ?? '-' }}</td>
                             <td class="px-4 py-3">{{ $row['type'] ?? '-' }}</td>
-                            <td class="px-4 py-3">{{ $row['reference'] ?? '-' }}</td>
                             <td class="px-4 py-3 font-semibold">{{ $formatFcfa((float) ($row['montant'] ?? 0)) }}</td>
                         </tr>
                     @empty
-                        <tr><td colspan="5" class="px-4 py-8 text-center text-slate-500">Aucune recette sur la période.</td></tr>
+                        <tr><td colspan="4" class="px-4 py-8 text-center text-slate-500">Aucune recette sur la période.</td></tr>
                     @endforelse
                 </tbody>
             </table>

@@ -104,9 +104,31 @@
                                 <td class="px-4 py-3 whitespace-nowrap">{{ $report->created_at->format('d/m/Y H:i') }}</td>
                                 <td class="px-4 py-3">{{ $report->createdBy->name ?? '—' }}</td>
                                 <td class="px-4 py-3 text-right">
-                                    <a href="{{ route('financial-reports.show', $report) }}" class="adventiste-btn-secondary inline-flex text-xs py-2 px-3" title="Voir et imprimer">
-                                        <i class="fas fa-eye me-1.5" aria-hidden="true"></i>Voir / Imprimer
-                                    </a>
+                                    <div class="inline-flex flex-wrap items-center justify-end gap-2">
+                                        <x-action-button
+                                            variant="view"
+                                            :href="route('financial-reports.show', $report)"
+                                            title="Voir / Imprimer"
+                                        />
+                                        @can('generate_financial_reports')
+                                            @php $editHref = $report->editUrlForList(); @endphp
+                                            @if ($editHref)
+                                                <x-action-button
+                                                    variant="edit"
+                                                    :href="$editHref"
+                                                    title="Modifier"
+                                                    custom-classes="border border-emerald-200 dark:border-emerald-800/80 bg-emerald-50/80 dark:bg-emerald-950/35 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 focus:ring-2 focus:ring-emerald-400/30"
+                                                />
+                                            @endif
+                                            <x-action-button
+                                                variant="delete"
+                                                :action="route('financial-reports.destroy', $report)"
+                                                method="DELETE"
+                                                confirm-message="Supprimer ce rapport enregistré ? Cette action est réversible côté administrateur de base (soft delete)."
+                                                confirm-text="Supprimer"
+                                            />
+                                        @endcan
+                                    </div>
                                 </td>
                             </tr>
                         @endforeach

@@ -10,7 +10,6 @@
 
 @section('content')
     @php
-        $countPage = $expenses->count();
         $formatFcfa = static fn (float $value): string => number_format($value, 0, ',', ' ') . ' fcfa';
         $categories = [
             'charge_fixe' => 'Charge fixe',
@@ -24,11 +23,7 @@
         $typesByCategoryFilter['alimentation_popote'] = \App\Support\ExpenseChargeCatalog::labeledOptionsForCategory('alimentation_popote');
     @endphp
 
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-5">
-        <div class="adventiste-card-pro-static p-4">
-            <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Dépenses (page)</p>
-            <p class="mt-1 text-2xl font-bold text-slate-900 dark:text-slate-100">{{ $countPage }}</p>
-        </div>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-5">
         <div class="adventiste-card-pro-static p-4">
             <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Total des dépenses</p>
             <p class="mt-1 text-2xl font-bold text-rose-700 dark:text-rose-400">{{ $formatFcfa($totalMontantDepenses) }}</p>

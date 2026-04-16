@@ -221,7 +221,6 @@
                                 <th class="px-4 py-3 font-semibold">Jour</th>
                                 <th class="px-4 py-3 font-semibold">Période</th>
                                 <th class="px-4 py-3 font-semibold">Méthode</th>
-                                <th class="px-4 py-3 font-semibold">Référence</th>
                                 <th class="px-4 py-3 font-semibold text-right">Montant</th>
                             </tr>
                         </thead>
@@ -249,14 +248,13 @@
                                         @endif
                                     </td>
                                     <td class="px-4 py-3">{{ $revenue->methode_paiement ?? '—' }}</td>
-                                    <td class="px-4 py-3">{{ $revenue->reference_paiement ?? '—' }}</td>
                                     <td class="px-4 py-3 text-right font-semibold">{{ \App\Helpers\ParoisseConfig::formatMontant($revenue->montant) }}</td>
                                 </tr>
                             @endforeach
                         </tbody>
                         <tfoot>
                             <tr class="bg-slate-100/90 dark:bg-slate-800/80 font-bold text-slate-900 dark:text-white">
-                                <td colspan="5" class="px-4 py-3">Total général</td>
+                                <td colspan="4" class="px-4 py-3">Total général</td>
                                 <td class="px-4 py-3 text-right">{{ \App\Helpers\ParoisseConfig::formatMontant($report['total_general']) }}</td>
                             </tr>
                         </tfoot>

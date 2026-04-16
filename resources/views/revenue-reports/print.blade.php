@@ -70,7 +70,6 @@
                     <th>Date</th>
                     <th>Catégorie</th>
                     <th>Type</th>
-                    <th>Référence</th>
                     <th class="right">Montant</th>
                 </tr>
             </thead>
@@ -80,14 +79,13 @@
                         <td>{{ \Illuminate\Support\Carbon::parse($row['date'])->format('d/m/Y') }}</td>
                         <td>{{ $row['category'] ?? '-' }}</td>
                         <td>{{ $row['type'] ?? '-' }}</td>
-                        <td>{{ $row['reference'] ?? '-' }}</td>
                         <td class="right">{{ number_format((float) ($row['montant'] ?? 0), 0, ',', ' ') }} fcfa</td>
                     </tr>
                 @empty
-                    <tr><td colspan="5" style="text-align:center;">Aucune recette sur la période.</td></tr>
+                    <tr><td colspan="4" style="text-align:center;">Aucune recette sur la période.</td></tr>
                 @endforelse
                 <tr class="total">
-                    <td colspan="4">TOTAL RECETTES</td>
+                    <td colspan="3">TOTAL RECETTES</td>
                     <td class="right">{{ number_format((float) $report->total_recettes, 0, ',', ' ') }} fcfa</td>
                 </tr>
             </tbody>

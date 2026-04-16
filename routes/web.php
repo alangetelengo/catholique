@@ -89,6 +89,7 @@ Route::middleware('auth')->group(function (): void {
     Route::post('financial-reports/revenues-by-category/store', [FinancialReportController::class, 'storeRevenuesByCategory'])->name('financial-reports.revenues-by-category.store');
     Route::get('financial-reports/revenues-by-category/pdf', [FinancialReportController::class, 'downloadRevenuesByCategoryPdf'])->name('financial-reports.revenues-by-category.pdf');
     Route::get('financial-reports/{financialReport}/pdf', [FinancialReportController::class, 'downloadPdf'])->name('financial-reports.download-pdf');
+    Route::delete('financial-reports/{financialReport}', [FinancialReportController::class, 'destroy'])->name('financial-reports.destroy');
     Route::get('financial-reports/{financialReport}', [FinancialReportController::class, 'show'])->name('financial-reports.show');
     Route::post('financial-reports', [FinancialReportController::class, 'store'])->name('financial-reports.store');
 

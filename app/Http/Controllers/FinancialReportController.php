@@ -11,6 +11,7 @@ use App\Models\Revenue;
 use App\Models\RevenueCategory;
 use App\Models\RevenueType;
 use App\Support\ExpenseChargeCatalog;
+use App\Support\FinancialReportSignatories;
 use App\Support\PaginationPerPage;
 use App\Traits\LogsErrors;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -67,7 +68,7 @@ class FinancialReportController extends Controller implements HasMiddleware
                 'expensesByCategory', 'expensesByCategoryCalculate',
             ]),
             new Middleware('permission:generate_financial_reports', only: [
-                'store', 'downloadPdf', 'downloadRevenuesWeeklyPdf',
+                'store', 'destroy', 'downloadPdf', 'downloadRevenuesWeeklyPdf',
                 'storeRevenuesByCategory', 'downloadRevenuesByCategoryPdf', 'downloadExpensesByCategoryPdf',
             ]),
         ];
@@ -164,6 +165,30 @@ class FinancialReportController extends Controller implements HasMiddleware
             FlashAlert::error('Une erreur est survenue lors de l\'enregistrement du rapport.');
 
             return redirect()->back()->withInput();
+        }
+    }
+
+    public function destroy(Request $request, FinancialReport $financialReport): RedirectResponse
+    {
+        try {
+            $user = $request->user();
+
+            if (! $user->hasRole('super_admin') && (int) $financialReport->paroisse_id !== (int) $user->paroisse_id) {
+                FlashAlert::error('Vous n\'avez pas accès à ce rapport.');
+
+                return redirect()->route('financial-reports.list');
+            }
+
+            $financialReport->delete();
+            $this->logInfo('Rapport financier supprimé (soft delete)', ['report_id' => $financialReport->id]);
+            FlashAlert::success('Le rapport enregistré a été supprimé.');
+
+            return redirect()->route('financial-reports.list');
+        } catch (Throwable $e) {
+            $this->logError($e, 'Erreur suppression rapport financier', ['report_id' => $financialReport->id]);
+            FlashAlert::error('La suppression du rapport a échoué.');
+
+            return redirect()->route('financial-reports.list');
         }
     }
 
@@ -473,6 +498,7 @@ class FinancialReportController extends Controller implements HasMiddleware
                 'report' => $report,
                 'paroisse' => $paroisse,
                 'headerConfig' => $headerConfig,
+                'signataires' => FinancialReportSignatories::defaultPdfBlocks(),
             ])->setPaper('a4', 'portrait');
 
             $filename = 'rapport-financier-'.$financialReport->paroisse->nom.'-'.$dateDebut->format('Y-m').'.pdf';

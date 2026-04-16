@@ -43,5 +43,28 @@ class FinancialReport extends Model
     {
         return $this->belongsTo(User::class, 'created_by');
     }
-}
 
+    /**
+     * Lien « modifier » depuis la liste globale des rapports enregistrés (selon le type de période).
+     */
+    public function editUrlForList(): ?string
+    {
+        $details = is_array($this->details_recettes) ? $this->details_recettes : [];
+
+        return match ($this->periode_type) {
+            'charges_fixes' => route('charges-fixes-reports.edit', $this),
+            'popote_subvention' => route('popote-reports.edit', $this),
+            'revenues_by_category' => isset($details['report_target'])
+                ? route('revenue-reports.edit', $this)
+                : route('financial-reports.revenues-by-category'),
+            'total' => isset($details['report_target'])
+                ? route('revenue-reports.edit', $this)
+                : route('financial-reports.index', [
+                    'paroisse_id' => $this->paroisse_id,
+                    'month' => (int) ($this->date_debut?->month ?? 1),
+                    'year' => (int) ($this->date_debut?->year ?? now()->year),
+                ]),
+            default => null,
+        };
+    }
+}

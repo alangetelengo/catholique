@@ -128,9 +128,16 @@
             font-size: 9px;
             color: #666;
         }
+        /* Marges resserrées ; pas de page-break-inside: avoid sur les gros blocs (DomPDF laisse sinon un grand vide avant la liste détaillée). */
         .section {
-            margin: 25px 0;
-            page-break-inside: avoid;
+            margin: 12px 0;
+            page-break-inside: auto;
+        }
+        .section--compact {
+            margin: 6px 0 8px;
+        }
+        .section--keep-with-previous {
+            margin-top: 4px;
         }
         .section-title {
             font-size: 14px;
@@ -182,13 +189,40 @@
         .details-grid {
             display: table;
             width: 100%;
-            margin-bottom: 20px;
+            margin-bottom: 6px;
         }
         .details-col {
             display: table-cell;
             width: 50%;
             padding: 0 10px;
             vertical-align: top;
+        }
+        /* Signataires (alignés sur le rapport de recettes — rendu table pour DomPDF) */
+        .signataires {
+            margin-top: 28px;
+            display: table;
+            width: 100%;
+            table-layout: fixed;
+            border-spacing: 14px 0;
+        }
+        .signataires-cell {
+            display: table-cell;
+            text-align: center;
+            vertical-align: top;
+        }
+        .signataires-line {
+            border-top: 1px solid #6b7280;
+            margin-bottom: 8px;
+        }
+        .signataires-titre {
+            font-weight: bold;
+            font-size: 12px;
+            color: #111;
+        }
+        .signataires-nom {
+            font-size: 10px;
+            color: #555;
+            margin-top: 4px;
         }
         @page {
             margin: 20mm;
@@ -304,7 +338,7 @@
     {{-- Détails des recettes et dépenses --}}
     <div class="details-grid">
         <div class="details-col">
-            <div class="section">
+            <div class="section section--compact">
                 <div class="section-title">Détails des recettes (hors Procure)</div>
                 @if(count($report['details_recettes']) > 0)
                     <table>
@@ -336,7 +370,7 @@
             </div>
         </div>
         <div class="details-col">
-            <div class="section">
+            <div class="section section--compact">
                 <div class="section-title">Détails des Dépenses par Catégorie</div>
                 <table>
                     <thead>
@@ -374,7 +408,7 @@
 
     {{-- Liste détaillée des recettes --}}
     @if($report['revenues']->count() > 0)
-        <div class="section">
+        <div class="section section--keep-with-previous">
             <div class="section-title">Liste détaillée des Recettes</div>
             <table>
                 <thead>
@@ -383,7 +417,6 @@
                         <th>Catégorie</th>
                         <th>Type</th>
                         <th>Méthode</th>
-                        <th>Référence</th>
                         <th class="text-right">Montant</th>
                     </tr>
                 </thead>
@@ -394,7 +427,6 @@
                             <td>{{ $revenue->category->nom ?? '—' }}</td>
                             <td>{{ $revenue->type->nom ?? '—' }}</td>
                             <td>{{ $revenue->methode_paiement ?? '—' }}</td>
-                            <td>{{ $revenue->reference_paiement ?? '—' }}</td>
                             <td class="text-right">{{ \App\Helpers\ParoisseConfig::formatMontant($revenue->montant) }}</td>
                         </tr>
                     @endforeach
@@ -415,7 +447,7 @@
             $expenseTypesPdf = trans('expenses.types');
             $expenseTypesPdf = is_array($expenseTypesPdf) ? $expenseTypesPdf : [];
         @endphp
-        <div class="section">
+        <div class="section section--compact">
             <div class="section-title">Liste détaillée des Dépenses</div>
             <table>
                 <thead>
@@ -445,6 +477,21 @@
                     @endforeach
                 </tbody>
             </table>
+        </div>
+    @endif
+
+    @php
+        $signatairesPdf = $signataires ?? \App\Support\FinancialReportSignatories::defaultPdfBlocks();
+    @endphp
+    @if (is_array($signatairesPdf) && count($signatairesPdf) > 0)
+        <div class="signataires">
+            @foreach ($signatairesPdf as $signataire)
+                <div class="signataires-cell">
+                    <div class="signataires-line"></div>
+                    <div class="signataires-titre">{{ $signataire['titre'] ?? '' }}</div>
+                    <div class="signataires-nom">{{ $signataire['nom'] ?? '' }}</div>
+                </div>
+            @endforeach
         </div>
     @endif
 

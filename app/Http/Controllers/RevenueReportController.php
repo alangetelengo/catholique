@@ -6,6 +6,7 @@ use App\Models\FinancialReport;
 use App\Models\Paroisse;
 use App\Models\Revenue;
 use App\Models\RevenueCategory;
+use App\Support\FinancialReportSignatories;
 use App\Support\PaginationPerPage;
 use App\Traits\LogsErrors;
 use Carbon\Carbon;
@@ -148,11 +149,7 @@ class RevenueReportController extends Controller
             'details' => $details,
             'rows' => $rows,
             'paroisse' => $paroisse,
-            'signataires' => [
-                ['titre' => 'Le Curé', 'nom' => 'Nom et signature'],
-                ['titre' => 'Le Gestionnaire', 'nom' => 'Nom et signature'],
-                ['titre' => 'Le Vicaire Économe', 'nom' => 'Nom et signature'],
-            ],
+            'signataires' => FinancialReportSignatories::defaultPdfBlocks(),
         ]);
     }
 
