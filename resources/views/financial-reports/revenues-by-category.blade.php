@@ -42,19 +42,22 @@
     </div>
 
     <div class="adventiste-card-pro-static p-4 sm:p-5 mb-6">
-        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4 pb-4 border-b border-slate-200/80 dark:border-slate-600/80">
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4 pb-4 border-b border-slate-200/80 dark:border-slate-600/80">
             <h2 class="text-base font-semibold text-slate-900 dark:text-white m-0 flex items-center gap-2">
                 <i class="fas fa-filter text-emerald-600 dark:text-emerald-400" aria-hidden="true"></i>
                 Filtres
             </h2>
-            <div class="flex flex-wrap gap-2">
-                <button type="button" class="adventiste-btn-secondary text-xs py-2 px-3 rbc-shortcut" data-debut="{{ $today }}" data-fin="{{ $today }}">Aujourd’hui</button>
-                <button type="button" class="adventiste-btn-secondary text-xs py-2 px-3 rbc-shortcut" data-debut="{{ $debSem }}" data-fin="{{ $finSem }}">Semaine</button>
-                <button type="button" class="adventiste-btn-secondary text-xs py-2 px-3 rbc-shortcut" data-debut="{{ $debMois }}" data-fin="{{ $finMois }}">Mois en cours</button>
+            <div class="flex flex-col items-stretch gap-1.5 sm:items-end">
+                <span class="text-[10px] font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">Période rapide</span>
+                <div class="flex flex-wrap gap-2" role="group" aria-label="Raccourcis de période">
+                    <button type="button" class="adventiste-btn-secondary text-xs py-2 px-3 rbc-shortcut" data-debut="{{ $today }}" data-fin="{{ $today }}">Aujourd’hui</button>
+                    <button type="button" class="adventiste-btn-secondary text-xs py-2 px-3 rbc-shortcut" data-debut="{{ $debSem }}" data-fin="{{ $finSem }}">Semaine</button>
+                    <button type="button" class="adventiste-btn-secondary text-xs py-2 px-3 rbc-shortcut" data-debut="{{ $debMois }}" data-fin="{{ $finMois }}">Mois en cours</button>
+                </div>
             </div>
         </div>
 
-        <form id="filterForm" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-4 items-end" onsubmit="return false;">
+        <form id="filterForm" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-3 lg:gap-4 lg:items-start" onsubmit="return false;">
             @if (auth()->user()->hasRole('super_admin') && $paroisses->count() > 0)
                 <div class="lg:col-span-3">
                     <label for="rbc_paroisse" class="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-300">Paroisse <span class="text-red-500">*</span></label>
@@ -87,13 +90,19 @@
                 </select>
             </div>
             <div class="lg:col-span-3">
-                <label for="rbc_type" class="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-300">Type <span class="text-slate-400 font-normal">(selon la catégorie)</span></label>
-                <select id="rbc_type" name="revenue_type_id" class="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-slate-100 dark:bg-slate-900/50 text-slate-500 dark:text-slate-400 px-3 py-2.5 text-sm cursor-not-allowed" disabled>
-                    <option value="">— Choisissez d’abord une catégorie —</option>
+                <label for="rbc_type" class="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-300" title="Activé dès qu’une catégorie précise est choisie (pas pour « Toutes les catégories »).">Type</label>
+                <select id="rbc_type" name="revenue_type_id" class="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-slate-100 dark:bg-slate-900/50 text-slate-500 dark:text-slate-400 px-3 py-2.5 text-sm cursor-not-allowed border-dashed" disabled aria-describedby="rbc-filter-hint">
+                    <option value="">Choisir une catégorie…</option>
                 </select>
-                <p class="mt-1 text-[11px] text-slate-500 dark:text-slate-400 m-0">Choisissez une <strong class="font-medium">catégorie</strong> : les types se chargent automatiquement. Puis <strong class="font-medium">Calculer</strong> pour le rapport.</p>
             </div>
-            <div class="lg:col-span-12 flex flex-wrap gap-2 justify-end pt-1 border-t border-slate-200/80 dark:border-slate-600/60 lg:border-0 lg:pt-0">
+            <div id="rbc-filter-hint" class="lg:col-span-12 rounded-lg border border-slate-200/90 bg-slate-50/80 px-3 py-2 text-xs leading-relaxed text-slate-600 dark:border-slate-600/60 dark:bg-slate-800/40 dark:text-slate-400">
+                @if (auth()->user()->hasRole('super_admin'))
+                    <span class="block sm:inline">Choisissez d’abord une <strong class="font-medium text-slate-700 dark:text-slate-300">paroisse</strong> pour activer catégorie et type.</span>
+                    <span class="hidden sm:inline text-slate-400 dark:text-slate-500" aria-hidden="true"> · </span>
+                @endif
+                <span class="block sm:inline">Le filtre <strong class="font-medium text-slate-700 dark:text-slate-300">Type</strong> s’active lorsqu’une <strong class="font-medium text-slate-700 dark:text-slate-300">catégorie</strong> précise est choisie (liste chargée automatiquement).</span>
+            </div>
+            <div class="lg:col-span-12 flex flex-wrap gap-2 justify-end border-t border-slate-200/80 pt-3 dark:border-slate-600/60 lg:pt-4">
                 <button type="button" id="rbc-btn-calculate" class="adventiste-btn-primary">
                     <i class="fas fa-calculator me-2" aria-hidden="true"></i>Calculer
                 </button>
@@ -142,6 +151,7 @@
                     t.classList.toggle('dark:bg-slate-900/50', !!disabled);
                     t.classList.toggle('text-slate-500', !!disabled);
                     t.classList.toggle('cursor-not-allowed', !!disabled);
+                    t.classList.toggle('border-dashed', !!disabled);
                     t.classList.toggle('bg-white', !disabled);
                     t.classList.toggle('dark:bg-slate-800', !disabled);
                 }
@@ -152,7 +162,7 @@
                     t.innerHTML = '';
                     var o0 = document.createElement('option');
                     o0.value = '';
-                    o0.textContent = 'Tous les types de cette catégorie';
+                    o0.textContent = 'Tous les types';
                     t.appendChild(o0);
                     (types || []).forEach(function (row) {
                         var o = document.createElement('option');
@@ -173,7 +183,7 @@
                     t.innerHTML = '';
                     var o = document.createElement('option');
                     o.value = '';
-                    o.textContent = '— Choisissez d’abord une catégorie —';
+                    o.textContent = 'Choisir une catégorie…';
                     t.appendChild(o);
                     t.value = '';
                     t.removeAttribute('name');
