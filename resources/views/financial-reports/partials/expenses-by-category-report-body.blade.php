@@ -139,3 +139,5 @@
         Aucune dépense validée pour ces critères.
     </div>
 @endif
+
+@include('financial-reports.partials.report-signataires-block')

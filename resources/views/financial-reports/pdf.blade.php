@@ -197,33 +197,6 @@
             padding: 0 10px;
             vertical-align: top;
         }
-        /* Signataires (alignés sur le rapport de recettes — rendu table pour DomPDF) */
-        .signataires {
-            margin-top: 28px;
-            display: table;
-            width: 100%;
-            table-layout: fixed;
-            border-spacing: 14px 0;
-        }
-        .signataires-cell {
-            display: table-cell;
-            text-align: center;
-            vertical-align: top;
-        }
-        .signataires-line {
-            border-top: 1px solid #6b7280;
-            margin-bottom: 8px;
-        }
-        .signataires-titre {
-            font-weight: bold;
-            font-size: 12px;
-            color: #111;
-        }
-        .signataires-nom {
-            font-size: 10px;
-            color: #555;
-            margin-top: 4px;
-        }
         @page {
             margin: 20mm;
         }
@@ -480,20 +453,7 @@
         </div>
     @endif
 
-    @php
-        $signatairesPdf = $signataires ?? \App\Support\FinancialReportSignatories::defaultPdfBlocks();
-    @endphp
-    @if (is_array($signatairesPdf) && count($signatairesPdf) > 0)
-        <div class="signataires">
-            @foreach ($signatairesPdf as $signataire)
-                <div class="signataires-cell">
-                    <div class="signataires-line"></div>
-                    <div class="signataires-titre">{{ $signataire['titre'] ?? '' }}</div>
-                    <div class="signataires-nom">{{ $signataire['nom'] ?? '' }}</div>
-                </div>
-            @endforeach
-        </div>
-    @endif
+    @include('financial-reports.partials.pdf-signataires-table')
 
     {{-- Pied de page --}}
     <div class="footer">

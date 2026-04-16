@@ -1508,6 +1508,7 @@ class FinancialReportController extends Controller implements HasMiddleware
                 'dateFin' => $dateFin,
                 'selectedCategorieCharge' => $categorieCharge,
                 'selectedTypeCharge' => $typeCharge,
+                'signataires' => FinancialReportSignatories::defaultPdfBlocks(),
             ])->setPaper('a4', 'portrait');
 
             $filename = 'rapport-depenses-par-categorie-'.Str::slug($paroisse->nom).'-'.$dateDebut->format('Y-m-d').'-'.$dateFin->format('Y-m-d').'.pdf';

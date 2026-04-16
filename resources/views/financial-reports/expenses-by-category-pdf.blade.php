@@ -2,6 +2,7 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     @php
         $pdfTitle = 'Rapport dépenses par catégorie';
         if ($paroisse) {
@@ -22,75 +23,213 @@
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: 'DejaVu Sans', Arial, sans-serif;
-            font-size: 8px;
+            font-size: 11px;
             color: #333;
-            line-height: 1.25;
+            line-height: 1.6;
         }
         .header {
             background-color: {{ $headerConfig['header_bg_color'] ?? '#003366' }};
             color: {{ $headerConfig['header_text_color'] ?? '#FFFFFF' }};
-            padding: 8px 12px;
-            margin-bottom: 8px;
-            border-radius: 2px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-radius: 4px;
         }
         .header-content { display: table; width: 100%; }
-        .header-center { display: table-cell; vertical-align: middle; text-align: center; width: 100%; }
-        .header h1 { font-size: 12px; font-weight: bold; margin-bottom: 2px; }
-        .header h2 { font-size: 10px; font-weight: normal; margin: 0; }
+        .header-left {
+            display: table-cell;
+            vertical-align: middle;
+            width: {{ ($headerConfig['show_logo'] ?? false) && ($headerConfig['logo_path'] ?? null) ? '20%' : '0%' }};
+        }
+        .header-center {
+            display: table-cell;
+            vertical-align: middle;
+            text-align: center;
+            width: {{ ($headerConfig['show_logo'] ?? false) && ($headerConfig['logo_path'] ?? null) ? '60%' : '100%' }};
+        }
+        .header-right {
+            display: table-cell;
+            vertical-align: middle;
+            text-align: right;
+            width: {{ ($headerConfig['show_logo'] ?? false) && ($headerConfig['logo_path'] ?? null) ? '20%' : '0%' }};
+        }
+        .header img {
+            max-width: {{ $headerConfig['logo_width'] ?? '80' }}px;
+            max-height: 80px;
+        }
+        .header h1 {
+            font-size: 20px;
+            font-weight: bold;
+            margin-bottom: 5px;
+            color: {{ $headerConfig['header_text_color'] ?? '#FFFFFF' }};
+        }
+        .header h2 {
+            font-size: 16px;
+            font-weight: normal;
+            margin-bottom: 5px;
+            color: {{ $headerConfig['header_text_color'] ?? '#FFFFFF' }};
+        }
+        .header p {
+            font-size: 10px;
+            margin: 2px 0;
+            color: {{ $headerConfig['header_text_color'] ?? '#FFFFFF' }};
+        }
         .report-title {
             text-align: center;
-            margin: 6px 0;
-            padding: 6px 10px;
+            margin: 20px 0;
+            padding: 15px;
             background-color: #f5f5f5;
-            border-left: 3px solid {{ $headerConfig['header_bg_color'] ?? '#003366' }};
+            border-left: 4px solid {{ $headerConfig['header_bg_color'] ?? '#003366' }};
         }
-        .report-title h3 { font-size: 11px; color: {{ $headerConfig['header_bg_color'] ?? '#003366' }}; margin-bottom: 2px; }
-        .report-title p { font-size: 8px; color: #666; }
-        .section { margin: 6px 0; page-break-inside: avoid; }
-        .section-title {
-            font-size: 9px;
+        .report-title h3 {
+            font-size: 18px;
+            color: {{ $headerConfig['header_bg_color'] ?? '#003366' }};
+            margin-bottom: 5px;
+        }
+        .report-title p {
+            font-size: 11px;
+            color: #666;
+        }
+        .summary { margin: 20px 0; }
+        .summary-row {
+            display: table;
+            width: 100%;
+            margin-bottom: 15px;
+        }
+        .summary-box {
+            display: table-cell;
+            width: 100%;
+            padding: 15px;
+            text-align: center;
+            vertical-align: top;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .summary-box.danger {
+            background-color: #f8d7da;
+            border-color: #f5c6cb;
+        }
+        .summary-box h4 {
+            font-size: 12px;
+            margin-bottom: 8px;
             font-weight: bold;
-            margin-bottom: 4px;
-            padding-bottom: 2px;
-            border-bottom: 1px solid {{ $headerConfig['header_bg_color'] ?? '#003366' }};
+        }
+        .summary-box .amount {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        .summary-box .label {
+            font-size: 9px;
+            color: #666;
+        }
+        .section {
+            margin: 12px 0;
+            page-break-inside: auto;
+        }
+        .section-title {
+            font-size: 14px;
+            font-weight: bold;
+            margin-bottom: 10px;
+            padding-bottom: 5px;
+            border-bottom: 2px solid {{ $headerConfig['header_bg_color'] ?? '#003366' }};
             color: {{ $headerConfig['header_bg_color'] ?? '#003366' }};
         }
-        table { width: 100%; border-collapse: collapse; margin-bottom: 6px; font-size: 7px; }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 15px;
+            font-size: 10px;
+        }
         table th {
             background-color: {{ $headerConfig['header_bg_color'] ?? '#003366' }};
             color: {{ $headerConfig['header_text_color'] ?? '#FFFFFF' }};
-            padding: 3px 4px;
+            padding: 8px;
             text-align: left;
             font-weight: bold;
             border: 1px solid #ddd;
         }
-        table td { padding: 2px 4px; border: 1px solid #ddd; }
+        table td {
+            padding: 6px 8px;
+            border: 1px solid #ddd;
+        }
+        table tr:nth-child(even) { background-color: #f9f9f9; }
         table .text-right { text-align: right; }
         table .text-center { text-align: center; }
-        .total-row { font-weight: bold; background-color: #f0f0f0 !important; }
-        .summary-box {
-            display: table-cell;
-            padding: 8px 10px;
-            text-align: center;
-            border: 1px solid #ddd;
-            width: 100%;
+        .total-row {
+            font-weight: bold;
+            background-color: #f0f0f0 !important;
         }
-        .summary-row { display: table; width: 100%; margin-bottom: 8px; }
-        .footer { margin-top: 8px; font-size: 7px; color: #666; text-align: center; }
-        @page { margin: 12mm; size: A4 portrait; }
+        .footer {
+            margin-top: 30px;
+            padding-top: 15px;
+            border-top: 1px solid #ddd;
+            font-size: 9px;
+            color: #666;
+            text-align: center;
+        }
+        @page { margin: 20mm; }
     </style>
 </head>
 <body>
     <div class="header">
         <div class="header-content">
+            @if(($headerConfig['show_logo'] ?? false) && ($headerConfig['logo_path'] ?? null))
+                <div class="header-left">
+                    @php
+                        $logoPath = $headerConfig['logo_path'];
+                        $logoBase64 = null;
+                        if (! str_starts_with($logoPath, 'http') && ! str_starts_with($logoPath, 'data:')) {
+                            if (str_starts_with($logoPath, '/')) {
+                                $logoPath = public_path($logoPath);
+                            } else {
+                                $logoPath = public_path('/'.ltrim($logoPath, '/'));
+                            }
+                            if (file_exists($logoPath) && is_file($logoPath)) {
+                                try {
+                                    $imageData = base64_encode(file_get_contents($logoPath));
+                                    $imageInfo = @getimagesize($logoPath);
+                                    if ($imageInfo !== false) {
+                                        $mimeType = $imageInfo['mime'];
+                                        $logoBase64 = 'data:'.$mimeType.';base64,'.$imageData;
+                                    }
+                                } catch (\Exception $e) {
+                                }
+                            }
+                        } elseif (str_starts_with($logoPath, 'data:')) {
+                            $logoBase64 = $logoPath;
+                        }
+                    @endphp
+                    @if($logoBase64)
+                        <img src="{{ $logoBase64 }}" alt="Logo" style="max-width: {{ $headerConfig['logo_width'] ?? '80' }}px;">
+                    @endif
+                </div>
+            @endif
             <div class="header-center">
-                @if ($headerConfig['title'] ?? null)
+                @if($headerConfig['title'] ?? null)
                     <h1>{{ $headerConfig['title'] }}</h1>
-                @elseif ($paroisse)
+                @elseif($paroisse)
                     <h1>{{ $paroisse->nom }}</h1>
                 @endif
-                @if ($headerConfig['subtitle'] ?? null)
+                @if($headerConfig['subtitle'] ?? null)
                     <h2>{{ $headerConfig['subtitle'] }}</h2>
+                @endif
+                @if($headerConfig['address'] ?? null)
+                    <p>{{ $headerConfig['address'] }}</p>
+                @elseif($paroisse && $paroisse->adresse)
+                    <p>{{ $paroisse->adresse }}, {{ $paroisse->ville ?? '' }}</p>
+                @endif
+                @if($headerConfig['phone'] ?? null)
+                    <p>Tél: {{ $headerConfig['phone'] }}</p>
+                @elseif($paroisse && $paroisse->telephone)
+                    <p>Tél: {{ $paroisse->telephone }}</p>
+                @endif
+                @if($headerConfig['email'] ?? null)
+                    <p>Email: {{ $headerConfig['email'] }}</p>
+                @elseif($paroisse && $paroisse->email)
+                    <p>Email: {{ $paroisse->email }}</p>
+                @endif
+                @if($headerConfig['custom_text'] ?? null)
+                    <p style="margin-top: 10px; font-style: italic;">{{ $headerConfig['custom_text'] }}</p>
                 @endif
             </div>
         </div>
@@ -98,9 +237,13 @@
 
     <div class="report-title">
         <h3>Rapport par catégories de dépenses</h3>
-        <p>Période : {{ $dateDebut->format('d/m/Y') }} au {{ $dateFin->format('d/m/Y') }} — Généré le {{ now()->format('d/m/Y H:i') }}</p>
+        <p>
+            Période : {{ $dateDebut->format('d/m/Y') }} au {{ $dateFin->format('d/m/Y') }}
+            <br>
+            Généré le : {{ now()->format('d/m/Y à H:i') }}
+        </p>
         @if ($selectedCategorieCharge)
-            <p style="margin-top:4px;">
+            <p style="margin-top:8px;">
                 Filtre catégorie : <strong>{{ $labelsCat[$selectedCategorieCharge] ?? $selectedCategorieCharge }}</strong>
                 @if ($selectedTypeCharge)
                     — type : <strong>{{ $labelsType[$selectedTypeCharge] ?? $selectedTypeCharge }}</strong>
@@ -109,11 +252,13 @@
         @endif
     </div>
 
-    <div class="summary-row">
-        <div class="summary-box" style="background:#fde8e8;">
-            <strong>Total dépenses</strong>
-            <div style="font-size:12px;font-weight:bold;margin-top:4px;">{{ \App\Helpers\ParoisseConfig::formatMontant($report['total_general']) }}</div>
-            <div style="font-size:7px;color:#666;">{{ $report['expenses']->count() }} ligne(s) validée(s)</div>
+    <div class="summary">
+        <div class="summary-row">
+            <div class="summary-box danger">
+                <h4>Total dépenses</h4>
+                <div class="amount" style="color:#721c24;">{{ \App\Helpers\ParoisseConfig::formatMontant($report['total_general']) }}</div>
+                <div class="label">{{ $report['expenses']->count() }} ligne(s) au statut « validé »</div>
+            </div>
         </div>
     </div>
 
@@ -177,14 +322,15 @@
     @endphp
     @if ($rowsPdf->count() > 0)
         <div class="section">
-            <div class="section-title">Liste ({{ $report['expenses']->count() }} @if ($report['expenses']->count() > 80) — affichage des 80 premières @endif)</div>
+            <div class="section-title">Liste détaillée ({{ $report['expenses']->count() }} @if ($report['expenses']->count() > 80) — affichage des 80 premières lignes @endif)</div>
             <table>
                 <thead>
                     <tr>
                         <th>Date</th>
-                        <th>Cat.</th>
+                        <th>Catégorie</th>
                         <th>Type</th>
                         <th>Libellé</th>
+                        <th>Fournisseur</th>
                         <th class="text-right">Montant</th>
                     </tr>
                 </thead>
@@ -194,14 +340,15 @@
                             <td>{{ $ex->date_depense?->format('d/m/Y') }}</td>
                             <td>{{ $labelsCat[$ex->categorie_charge] ?? $ex->categorie_charge }}</td>
                             <td>{{ $labelsType[$ex->type_charge] ?? $ex->type_charge }}</td>
-                            <td>{{ Str::limit($ex->libelle ?? '—', 40) }}</td>
+                            <td>{{ \Illuminate\Support\Str::limit($ex->libelle ?? '—', 36) }}</td>
+                            <td>{{ \Illuminate\Support\Str::limit($ex->fournisseur ?? '—', 28) }}</td>
                             <td class="text-right">{{ \App\Helpers\ParoisseConfig::formatMontant($ex->montant) }}</td>
                         </tr>
                     @endforeach
                 </tbody>
                 <tfoot>
                     <tr class="total-row">
-                        <td colspan="4">TOTAL</td>
+                        <td colspan="5">TOTAL</td>
                         <td class="text-right">{{ \App\Helpers\ParoisseConfig::formatMontant($report['total_general']) }}</td>
                     </tr>
                 </tfoot>
@@ -209,8 +356,11 @@
         </div>
     @endif
 
+    @include('financial-reports.partials.pdf-signataires-table')
+
     <div class="footer">
-        Document généré automatiquement — dépenses au statut « validé » uniquement.
+        <p><strong>Note :</strong> ce document ne retient que les dépenses au statut « validé » sur la période affichée.</p>
+        <p>Document généré le {{ now()->format('d/m/Y à H:i') }}</p>
     </div>
 </body>
 </html>
