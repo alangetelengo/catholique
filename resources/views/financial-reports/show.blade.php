@@ -40,19 +40,8 @@
             'charge_exceptionnelle' => 'Charge exceptionnelle',
             'alimentation_popote' => 'Alimentation popote',
         ];
-        $types = [
-            'carburant' => 'Carburant',
-            'hosties' => 'Hosties',
-            'internet' => 'Internet',
-            'maintenance_materiel' => 'Maintenance matériel',
-            'gaz' => 'Gaz',
-            'eau' => 'Eau',
-            'electricite' => 'Électricité',
-            'jardinage' => 'Jardinage',
-            'salaire_ouvrier' => 'Salaire ouvrier',
-            'autre' => 'Autre',
-            'alimentation' => 'Alimentation',
-        ];
+        $types = trans('expenses.types');
+        $types = is_array($types) ? $types : [];
         $badgeCat = static function (string $key): string {
             return match ($key) {
                 'charge_fixe' => 'bg-rose-500/10 dark:bg-rose-500/20 text-rose-800 dark:text-rose-200',
@@ -67,7 +56,7 @@
     <div class="rounded-xl border border-emerald-200/90 dark:border-emerald-900/40 bg-emerald-50/90 dark:bg-emerald-950/20 px-4 py-3 mb-6 text-sm text-emerald-950 dark:text-emerald-100 leading-relaxed print:hidden">
         <p class="m-0 flex gap-2">
             <i class="fas fa-file-invoice-dollar mt-0.5 shrink-0 text-emerald-600 dark:text-emerald-400" aria-hidden="true"></i>
-            <span>Rapport <strong class="font-semibold">figé</strong> à la date d’enregistrement : recettes popote/subvention, dépenses par catégorie et <strong class="font-semibold">solde</strong> pour la période affichée. Utilisez « PDF » ou « Imprimer » pour une version papier.</span>
+            <span>Rapport <strong class="font-semibold">figé</strong> à la date d’enregistrement : recettes hors Procure (quêtes, locations, popote/subvention), dépenses toutes catégories et <strong class="font-semibold">solde</strong> pour la période affichée. Utilisez « PDF » ou « Imprimer » pour une version papier.</span>
         </p>
     </div>
 
@@ -95,7 +84,7 @@
                     Total recettes
                 </p>
                 <p class="mt-1 text-xl font-bold text-emerald-700 dark:text-emerald-400 tabular-nums">{{ $fmt($report['total_recettes']) }}</p>
-                <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">Popote / subvention</p>
+                <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">Quêtes, locations, popote (hors Procure)</p>
             </div>
             <div class="adventiste-card-pro-static p-4 sm:p-5 border-t-4 border-t-rose-500">
                 <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400 flex items-center gap-2">
@@ -111,7 +100,7 @@
                     Solde
                 </p>
                 <p class="mt-1 text-xl font-bold tabular-nums {{ $report['solde'] >= 0 ? 'text-sky-700 dark:text-sky-300' : 'text-amber-700 dark:text-amber-400' }}">{{ $fmt($report['solde']) }}</p>
-                <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">{{ $report['solde'] >= 0 ? 'Excédent' : 'Déficit' }}</p>
+                <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">{{ $report['solde'] >= 0 ? 'Excédent' : 'Déficit' }} · recettes − dépenses</p>
             </div>
         </div>
 
@@ -120,9 +109,9 @@
                 <div class="px-4 py-3 border-b border-slate-200/80 dark:border-slate-600/80 bg-slate-50/80 dark:bg-slate-800/50">
                     <h3 class="text-sm font-semibold text-slate-900 dark:text-white m-0 flex items-center gap-2">
                         <i class="fas fa-layer-group text-emerald-600 dark:text-emerald-400" aria-hidden="true"></i>
-                        Détails des recettes (popote / subvention)
+                        Détails des recettes (hors Procure)
                     </h3>
-                    <p class="text-xs text-slate-500 dark:text-slate-400 m-0 mt-1">Montants agrégés par type de recette</p>
+                    <p class="text-xs text-slate-500 dark:text-slate-400 m-0 mt-1">Montants agrégés par catégorie de recette</p>
                 </div>
                 <div class="p-4 sm:p-5">
                     @if (count($report['details_recettes']) > 0)
@@ -131,7 +120,7 @@
                                 <table class="min-w-full text-sm">
                                     <thead>
                                         <tr class="text-left text-slate-700 dark:text-slate-200">
-                                            <th class="px-4 py-3 font-semibold">Type</th>
+                                            <th class="px-4 py-3 font-semibold">Catégorie</th>
                                             <th class="px-4 py-3 font-semibold text-right">Montant</th>
                                             <th class="px-4 py-3 font-semibold text-center">Nb</th>
                                         </tr>
@@ -156,7 +145,7 @@
                             </div>
                         </div>
                     @else
-                        <p class="text-sm text-slate-500 dark:text-slate-400 m-0">Aucune recette popote/subvention pour cette période.</p>
+                        <p class="text-sm text-slate-500 dark:text-slate-400 m-0">Aucune recette dans les catégories retenues pour cette période.</p>
                     @endif
                 </div>
             </div>
@@ -225,6 +214,7 @@
                             <thead>
                                 <tr class="text-left text-slate-700 dark:text-slate-200">
                                     <th class="px-4 py-3 font-semibold">Date</th>
+                                    <th class="px-4 py-3 font-semibold">Catégorie</th>
                                     <th class="px-4 py-3 font-semibold">Type</th>
                                     <th class="px-4 py-3 font-semibold">Méthode</th>
                                     <th class="px-4 py-3 font-semibold">Référence</th>
@@ -235,6 +225,7 @@
                                 @foreach ($report['revenues'] as $revenue)
                                     <tr class="text-slate-700 dark:text-slate-200">
                                         <td class="px-4 py-3 whitespace-nowrap">{{ $revenue->date_recette?->format('d/m/Y') }}</td>
+                                        <td class="px-4 py-3">{{ $revenue->category->nom ?? '—' }}</td>
                                         <td class="px-4 py-3">{{ $revenue->type->nom ?? '—' }}</td>
                                         <td class="px-4 py-3">
                                             <span class="inline-flex rounded-full bg-slate-100 dark:bg-slate-700 px-2.5 py-0.5 text-xs font-medium text-slate-700 dark:text-slate-200">{{ $payLabel($revenue->methode_paiement ?? '') ?: '—' }}</span>
@@ -246,7 +237,7 @@
                             </tbody>
                             <tfoot>
                                 <tr class="bg-slate-50/90 dark:bg-slate-800/50 font-bold text-slate-900 dark:text-slate-100">
-                                    <td class="px-4 py-3 text-right" colspan="4">Total recettes</td>
+                                    <td class="px-4 py-3 text-right" colspan="5">Total recettes</td>
                                     <td class="px-4 py-3 text-right tabular-nums">{{ $fmt($report['total_recettes']) }}</td>
                                 </tr>
                             </tfoot>
@@ -308,7 +299,7 @@
         <div class="adventiste-card-pro-static p-4 sm:p-5 border border-slate-200/80 dark:border-slate-600/60 bg-slate-50/50 dark:bg-slate-900/30 print-footer text-sm text-slate-600 dark:text-slate-400">
             <p class="mb-2 m-0 flex gap-2">
                 <i class="fas fa-info-circle mt-0.5 shrink-0 text-slate-500" aria-hidden="true"></i>
-                <span><strong class="text-slate-800 dark:text-slate-200">Note :</strong> ce rapport justifie les dépenses effectuées contre les recettes popote/subvention reçues pour la période indiquée.</span>
+                <span><strong class="text-slate-800 dark:text-slate-200">Note :</strong> le solde compare les recettes retenues (quête ordinaire et extraordinaire, location, popote/subvention ; hors Procure) à l’ensemble des dépenses validées sur la période.</span>
             </p>
             <p class="text-xs text-slate-500 dark:text-slate-500 m-0">Document consulté / imprimé le {{ now()->format('d/m/Y à H:i') }}</p>
         </div>

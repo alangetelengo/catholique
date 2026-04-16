@@ -2,7 +2,7 @@
 
 @section('title', 'Rapports financiers enregistrés — Catholique')
 @section('page-title', 'Rapports financiers enregistrés')
-@section('page-title-info', 'Rapports mensuels figés : recettes, dépenses et solde par période. Filtrez par paroisse (super admin) et par année.')
+@section('page-title-info', 'Versions enregistrées du rapport mensuel : totaux figés (recettes hors Procure, dépenses toutes catégories, solde). Filtrez par paroisse (super admin) et par année.')
 
 @section('btn-create')
     <div class="flex flex-wrap items-center gap-2">
@@ -70,9 +70,9 @@
                             @if (auth()->user()->hasRole('super_admin'))
                                 <th class="px-4 py-3 font-semibold">Paroisse</th>
                             @endif
-                            <th class="px-4 py-3 font-semibold text-right">Recettes</th>
-                            <th class="px-4 py-3 font-semibold text-right">Dépenses</th>
-                            <th class="px-4 py-3 font-semibold text-right">Solde</th>
+                            <th class="px-4 py-3 font-semibold text-right" title="Recettes validées hors Procure (hub)">Recettes</th>
+                            <th class="px-4 py-3 font-semibold text-right" title="Toutes catégories de dépenses validées">Dépenses</th>
+                            <th class="px-4 py-3 font-semibold text-right" title="Recettes − dépenses">Solde</th>
                             <th class="px-4 py-3 font-semibold">Créé le</th>
                             <th class="px-4 py-3 font-semibold">Créé par</th>
                             <th class="px-4 py-3 font-semibold text-right">Actions</th>

@@ -13,6 +13,9 @@
         <a id="rbc-pdf-link" href="#" target="_blank" rel="noopener noreferrer" class="hidden inline-flex items-center gap-2 rounded-lg border border-rose-200 dark:border-rose-800/60 bg-rose-50 dark:bg-rose-950/40 px-3 py-2 text-sm font-semibold text-rose-800 dark:text-rose-200 hover:bg-rose-100 dark:hover:bg-rose-900/50 transition-colors no-underline">
             <i class="fas fa-file-pdf" aria-hidden="true"></i>Exporter PDF
         </a>
+        <a href="{{ route('financial-reports.expenses-by-category') }}" class="adventiste-btn-secondary text-sm no-underline">
+            <i class="fas fa-receipt me-1.5" aria-hidden="true"></i>Dépenses par catégorie
+        </a>
         <a href="{{ route('financial-reports.index') }}" class="adventiste-btn-secondary text-sm no-underline">
             <i class="fas fa-chart-pie me-1.5" aria-hidden="true"></i>Hub rapports
         </a>

@@ -18,12 +18,10 @@
             'charge_exceptionnelle' => 'Charge exceptionnelle',
             'alimentation_popote' => 'Alimentation popote',
         ];
-        $types = [
-            'carburant' => 'Carburant', 'hosties' => 'Hosties', 'internet' => 'Internet',
-            'maintenance_materiel' => 'Maintenance matériel', 'gaz' => 'Gaz', 'eau' => 'Eau',
-            'electricite' => 'Électricité', 'gardiennage' => 'Gardiennage', 'salaire_ouvrier' => 'Salaire ouvrier',
-            'autre' => 'Autre', 'alimentation' => 'Alimentation',
-        ];
+        $types = trans('expenses.types');
+        $types = is_array($types) ? $types : [];
+        $typesByCategoryFilter = \App\Support\ExpenseChargeCatalog::labeledOptionsByCategoryExcludingPopote();
+        $typesByCategoryFilter['alimentation_popote'] = \App\Support\ExpenseChargeCatalog::labeledOptionsForCategory('alimentation_popote');
     @endphp
 
     <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-5">
@@ -56,13 +54,13 @@
                 placeholder="Recherche (notes, fournisseur, facture)"
                 class="md:col-span-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2.5 text-sm"
             >
-            <select name="categorie_charge" class="rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2.5 text-sm">
+            <select name="categorie_charge" id="expenses_index_categorie_charge" class="rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2.5 text-sm">
                 <option value="">Toutes catégories</option>
                 @foreach ($categories as $key => $label)
                     <option value="{{ $key }}" {{ request('categorie_charge') === $key ? 'selected' : '' }}>{{ $label }}</option>
                 @endforeach
             </select>
-            <select name="type_charge" class="rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2.5 text-sm">
+            <select name="type_charge" id="expenses_index_type_charge" class="rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2.5 text-sm">
                 <option value="">Tous types</option>
                 @foreach ($types as $key => $label)
                     <option value="{{ $key }}" {{ request('type_charge') === $key ? 'selected' : '' }}>{{ $label }}</option>
@@ -159,5 +157,55 @@
     <div class="mt-4">
         @include('partials.pagination-fr', ['paginator' => $expenses, 'itemLabel' => 'dépenses'])
     </div>
+
+    @push('scripts')
+        <script>
+            (function () {
+                var byCat = @json($typesByCategoryFilter);
+                var allTypes = @json($types);
+                var catEl = document.getElementById('expenses_index_categorie_charge');
+                var typeEl = document.getElementById('expenses_index_type_charge');
+                if (!catEl || !typeEl) return;
+
+                function fillTypeSelect(allowedMap, preserveValue) {
+                    var prev = preserveValue !== undefined && preserveValue !== null ? preserveValue : typeEl.value;
+                    typeEl.innerHTML = '';
+                    var o0 = document.createElement('option');
+                    o0.value = '';
+                    o0.textContent = 'Tous types';
+                    typeEl.appendChild(o0);
+                    var keys = Object.keys(allowedMap || {});
+                    keys.sort();
+                    keys.forEach(function (k) {
+                        var o = document.createElement('option');
+                        o.value = k;
+                        o.textContent = allowedMap[k];
+                        typeEl.appendChild(o);
+                    });
+                    if (prev && allowedMap && Object.prototype.hasOwnProperty.call(allowedMap, prev)) {
+                        typeEl.value = prev;
+                    } else {
+                        typeEl.value = '';
+                    }
+                }
+
+                function syncTypeFilterOptions() {
+                    var cid = catEl.value;
+                    if (!cid) {
+                        fillTypeSelect(allTypes, typeEl.getAttribute('data-request-type') || '');
+                        return;
+                    }
+                    fillTypeSelect(byCat[cid] || {}, typeEl.getAttribute('data-request-type') || '');
+                }
+
+                typeEl.setAttribute('data-request-type', @json(request('type_charge', '')));
+                syncTypeFilterOptions();
+                catEl.addEventListener('change', function () {
+                    typeEl.removeAttribute('data-request-type');
+                    syncTypeFilterOptions();
+                });
+            })();
+        </script>
+    @endpush
 @endsection
 

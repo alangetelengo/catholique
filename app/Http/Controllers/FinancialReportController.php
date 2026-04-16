@@ -10,6 +10,7 @@ use App\Models\Paroisse;
 use App\Models\Revenue;
 use App\Models\RevenueCategory;
 use App\Models\RevenueType;
+use App\Support\ExpenseChargeCatalog;
 use App\Support\PaginationPerPage;
 use App\Traits\LogsErrors;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -32,6 +33,28 @@ class FinancialReportController extends Controller implements HasMiddleware
     use LogsErrors;
 
     /**
+     * Recettes prises en compte dans le rapport hub mensuel (hors Procure).
+     *
+     * @var list<string>
+     */
+    private const REVENUE_CATEGORY_CODES_HUB = [
+        'quete_ordinaire',
+        'quete_extraordinaire',
+        'location',
+        'popote_subvention',
+    ];
+
+    /**
+     * @return list<string>
+     */
+    private static function expenseTypeChargeCodes(): array
+    {
+        $codes = config('expenses.type_charge_codes', []);
+
+        return is_array($codes) ? array_values(array_filter($codes, 'is_string')) : [];
+    }
+
+    /**
      * @return array<int, Middleware>
      */
     public static function middleware(): array
@@ -39,12 +62,13 @@ class FinancialReportController extends Controller implements HasMiddleware
         return [
             new Middleware('permission:view_financial_reports', only: [
                 'index', 'list', 'show', 'statistics', 'revenuesWeekly', 'revenuesWeeklyPrint',
-                'popoteReport', 'popotePrint', 'chargesFixesReport', 'revenuesByCategory',
+                'chargesFixesReport', 'revenuesByCategory',
                 'revenueCategoriesForParoisse', 'revenueTypesForCategory', 'revenuesByCategoryCalculate',
+                'expensesByCategory', 'expensesByCategoryCalculate',
             ]),
             new Middleware('permission:generate_financial_reports', only: [
-                'store', 'downloadPdf', 'downloadRevenuesWeeklyPdf', 'downloadPopotePdf',
-                'storeRevenuesByCategory', 'downloadRevenuesByCategoryPdf',
+                'store', 'downloadPdf', 'downloadRevenuesWeeklyPdf',
+                'storeRevenuesByCategory', 'downloadRevenuesByCategoryPdf', 'downloadExpensesByCategoryPdf',
             ]),
         ];
     }
@@ -148,50 +172,54 @@ class FinancialReportController extends Controller implements HasMiddleware
      */
     private function calculateReport(int $paroisseId, Carbon $dateDebut, Carbon $dateFin): array
     {
-        // Recettes popote/subvention uniquement (catégorie de la paroisse)
-        $popoteCategory = RevenueCategory::where('paroisse_id', $paroisseId)->where('code', 'popote_subvention')->first();
-        $popoteRevenues = Revenue::query()
-            ->with('type')
+        $revenues = Revenue::query()
+            ->with(['category', 'type'])
             ->where('paroisse_id', $paroisseId)
+            ->where('statut', 'valide')
             ->whereDate('date_recette', '>=', $dateDebut)
             ->whereDate('date_recette', '<=', $dateFin)
-            ->when($popoteCategory, function ($q) use ($popoteCategory): void {
-                $q->where('revenue_category_id', $popoteCategory->id);
+            ->whereHas('category', function ($q) use ($paroisseId): void {
+                $q->where('paroisse_id', $paroisseId)
+                    ->whereIn('code', self::REVENUE_CATEGORY_CODES_HUB);
             })
+            ->orderBy('date_recette')
             ->get();
 
-        $totalRecettes = $popoteRevenues->sum('montant');
+        $totalRecettes = (float) $revenues->sum('montant');
 
-        // Dépenses (toutes catégories)
         $expenses = Expense::query()
             ->where('paroisse_id', $paroisseId)
+            ->where('statut', 'valide')
             ->whereDate('date_depense', '>=', $dateDebut)
             ->whereDate('date_depense', '<=', $dateFin)
+            ->orderBy('date_depense')
             ->get();
 
-        $totalDepenses = $expenses->sum('montant');
+        $totalDepenses = (float) $expenses->sum('montant');
 
-        // Détails par catégories de dépenses (alimentation_popote = dépenses popote / subvention)
         $detailsDepenses = [
-            'charge_fixe' => $expenses->where('categorie_charge', 'charge_fixe')->sum('montant'),
-            'charge_variable' => $expenses->where('categorie_charge', 'charge_variable')->sum('montant'),
-            'charge_exceptionnelle' => $expenses->where('categorie_charge', 'charge_exceptionnelle')->sum('montant'),
-            'alimentation_popote' => $expenses->where('categorie_charge', 'alimentation_popote')->sum('montant'),
+            'charge_fixe' => (float) $expenses->where('categorie_charge', 'charge_fixe')->sum('montant'),
+            'charge_variable' => (float) $expenses->where('categorie_charge', 'charge_variable')->sum('montant'),
+            'charge_exceptionnelle' => (float) $expenses->where('categorie_charge', 'charge_exceptionnelle')->sum('montant'),
+            'alimentation_popote' => (float) $expenses->where('categorie_charge', 'alimentation_popote')->sum('montant'),
         ];
 
-        // Détails des recettes popote/subvention par type
         $detailsRecettes = [];
-        if ($popoteCategory) {
-            foreach ($popoteRevenues->groupBy('revenue_type_id') as $typeId => $revenues) {
-                $type = $revenues->first()->type;
-                if ($type) {
-                    $detailsRecettes[$type->code] = [
-                        'nom' => $type->nom,
-                        'montant' => $revenues->sum('montant'),
-                        'count' => $revenues->count(),
-                    ];
-                }
+        foreach (self::REVENUE_CATEGORY_CODES_HUB as $code) {
+            $cat = RevenueCategory::query()
+                ->where('paroisse_id', $paroisseId)
+                ->where('code', $code)
+                ->first();
+            if (! $cat) {
+                continue;
             }
+            $subset = $revenues->where('revenue_category_id', $cat->id);
+            $detailsRecettes[] = [
+                'code' => $code,
+                'nom' => $cat->nom,
+                'montant' => (float) $subset->sum('montant'),
+                'count' => $subset->count(),
+            ];
         }
 
         return [
@@ -200,7 +228,7 @@ class FinancialReportController extends Controller implements HasMiddleware
             'solde' => $totalRecettes - $totalDepenses,
             'details_recettes' => $detailsRecettes,
             'details_depenses' => $detailsDepenses,
-            'revenues' => $popoteRevenues,
+            'revenues' => $revenues,
             'expenses' => $expenses,
         ];
     }
@@ -270,36 +298,28 @@ class FinancialReportController extends Controller implements HasMiddleware
                 $dateDebut = Carbon::create($selectedYear, 1, 1)->startOfDay();
                 $dateFin = Carbon::create($selectedYear, 12, 31)->endOfDay();
 
-                $totalRecettes = Revenue::query()
+                $totalRecettes = (float) Revenue::query()
                     ->where('paroisse_id', $selectedParoisseId)
+                    ->where('statut', 'valide')
                     ->whereDate('date_recette', '>=', $dateDebut)
                     ->whereDate('date_recette', '<=', $dateFin)
+                    ->whereHas('category', function ($q) use ($selectedParoisseId): void {
+                        $q->where('paroisse_id', $selectedParoisseId)
+                            ->whereIn('code', self::REVENUE_CATEGORY_CODES_HUB);
+                    })
                     ->sum('montant');
 
-                // Seules les dépenses Popote/Alimentation sont déduites des recettes.
-                // Les autres (charges fixes, variables, exceptionnelles) sont pour rapports hiérarchie.
-                $depensesPopote = Expense::query()
+                $totalDepenses = (float) Expense::query()
                     ->where('paroisse_id', $selectedParoisseId)
-                    ->where('categorie_charge', 'alimentation_popote')
+                    ->where('statut', 'valide')
                     ->whereDate('date_depense', '>=', $dateDebut)
                     ->whereDate('date_depense', '<=', $dateFin)
                     ->sum('montant');
-
-                $depensesAutres = Expense::query()
-                    ->where('paroisse_id', $selectedParoisseId)
-                    ->whereIn('categorie_charge', ['charge_fixe', 'charge_variable', 'charge_exceptionnelle'])
-                    ->whereDate('date_depense', '>=', $dateDebut)
-                    ->whereDate('date_depense', '<=', $dateFin)
-                    ->sum('montant');
-
-                $totalDepenses = $depensesPopote + $depensesAutres;
 
                 $stats = [
                     'total_recettes' => $totalRecettes,
                     'total_depenses' => $totalDepenses,
-                    'depenses_popote' => $depensesPopote,
-                    'depenses_autres' => $depensesAutres,
-                    'solde' => $totalRecettes - $depensesPopote,
+                    'solde' => $totalRecettes - $totalDepenses,
                 ];
 
                 $moisNoms = [
@@ -310,30 +330,27 @@ class FinancialReportController extends Controller implements HasMiddleware
                 for ($m = 1; $m <= 12; $m++) {
                     $debutMois = Carbon::create($selectedYear, $m, 1)->startOfMonth();
                     $finMois = $debutMois->copy()->endOfMonth();
-                    $recettesMois = Revenue::query()
+                    $recettesMois = (float) Revenue::query()
                         ->where('paroisse_id', $selectedParoisseId)
+                        ->where('statut', 'valide')
                         ->whereDate('date_recette', '>=', $debutMois)
                         ->whereDate('date_recette', '<=', $finMois)
+                        ->whereHas('category', function ($q) use ($selectedParoisseId): void {
+                            $q->where('paroisse_id', $selectedParoisseId)
+                                ->whereIn('code', self::REVENUE_CATEGORY_CODES_HUB);
+                        })
                         ->sum('montant');
-                    $depensesPopoteMois = Expense::query()
+                    $depensesMois = (float) Expense::query()
                         ->where('paroisse_id', $selectedParoisseId)
-                        ->where('categorie_charge', 'alimentation_popote')
-                        ->whereDate('date_depense', '>=', $debutMois)
-                        ->whereDate('date_depense', '<=', $finMois)
-                        ->sum('montant');
-                    $depensesAutresMois = Expense::query()
-                        ->where('paroisse_id', $selectedParoisseId)
-                        ->whereIn('categorie_charge', ['charge_fixe', 'charge_variable', 'charge_exceptionnelle'])
+                        ->where('statut', 'valide')
                         ->whereDate('date_depense', '>=', $debutMois)
                         ->whereDate('date_depense', '<=', $finMois)
                         ->sum('montant');
                     $byMonth[$m] = [
                         'nom' => $moisNoms[$m],
                         'recettes' => $recettesMois,
-                        'depenses_popote' => $depensesPopoteMois,
-                        'depenses_autres' => $depensesAutresMois,
-                        'depenses' => $depensesPopoteMois + $depensesAutresMois,
-                        'solde' => $recettesMois - $depensesPopoteMois,
+                        'depenses' => $depensesMois,
+                        'solde' => $recettesMois - $depensesMois,
                     ];
                 }
             }
@@ -727,195 +744,6 @@ class FinancialReportController extends Controller implements HasMiddleware
             'details_dimanche' => $detailsDimanche,
             'revenues_semaine' => $revenuesSemaine,
             'revenues_dimanche' => $revenuesDimanche,
-        ];
-    }
-
-    /**
-     * Rapport Subvention Popote vs Dépenses alimentation (mensuel / annuel).
-     * La subvention popote est réservée aux dépenses d'alimentation.
-     */
-    public function popoteReport(Request $request): View
-    {
-        try {
-            $user = $request->user();
-
-            $paroisses = $user->hasRole('super_admin')
-                ? Paroisse::orderBy('nom')->get()
-                : Paroisse::whereKey($user->paroisse_id)->get();
-
-            $selectedParoisseId = $request->integer('paroisse_id', $user->hasRole('super_admin') ? null : $user->paroisse_id);
-            $periodType = $request->input('period_type', 'month'); // month | year
-            $selectedMonth = $request->integer('month', now()->month);
-            $selectedYear = $request->integer('year', now()->year);
-
-            $report = null;
-            if ($selectedParoisseId) {
-                if ($periodType === 'year') {
-                    $dateDebut = Carbon::create($selectedYear, 1, 1)->startOfMonth();
-                    $dateFin = Carbon::create($selectedYear, 12, 31)->endOfDay();
-                } else {
-                    $dateDebut = Carbon::create($selectedYear, $selectedMonth, 1)->startOfMonth();
-                    $dateFin = $dateDebut->copy()->endOfMonth();
-                }
-                $report = $this->calculatePopoteReport($selectedParoisseId, $dateDebut, $dateFin);
-            }
-
-            return view('financial-reports.popote-report', [
-                'paroisses' => $paroisses,
-                'selectedParoisseId' => $selectedParoisseId,
-                'periodType' => $periodType,
-                'selectedMonth' => $selectedMonth,
-                'selectedYear' => $selectedYear,
-                'report' => $report,
-            ]);
-        } catch (Throwable $e) {
-            $this->logError($e, 'Erreur rapport Popote');
-            FlashAlert::error('Une erreur est survenue.');
-
-            return view('financial-reports.popote-report', [
-                'paroisses' => collect(),
-                'selectedParoisseId' => null,
-                'periodType' => 'month',
-                'selectedMonth' => now()->month,
-                'selectedYear' => now()->year,
-                'report' => null,
-            ]);
-        }
-    }
-
-    /**
-     * Vue imprimable du rapport Subvention Popote.
-     */
-    public function popotePrint(Request $request): View|RedirectResponse
-    {
-        try {
-            $user = $request->user();
-
-            $validated = $request->validate([
-                'paroisse_id' => ['required', 'exists:paroisses,id'],
-                'period_type' => ['required', 'in:month,year'],
-                'month' => ['required_if:period_type,month', 'integer', 'min:1', 'max:12'],
-                'year' => ['required', 'integer', 'min:2000', 'max:2100'],
-            ]);
-
-            if (! $user->hasRole('super_admin') && (int) $validated['paroisse_id'] !== (int) $user->paroisse_id) {
-                FlashAlert::error('Vous ne pouvez générer des rapports que pour votre paroisse.');
-
-                return redirect()->route('financial-reports.popote');
-            }
-
-            if ($validated['period_type'] === 'year') {
-                $dateDebut = Carbon::create($validated['year'], 1, 1)->startOfMonth();
-                $dateFin = Carbon::create($validated['year'], 12, 31)->endOfDay();
-            } else {
-                $dateDebut = Carbon::create($validated['year'], $validated['month'], 1)->startOfMonth();
-                $dateFin = $dateDebut->copy()->endOfMonth();
-            }
-
-            $report = $this->calculatePopoteReport($validated['paroisse_id'], $dateDebut, $dateFin);
-            $paroisse = Paroisse::find($validated['paroisse_id']);
-            $headerConfig = $this->getHeaderConfig($validated['paroisse_id']);
-
-            return view('financial-reports.popote-print', [
-                'report' => $report,
-                'paroisse' => $paroisse,
-                'headerConfig' => $headerConfig,
-                'dateDebut' => $dateDebut,
-                'dateFin' => $dateFin,
-                'periodType' => $validated['period_type'],
-            ]);
-        } catch (ValidationException $e) {
-            throw $e;
-        } catch (Throwable $e) {
-            $this->logError($e, 'Erreur affichage rapport Popote imprimable');
-            FlashAlert::error('Une erreur est survenue.');
-
-            return redirect()->route('financial-reports.popote');
-        }
-    }
-
-    public function downloadPopotePdf(Request $request)
-    {
-        try {
-            $user = $request->user();
-
-            $validated = $request->validate([
-                'paroisse_id' => ['required', 'exists:paroisses,id'],
-                'period_type' => ['required', 'in:month,year'],
-                'month' => ['required_if:period_type,month', 'integer', 'min:1', 'max:12'],
-                'year' => ['required', 'integer', 'min:2000', 'max:2100'],
-            ]);
-
-            if (! $user->hasRole('super_admin') && (int) $validated['paroisse_id'] !== (int) $user->paroisse_id) {
-                FlashAlert::error('Vous ne pouvez générer des rapports que pour votre paroisse.');
-
-                return redirect()->back();
-            }
-
-            if ($validated['period_type'] === 'year') {
-                $dateDebut = Carbon::create($validated['year'], 1, 1)->startOfMonth();
-                $dateFin = Carbon::create($validated['year'], 12, 31)->endOfDay();
-            } else {
-                $dateDebut = Carbon::create($validated['year'], $validated['month'], 1)->startOfMonth();
-                $dateFin = $dateDebut->copy()->endOfMonth();
-            }
-
-            $report = $this->calculatePopoteReport($validated['paroisse_id'], $dateDebut, $dateFin);
-            $paroisse = Paroisse::find($validated['paroisse_id']);
-            $headerConfig = $this->getHeaderConfig($validated['paroisse_id']);
-
-            $pdf = Pdf::loadView('financial-reports.popote-pdf', [
-                'report' => $report,
-                'paroisse' => $paroisse,
-                'headerConfig' => $headerConfig,
-                'dateDebut' => $dateDebut,
-                'dateFin' => $dateFin,
-                'periodType' => $validated['period_type'],
-            ])->setPaper('a4', 'portrait');
-
-            $periodLabel = $validated['period_type'] === 'year'
-                ? $dateDebut->format('Y')
-                : $dateDebut->format('Y-m');
-            $filename = 'rapport-popote-'.Str::slug($paroisse->nom).'-'.$periodLabel.'.pdf';
-
-            return $pdf->download($filename);
-        } catch (Throwable $e) {
-            $this->logError($e, 'Erreur génération PDF Popote', ['data' => $request->all()]);
-            FlashAlert::error('Une erreur est survenue lors de la génération du PDF.');
-
-            return redirect()->back();
-        }
-    }
-
-    private function calculatePopoteReport(int $paroisseId, Carbon $dateDebut, Carbon $dateFin): array
-    {
-        $popoteCategory = RevenueCategory::where('paroisse_id', $paroisseId)->where('code', 'popote_subvention')->first();
-
-        $subventionRecue = Revenue::query()
-            ->where('paroisse_id', $paroisseId)
-            ->whereDate('date_recette', '>=', $dateDebut)
-            ->whereDate('date_recette', '<=', $dateFin)
-            ->when($popoteCategory, fn ($q) => $q->where('revenue_category_id', $popoteCategory->id))
-            ->sum('montant');
-
-        $depensesAlimentation = Expense::query()
-            ->where('paroisse_id', $paroisseId)
-            ->where('categorie_charge', 'alimentation_popote')
-            ->whereDate('date_depense', '>=', $dateDebut)
-            ->whereDate('date_depense', '<=', $dateFin)
-            ->orderBy('date_depense')
-            ->get();
-
-        $totalDepensesAlimentation = $depensesAlimentation->sum('montant');
-        $solde = $subventionRecue - $totalDepensesAlimentation;
-
-        return [
-            'subvention_recue' => $subventionRecue,
-            'depenses_alimentation' => $depensesAlimentation,
-            'total_depenses_alimentation' => $totalDepensesAlimentation,
-            'solde' => $solde,
-            'date_debut' => $dateDebut,
-            'date_fin' => $dateFin,
         ];
     }
 
@@ -1419,6 +1247,343 @@ class FinancialReportController extends Controller implements HasMiddleware
         ];
     }
 
+    /**
+     * @return list<string>
+     */
+    private static function expenseCategorieChargeCodes(): array
+    {
+        return [
+            'charge_fixe',
+            'charge_variable',
+            'charge_exceptionnelle',
+            'alimentation_popote',
+        ];
+    }
+
+    /**
+     * Libellés modifiables dans lang/{locale}/expenses.php (clé `categories`).
+     *
+     * @return array<string, string>
+     */
+    private static function expenseCategorieChargeLabels(): array
+    {
+        $v = trans('expenses.categories');
+
+        return is_array($v) ? $v : [];
+    }
+
+    /**
+     * Libellés modifiables dans lang/{locale}/expenses.php (clé `types`).
+     *
+     * @return array<string, string>
+     */
+    private static function expenseTypeChargeLabels(): array
+    {
+        $v = trans('expenses.types');
+
+        return is_array($v) ? $v : [];
+    }
+
+    /**
+     * Rapport par catégories de dépenses — page initiale ; calcul via AJAX.
+     */
+    public function expensesByCategory(Request $request): View
+    {
+        try {
+            $user = $request->user();
+
+            $paroisses = $user->hasRole('super_admin')
+                ? Paroisse::orderBy('nom')->get()
+                : Paroisse::whereKey($user->paroisse_id)->get();
+
+            $selectedParoisseId = $user->hasRole('super_admin')
+                ? null
+                : (int) $user->paroisse_id;
+
+            $now = now();
+            $dateDebut = $now->copy()->startOfMonth()->format('Y-m-d');
+            $dateFin = $now->copy()->endOfMonth()->format('Y-m-d');
+
+            $expenseCategories = [];
+            foreach (self::expenseCategorieChargeCodes() as $code) {
+                $expenseCategories[] = [
+                    'code' => $code,
+                    'nom' => self::expenseCategorieChargeLabels()[$code] ?? $code,
+                ];
+            }
+
+            $typeOptionsByCategory = ExpenseChargeCatalog::typeOptionRowsByCategory();
+
+            return view('financial-reports.expenses-by-category', [
+                'paroisses' => $paroisses,
+                'selectedParoisseId' => $selectedParoisseId,
+                'dateDebut' => $dateDebut,
+                'dateFin' => $dateFin,
+                'selectedCategorieCharge' => null,
+                'selectedTypeCharge' => null,
+                'report' => null,
+                'expenseCategories' => $expenseCategories,
+                'typeOptionsByCategory' => $typeOptionsByCategory,
+                'ajaxCalculateRoute' => route('financial-reports.expenses-by-category.calculate'),
+            ]);
+        } catch (Throwable $e) {
+            $this->logError($e, 'Erreur rapport par catégories de dépenses');
+            FlashAlert::error('Une erreur est survenue lors du chargement du rapport.');
+
+            return view('financial-reports.expenses-by-category', [
+                'paroisses' => collect(),
+                'selectedParoisseId' => null,
+                'dateDebut' => now()->startOfMonth()->format('Y-m-d'),
+                'dateFin' => now()->endOfMonth()->format('Y-m-d'),
+                'selectedCategorieCharge' => null,
+                'selectedTypeCharge' => null,
+                'report' => null,
+                'expenseCategories' => [],
+                'typeOptionsByCategory' => [],
+                'ajaxCalculateRoute' => route('financial-reports.expenses-by-category.calculate'),
+            ]);
+        }
+    }
+
+    public function expensesByCategoryCalculate(Request $request): JsonResponse
+    {
+        try {
+            $user = $request->user();
+
+            $codes = self::expenseCategorieChargeCodes();
+            $typeCodes = self::expenseTypeChargeCodes();
+
+            $validated = $request->validate([
+                'paroisse_id' => ['required', 'integer', 'exists:paroisses,id'],
+                'date_debut' => ['required', 'date'],
+                'date_fin' => ['required', 'date', 'after_or_equal:date_debut'],
+                'categorie_charge' => ['nullable', 'string', 'in:'.implode(',', $codes)],
+                'type_charge' => ['nullable', 'string', 'in:'.implode(',', $typeCodes)],
+            ]);
+
+            if (! $user->hasRole('super_admin') && (int) $validated['paroisse_id'] !== (int) $user->paroisse_id) {
+                return response()->json(['message' => 'Vous ne pouvez consulter que les rapports de votre paroisse.'], 403);
+            }
+
+            $categorieCharge = $validated['categorie_charge'] ?? null;
+            $requestedType = $validated['type_charge'] ?? null;
+
+            if (($requestedType !== null && $requestedType !== '') && ($categorieCharge === null || $categorieCharge === '')) {
+                return response()->json([
+                    'message' => 'Choisissez une catégorie de charge pour filtrer par type.',
+                ], 422);
+            }
+            $typeCharge = $this->resolveExpenseTypeChargeForReport($requestedType, $categorieCharge);
+
+            if (($requestedType !== null && $requestedType !== '') && $typeCharge === null) {
+                return response()->json([
+                    'message' => 'Le type de dépense est invalide pour ce filtre.',
+                ], 422);
+            }
+
+            $dateDebut = Carbon::parse($validated['date_debut'])->startOfDay();
+            $dateFin = Carbon::parse($validated['date_fin'])->endOfDay();
+
+            $report = $this->calculateExpensesByCategoryReport(
+                (int) $validated['paroisse_id'],
+                $dateDebut,
+                $dateFin,
+                $categorieCharge,
+                $typeCharge
+            );
+
+            $html = view('financial-reports.partials.expenses-by-category-report-body', [
+                'report' => $report,
+                'dateDebut' => $validated['date_debut'],
+                'dateFin' => $validated['date_fin'],
+                'selectedCategorieCharge' => $categorieCharge,
+                'selectedTypeCharge' => $typeCharge,
+            ])->render();
+
+            $pdfUrl = route('financial-reports.expenses-by-category.pdf', array_filter([
+                'paroisse_id' => (int) $validated['paroisse_id'],
+                'date_debut' => $validated['date_debut'],
+                'date_fin' => $validated['date_fin'],
+                'categorie_charge' => $categorieCharge,
+                'type_charge' => $typeCharge,
+            ], fn ($v) => $v !== null && $v !== ''));
+
+            return response()->json([
+                'html' => $html,
+                'pdf_url' => $pdfUrl,
+                'period_label' => $dateDebut->format('d/m/Y').' → '.$dateFin->format('d/m/Y'),
+            ]);
+        } catch (ValidationException $e) {
+            throw $e;
+        } catch (Throwable $e) {
+            $this->logError($e, 'Erreur calcul AJAX rapport dépenses par catégorie', ['data' => $request->all()]);
+
+            return response()->json(['message' => 'Une erreur est survenue lors du calcul du rapport.'], 500);
+        }
+    }
+
+    public function downloadExpensesByCategoryPdf(Request $request): Response|RedirectResponse
+    {
+        try {
+            $user = $request->user();
+
+            $codes = self::expenseCategorieChargeCodes();
+            $typeCodes = self::expenseTypeChargeCodes();
+
+            $validated = $request->validate([
+                'paroisse_id' => ['required', 'exists:paroisses,id'],
+                'date_debut' => ['required', 'date'],
+                'date_fin' => ['required', 'date', 'after_or_equal:date_debut'],
+                'categorie_charge' => ['nullable', 'string', 'in:'.implode(',', $codes)],
+                'type_charge' => ['nullable', 'string', 'in:'.implode(',', $typeCodes)],
+            ]);
+
+            if (! $user->hasRole('super_admin') && (int) $validated['paroisse_id'] !== (int) $user->paroisse_id) {
+                FlashAlert::error('Vous ne pouvez générer des rapports que pour votre paroisse.');
+
+                return redirect()->back();
+            }
+
+            $dateDebut = Carbon::parse($validated['date_debut'])->startOfDay();
+            $dateFin = Carbon::parse($validated['date_fin'])->endOfDay();
+            $categorieCharge = $validated['categorie_charge'] ?? null;
+            $requestedType = $validated['type_charge'] ?? null;
+
+            if (($requestedType !== null && $requestedType !== '') && ($categorieCharge === null || $categorieCharge === '')) {
+                FlashAlert::error('Choisissez une catégorie de charge pour filtrer par type.');
+
+                return redirect()->back();
+            }
+
+            $typeCharge = $this->resolveExpenseTypeChargeForReport($requestedType, $categorieCharge);
+
+            if ($requestedType !== null && $requestedType !== '' && $typeCharge === null) {
+                FlashAlert::error('Le type de dépense est invalide pour ce filtre.');
+
+                return redirect()->back();
+            }
+
+            $report = $this->calculateExpensesByCategoryReport(
+                (int) $validated['paroisse_id'],
+                $dateDebut,
+                $dateFin,
+                $categorieCharge,
+                $typeCharge
+            );
+
+            $paroisse = Paroisse::find($validated['paroisse_id']);
+            $headerConfig = $this->getHeaderConfig($validated['paroisse_id']);
+
+            $pdf = Pdf::loadView('financial-reports.expenses-by-category-pdf', [
+                'report' => $report,
+                'paroisse' => $paroisse,
+                'headerConfig' => $headerConfig,
+                'dateDebut' => $dateDebut,
+                'dateFin' => $dateFin,
+                'selectedCategorieCharge' => $categorieCharge,
+                'selectedTypeCharge' => $typeCharge,
+            ])->setPaper('a4', 'portrait');
+
+            $filename = 'rapport-depenses-par-categorie-'.Str::slug($paroisse->nom).'-'.$dateDebut->format('Y-m-d').'-'.$dateFin->format('Y-m-d').'.pdf';
+
+            return $pdf->download($filename);
+        } catch (Throwable $e) {
+            $this->logError($e, 'Erreur génération PDF rapport dépenses par catégorie', ['data' => $request->all()]);
+            FlashAlert::error('Une erreur est survenue lors de la génération du PDF.');
+
+            return redirect()->back();
+        }
+    }
+
+    private function resolveExpenseTypeChargeForReport(?string $typeCharge, ?string $categorieCharge): ?string
+    {
+        if ($typeCharge === null || $typeCharge === '') {
+            return null;
+        }
+
+        if ($categorieCharge === null || $categorieCharge === '') {
+            return null;
+        }
+
+        if (! in_array($typeCharge, self::expenseTypeChargeCodes(), true)) {
+            return null;
+        }
+
+        if (! ExpenseChargeCatalog::typeAllowedForCategory($categorieCharge, $typeCharge)) {
+            return null;
+        }
+
+        return $typeCharge;
+    }
+
+    /**
+     * @return array{
+     *     expenses: Collection<int, Expense>,
+     *     by_category: array<string, array{code: string, nom: string, montant: float, count: int}>,
+     *     by_type: array<string, array{code: string, nom: string, montant: float, count: int}>,
+     *     total_general: float,
+     *     date_debut: Carbon,
+     *     date_fin: Carbon
+     * }
+     */
+    private function calculateExpensesByCategoryReport(
+        int $paroisseId,
+        Carbon $dateDebut,
+        Carbon $dateFin,
+        ?string $categorieCharge = null,
+        ?string $typeCharge = null
+    ): array {
+        $query = Expense::query()
+            ->where('paroisse_id', $paroisseId)
+            ->where('statut', 'valide')
+            ->whereDate('date_depense', '>=', $dateDebut)
+            ->whereDate('date_depense', '<=', $dateFin);
+
+        if ($categorieCharge) {
+            $query->where('categorie_charge', $categorieCharge);
+        }
+
+        if ($typeCharge) {
+            $query->where('type_charge', $typeCharge);
+        }
+
+        $expenses = $query->orderBy('date_depense')->orderBy('id')->get();
+
+        $catLabels = self::expenseCategorieChargeLabels();
+        $typeLabels = self::expenseTypeChargeLabels();
+
+        $byCategory = [];
+        foreach ($expenses->groupBy('categorie_charge') as $code => $items) {
+            /** @var string $code */
+            $byCategory[$code] = [
+                'code' => $code,
+                'nom' => $catLabels[$code] ?? $code,
+                'montant' => (float) $items->sum('montant'),
+                'count' => $items->count(),
+            ];
+        }
+
+        $byType = [];
+        foreach ($expenses->groupBy('type_charge') as $tcode => $items) {
+            /** @var string $tcode */
+            $byType[$tcode] = [
+                'code' => $tcode,
+                'nom' => $typeLabels[$tcode] ?? $tcode,
+                'montant' => (float) $items->sum('montant'),
+                'count' => $items->count(),
+            ];
+        }
+
+        return [
+            'expenses' => $expenses,
+            'by_category' => $byCategory,
+            'by_type' => $byType,
+            'total_general' => (float) $expenses->sum('montant'),
+            'date_debut' => $dateDebut,
+            'date_fin' => $dateFin,
+        ];
+    }
+
     private function calculateChargesFixesReport(int $paroisseId, Carbon $dateDebut, Carbon $dateFin): array
     {
         $expenses = Expense::query()
@@ -1429,25 +1594,12 @@ class FinancialReportController extends Controller implements HasMiddleware
             ->orderBy('date_depense')
             ->get();
 
-        $typeLabels = [
-            'carburant' => 'Carburant',
-            'hosties' => 'Hosties',
-            'internet' => 'Internet',
-            'maintenance_materiel' => 'Maintenance matériel',
-            'gaz' => 'Gaz',
-            'eau' => 'Eau',
-            'electricite' => 'Électricité',
-            'gardiennage' => 'Gardiennage',
-            'salaire_ouvrier' => 'Salaire ouvrier',
-            'autre' => 'Autre',
-        ];
-
         return [
             'expenses' => $expenses,
             'total' => $expenses->sum('montant'),
             'date_debut' => $dateDebut,
             'date_fin' => $dateFin,
-            'type_labels' => $typeLabels,
+            'type_labels' => self::expenseTypeChargeLabels(),
         ];
     }
 }

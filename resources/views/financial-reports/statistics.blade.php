@@ -2,7 +2,7 @@
 
 @section('title', 'Statistiques financières — Catholique')
 @section('page-title', 'Statistiques financières')
-@section('page-title-info', 'Vue annuelle : recettes, dépenses popote (déduites du solde) et autres charges (information hiérarchie), avec détail par mois.')
+@section('page-title-info', 'Vue annuelle : mêmes règles que le rapport mensuel — recettes hors Procure, dépenses toutes catégories (validées), solde par mois.')
 
 @section('btn-create')
     <div class="flex flex-wrap items-center gap-2">
@@ -54,42 +54,35 @@
             <p class="m-0 flex gap-2">
                 <i class="fas fa-info-circle mt-0.5 shrink-0 text-sky-600 dark:text-sky-400" aria-hidden="true"></i>
                 <span>
-                    <strong class="font-semibold">Règle comptable :</strong>
-                    seules les dépenses <strong>Popote / Alimentation</strong> (subvention) sont déduites des recettes pour le solde.
-                    Les charges fixes, variables et exceptionnelles sont suivies pour <strong>informer la hiérarchie</strong> ; elles ne sont pas déduites des revenus.
+                    <strong class="font-semibold">Règle (alignée sur le rapport mensuel) :</strong>
+                    les <strong>recettes</strong> comptabilisées excluent la catégorie <strong>Procure</strong> et regroupent quête ordinaire, quête extraordinaire, location et popote/subvention (recettes au statut « validé » uniquement).
+                    Les <strong>dépenses</strong> incluent toutes les catégories de charges (statut « validé »). Le <strong>solde</strong> est recettes − dépenses.
                 </span>
             </p>
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
             <div class="adventiste-card-pro-static p-4 border-t-4 border-t-emerald-500">
                 <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Total recettes {{ $selectedYear }}</p>
                 <p class="mt-1 text-xl font-bold text-emerald-700 dark:text-emerald-400">{{ $fmt($stats['total_recettes']) }}</p>
-                <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">Toutes catégories</p>
+                <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">Hors Procure</p>
             </div>
             <div class="adventiste-card-pro-static p-4 border-t-4 border-t-rose-500">
-                <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Dépenses popote / alimentation</p>
-                <p class="mt-1 text-xl font-bold text-rose-700 dark:text-rose-400">{{ $fmt($stats['depenses_popote']) }}</p>
-                <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">Déduites des recettes</p>
+                <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Total dépenses {{ $selectedYear }}</p>
+                <p class="mt-1 text-xl font-bold text-rose-700 dark:text-rose-400">{{ $fmt($stats['total_depenses']) }}</p>
+                <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">Toutes catégories</p>
             </div>
             <div class="adventiste-card-pro-static p-4 border-t-4 {{ $stats['solde'] >= 0 ? 'border-t-sky-500' : 'border-t-amber-500' }}">
                 <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Solde {{ $selectedYear }}</p>
                 <p class="mt-1 text-xl font-bold {{ $stats['solde'] >= 0 ? 'text-sky-700 dark:text-sky-300' : 'text-amber-700 dark:text-amber-400' }}">{{ $fmt($stats['solde']) }}</p>
-                <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">{{ $stats['solde'] >= 0 ? 'Excédent' : 'Déficit' }} (recettes − popote)</p>
+                <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">{{ $stats['solde'] >= 0 ? 'Excédent' : 'Déficit' }} (recettes − dépenses)</p>
             </div>
-        </div>
-
-        <div class="adventiste-card-pro-static p-4 mb-6 flex flex-wrap items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
-            <i class="fas fa-file-alt text-slate-400" aria-hidden="true"></i>
-            <span><strong class="font-semibold text-slate-900 dark:text-white">Autres dépenses</strong> (fixes, variables, exceptionnelles) :</span>
-            <span class="font-bold text-slate-900 dark:text-white">{{ $fmt($stats['depenses_autres']) }}</span>
-            <span class="text-xs text-slate-500 dark:text-slate-400">— Rapports hiérarchie (non déduites des recettes)</span>
         </div>
 
         <div class="adventiste-card-pro-static overflow-hidden">
             <div class="px-4 py-3 border-b border-slate-200/80 dark:border-slate-600/80 bg-slate-50/80 dark:bg-slate-800/50">
                 <h3 class="text-sm font-semibold text-slate-900 dark:text-white m-0">Répartition par mois</h3>
-                <p class="text-xs text-slate-500 dark:text-slate-400 m-0 mt-1">Solde = recettes − dépenses popote / alimentation</p>
+                <p class="text-xs text-slate-500 dark:text-slate-400 m-0 mt-1">Solde = recettes (hors Procure) − dépenses (toutes catégories)</p>
             </div>
             <div class="adventiste-table-shell border-0 rounded-none shadow-none">
                 <div class="overflow-x-auto">
@@ -98,8 +91,7 @@
                             <tr class="text-left text-slate-700 dark:text-slate-200">
                                 <th class="px-4 py-3 font-semibold">Mois</th>
                                 <th class="px-4 py-3 font-semibold text-right">Recettes</th>
-                                <th class="px-4 py-3 font-semibold text-right">Dép. popote</th>
-                                <th class="px-4 py-3 font-semibold text-right">Autres dép.</th>
+                                <th class="px-4 py-3 font-semibold text-right">Dépenses</th>
                                 <th class="px-4 py-3 font-semibold text-right">Solde</th>
                             </tr>
                         </thead>
@@ -108,8 +100,7 @@
                                 <tr class="text-slate-700 dark:text-slate-200">
                                     <td class="px-4 py-3 font-medium">{{ $row['nom'] }}</td>
                                     <td class="px-4 py-3 text-right">{{ $fmt($row['recettes']) }}</td>
-                                    <td class="px-4 py-3 text-right">{{ $fmt($row['depenses_popote']) }}</td>
-                                    <td class="px-4 py-3 text-right text-slate-500 dark:text-slate-400">{{ $fmt($row['depenses_autres']) }}</td>
+                                    <td class="px-4 py-3 text-right">{{ $fmt($row['depenses']) }}</td>
                                     <td class="px-4 py-3 text-right font-semibold {{ $row['solde'] >= 0 ? 'text-sky-700 dark:text-sky-300' : 'text-amber-700 dark:text-amber-400' }}">
                                         {{ $fmt($row['solde']) }}
                                     </td>
@@ -121,8 +112,7 @@
                                 <tr class="bg-slate-100/90 dark:bg-slate-800/80 font-bold text-slate-900 dark:text-white">
                                     <td class="px-4 py-3">Total {{ $selectedYear }}</td>
                                     <td class="px-4 py-3 text-right">{{ $fmt($stats['total_recettes']) }}</td>
-                                    <td class="px-4 py-3 text-right">{{ $fmt($stats['depenses_popote']) }}</td>
-                                    <td class="px-4 py-3 text-right text-slate-600 dark:text-slate-300">{{ $fmt($stats['depenses_autres']) }}</td>
+                                    <td class="px-4 py-3 text-right">{{ $fmt($stats['total_depenses']) }}</td>
                                     <td class="px-4 py-3 text-right {{ $stats['solde'] >= 0 ? 'text-sky-700 dark:text-sky-300' : 'text-amber-700 dark:text-amber-400' }}">
                                         {{ $fmt($stats['solde']) }}
                                     </td>

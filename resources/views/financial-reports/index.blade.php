@@ -2,7 +2,7 @@
 
 @section('title', 'Rapports financiers — Catholique')
 @section('page-title', 'Rapports financiers')
-@section('page-title-info', 'Choisissez paroisse, mois et année, puis calculez le rapport de justification (recettes popote/subvention, dépenses, solde). Vous pouvez l’enregistrer si votre rôle le permet.')
+@section('page-title-info', 'Justification mensuelle : recettes validées hors Procure (quêtes, locations, popote/subvention), dépenses validées toutes catégories, solde = recettes − dépenses. Enregistrement possible selon les droits.')
 
 @section('btn-create')
     <nav class="inline-flex min-w-0 max-w-full flex-wrap items-center justify-end gap-2" aria-label="Navigation rapports financiers">
@@ -22,15 +22,11 @@
         <span class="mx-0.5 hidden h-6 w-px shrink-0 self-center bg-slate-200 dark:bg-slate-600 sm:block" role="presentation" aria-hidden="true"></span>
         <a href="{{ route('financial-reports.revenues-by-category') }}" class="adventiste-btn-secondary text-sm no-underline inline-flex items-center gap-1.5">
             <i class="fas fa-layer-group text-slate-500 dark:text-slate-400" aria-hidden="true"></i>
-            <span>Par catégories</span>
+            <span>Recettes par catégorie</span>
         </a>
-        <a href="{{ route('financial-reports.popote') }}" class="adventiste-btn-secondary text-sm no-underline inline-flex items-center gap-1.5">
-            <i class="fas fa-utensils text-slate-500 dark:text-slate-400" aria-hidden="true"></i>
-            <span>Subvention Popote</span>
-        </a>
-        <a href="{{ route('financial-reports.charges-fixes') }}" class="adventiste-btn-secondary text-sm no-underline inline-flex items-center gap-1.5">
-            <i class="fas fa-file-invoice-dollar text-slate-500 dark:text-slate-400" aria-hidden="true"></i>
-            <span>Charges fixes</span>
+        <a href="{{ route('financial-reports.expenses-by-category') }}" class="adventiste-btn-secondary text-sm no-underline inline-flex items-center gap-1.5">
+            <i class="fas fa-receipt text-slate-500 dark:text-slate-400" aria-hidden="true"></i>
+            <span>Dépenses par catégorie</span>
         </a>
     </nav>
 @endsection
@@ -90,6 +86,18 @@
         </form>
     </div>
 
+    <div class="rounded-xl border border-sky-200/90 dark:border-sky-800/50 bg-sky-50/90 dark:bg-sky-950/25 px-4 py-3 mb-6 text-sm text-sky-950 dark:text-sky-100 leading-relaxed">
+        <p class="m-0 flex gap-2">
+            <i class="fas fa-info-circle mt-0.5 shrink-0 text-sky-600 dark:text-sky-400" aria-hidden="true"></i>
+            <span>
+                <strong class="font-semibold">Méthode de calcul :</strong>
+                les <strong>recettes</strong> totalisent uniquement les catégories quête ordinaire, quête extraordinaire, location et popote/subvention (la <strong>Procure</strong> est exclue) pour les lignes au statut « validé ».
+                Les <strong>dépenses</strong> additionnent toutes les catégories de charges sur la même période (statut « validé »).
+                Le <strong>solde</strong> est la différence entre ces deux totaux.
+            </span>
+        </p>
+    </div>
+
     @if ($report)
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
             <div class="adventiste-card-pro-static p-4 border-t-4 border-t-emerald-500">
@@ -98,7 +106,7 @@
                     Total recettes
                 </p>
                 <p class="mt-1 text-xl font-bold text-emerald-700 dark:text-emerald-400">{{ $fmt($report['total_recettes']) }}</p>
-                <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">Popote / Subvention</p>
+                <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">Quêtes, locations, popote (hors Procure)</p>
             </div>
             <div class="adventiste-card-pro-static p-4 border-t-4 border-t-rose-500">
                 <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400 flex items-center gap-2">
@@ -114,7 +122,7 @@
                     Solde
                 </p>
                 <p class="mt-1 text-xl font-bold {{ $report['solde'] >= 0 ? 'text-sky-700 dark:text-sky-300' : 'text-amber-700 dark:text-amber-400' }}">{{ $fmt($report['solde']) }}</p>
-                <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">{{ $report['solde'] >= 0 ? 'Excédent' : 'Déficit' }}</p>
+                <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">{{ $report['solde'] >= 0 ? 'Excédent' : 'Déficit' }} · recettes − dépenses</p>
             </div>
         </div>
 
@@ -123,8 +131,9 @@
                 <div class="px-4 py-3 border-b border-slate-200/80 dark:border-slate-600/80 bg-slate-50/80 dark:bg-slate-800/50">
                     <h3 class="text-sm font-semibold text-slate-900 dark:text-white m-0 flex items-center gap-2">
                         <i class="fas fa-coins text-amber-600 dark:text-amber-400" aria-hidden="true"></i>
-                        Détails des recettes (Popote/Subvention)
+                        Détails des recettes (hors Procure)
                     </h3>
+                    <p class="text-xs text-slate-500 dark:text-slate-400 m-0 mt-1">Somme par catégorie de recette</p>
                 </div>
                 <div class="p-4">
                     @if (count($report['details_recettes']) > 0)
@@ -133,7 +142,7 @@
                                 <table class="min-w-full text-sm">
                                     <thead>
                                         <tr class="text-left text-slate-700 dark:text-slate-200">
-                                            <th class="px-4 py-3 font-semibold">Type</th>
+                                            <th class="px-4 py-3 font-semibold">Catégorie</th>
                                             <th class="px-4 py-3 font-semibold text-right">Montant</th>
                                             <th class="px-4 py-3 font-semibold text-center">Nb</th>
                                         </tr>
@@ -149,11 +158,18 @@
                                             </tr>
                                         @endforeach
                                     </tbody>
+                                    <tfoot>
+                                        <tr class="bg-emerald-50/90 dark:bg-emerald-950/30 font-bold text-slate-900 dark:text-slate-100">
+                                            <td class="px-4 py-3">Total</td>
+                                            <td class="px-4 py-3 text-right tabular-nums">{{ $fmt($report['total_recettes']) }}</td>
+                                            <td class="px-4 py-3 text-center tabular-nums">{{ $report['revenues']->count() }}</td>
+                                        </tr>
+                                    </tfoot>
                                 </table>
                             </div>
                         </div>
                     @else
-                        <p class="text-sm text-slate-500 dark:text-slate-400 m-0">Aucune recette popote/subvention pour cette période.</p>
+                        <p class="text-sm text-slate-500 dark:text-slate-400 m-0">Aucune recette dans les catégories retenues (ou catégories non configurées) pour cette période.</p>
                     @endif
                 </div>
             </div>
@@ -164,6 +180,7 @@
                         <i class="fas fa-receipt text-slate-500 dark:text-slate-400" aria-hidden="true"></i>
                         Dépenses par catégorie
                     </h3>
+                    <p class="text-xs text-slate-500 dark:text-slate-400 m-0 mt-1">Ventilation des charges (somme = total dépenses)</p>
                 </div>
                 <div class="p-4">
                     <div class="adventiste-table-shell border-0 rounded-none shadow-none">
@@ -193,6 +210,12 @@
                                         <td class="px-4 py-3 text-right font-semibold">{{ $fmt($report['details_depenses']['alimentation_popote'] ?? 0) }}</td>
                                     </tr>
                                 </tbody>
+                                <tfoot>
+                                    <tr class="bg-rose-50/90 dark:bg-rose-950/30 font-bold text-slate-900 dark:text-slate-100">
+                                        <td class="px-4 py-3">Total</td>
+                                        <td class="px-4 py-3 text-right tabular-nums">{{ $fmt($report['total_depenses']) }}</td>
+                                    </tr>
+                                </tfoot>
                             </table>
                         </div>
                     </div>
@@ -200,12 +223,64 @@
             </div>
         </div>
 
+        @if ($report['revenues']->count() > 0)
+            @php
+                $payLabel = static fn ($v) => ucfirst(str_replace('_', ' ', (string) $v));
+            @endphp
+            <div class="adventiste-card-pro-static overflow-hidden mb-6">
+                <div class="px-4 py-3 border-b border-slate-200/80 dark:border-slate-600/80 bg-slate-50/80 dark:bg-slate-800/50">
+                    <h3 class="text-sm font-semibold text-slate-900 dark:text-white m-0 flex items-center gap-2">
+                        <i class="fas fa-list text-slate-500 dark:text-slate-400" aria-hidden="true"></i>
+                        Liste détaillée des recettes
+                    </h3>
+                    <p class="text-xs text-slate-500 dark:text-slate-400 m-0 mt-1">{{ $report['revenues']->count() }} ligne(s) · mêmes catégories que le total « recettes »</p>
+                </div>
+                <div class="adventiste-table-shell border-0 rounded-none shadow-none">
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full text-sm">
+                            <thead>
+                                <tr class="text-left text-slate-700 dark:text-slate-200">
+                                    <th class="px-4 py-3 font-semibold">Date</th>
+                                    <th class="px-4 py-3 font-semibold">Catégorie</th>
+                                    <th class="px-4 py-3 font-semibold">Type</th>
+                                    <th class="px-4 py-3 font-semibold">Méthode</th>
+                                    <th class="px-4 py-3 font-semibold">Référence</th>
+                                    <th class="px-4 py-3 font-semibold text-right">Montant</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200/70 dark:divide-slate-700/70">
+                                @foreach ($report['revenues'] as $revenue)
+                                    <tr class="text-slate-700 dark:text-slate-200">
+                                        <td class="px-4 py-3 whitespace-nowrap">{{ $revenue->date_recette?->format('d/m/Y') }}</td>
+                                        <td class="px-4 py-3">{{ $revenue->category->nom ?? '—' }}</td>
+                                        <td class="px-4 py-3">{{ $revenue->type->nom ?? '—' }}</td>
+                                        <td class="px-4 py-3">
+                                            <span class="inline-flex rounded-full bg-slate-100 dark:bg-slate-700 px-2.5 py-0.5 text-xs font-medium text-slate-700 dark:text-slate-200">{{ $payLabel($revenue->methode_paiement ?? '') ?: '—' }}</span>
+                                        </td>
+                                        <td class="px-4 py-3 font-mono text-xs">{{ $revenue->reference_paiement ?? '—' }}</td>
+                                        <td class="px-4 py-3 text-right font-semibold text-emerald-700 dark:text-emerald-400">{{ $fmt($revenue->montant) }}</td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                            <tfoot>
+                                <tr class="bg-slate-50/90 dark:bg-slate-800/50 font-bold text-slate-900 dark:text-slate-100">
+                                    <td class="px-4 py-3 text-right" colspan="5">Total recettes</td>
+                                    <td class="px-4 py-3 text-right tabular-nums">{{ $fmt($report['total_recettes']) }}</td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        @endif
+
         <div class="adventiste-card-pro-static overflow-hidden mb-6">
             <div class="px-4 py-3 border-b border-slate-200/80 dark:border-slate-600/80 bg-slate-50/80 dark:bg-slate-800/50">
                 <h3 class="text-sm font-semibold text-slate-900 dark:text-white m-0 flex items-center gap-2">
                     <i class="fas fa-list text-slate-500 dark:text-slate-400" aria-hidden="true"></i>
                     Liste détaillée des dépenses
                 </h3>
+                <p class="text-xs text-slate-500 dark:text-slate-400 m-0 mt-1">Toutes les dépenses validées sur la période</p>
             </div>
             <div class="p-0 sm:p-0">
                 @if ($report['expenses']->count() > 0)
@@ -216,19 +291,8 @@
                             'charge_exceptionnelle' => 'Charge exceptionnelle',
                             'alimentation_popote' => 'Alimentation popote',
                         ];
-                        $types = [
-                            'carburant' => 'Carburant',
-                            'hosties' => 'Hosties',
-                            'internet' => 'Internet',
-                            'maintenance_materiel' => 'Maintenance matériel',
-                            'gaz' => 'Gaz',
-                            'eau' => 'Eau',
-                            'electricite' => 'Électricité',
-                            'jardinage' => 'Jardinage',
-                            'salaire_ouvrier' => 'Salaire ouvrier',
-                            'autre' => 'Autre',
-                            'alimentation' => 'Alimentation',
-                        ];
+                        $types = trans('expenses.types');
+                        $types = is_array($types) ? $types : [];
                     @endphp
                     <div class="adventiste-table-shell border-0 rounded-none shadow-none">
                         <div class="overflow-x-auto">
@@ -255,11 +319,17 @@
                                         </tr>
                                     @endforeach
                                 </tbody>
+                                <tfoot>
+                                    <tr class="bg-slate-50/90 dark:bg-slate-800/50 font-bold text-slate-900 dark:text-slate-100">
+                                        <td class="px-4 py-3 text-right" colspan="4">Total dépenses</td>
+                                        <td class="px-4 py-3 text-right tabular-nums">{{ $fmt($report['total_depenses']) }}</td>
+                                    </tr>
+                                </tfoot>
                             </table>
                         </div>
                     </div>
                 @else
-                    <p class="text-sm text-slate-500 dark:text-slate-400 p-4 m-0">Aucune dépense enregistrée pour cette période.</p>
+                    <p class="text-sm text-slate-500 dark:text-slate-400 p-4 m-0">Aucune dépense validée pour cette période.</p>
                 @endif
             </div>
         </div>
@@ -284,7 +354,7 @@
             </div>
             <h3 class="text-lg font-semibold text-slate-800 dark:text-slate-100">Sélectionnez une période</h3>
             <p class="mt-2 text-sm text-slate-600 dark:text-slate-400 max-w-md mx-auto">
-                Choisissez le mois, l’année et la paroisse (si besoin), puis cliquez sur « Calculer le rapport » pour afficher recettes, dépenses et solde.
+                Choisissez le mois, l’année et la paroisse (si besoin), puis cliquez sur « Calculer le rapport » pour afficher le détail des recettes (hors Procure), des dépenses et le solde.
             </p>
         </div>
     @endif

@@ -286,7 +286,7 @@
             <div class="summary-box success">
                 <h4>Total Recettes</h4>
                 <div class="amount">{{ \App\Helpers\ParoisseConfig::formatMontant($report['total_recettes']) }}</div>
-                <div class="label">Popote / Subvention</div>
+                <div class="label">Hors Procure</div>
             </div>
             <div class="summary-box danger">
                 <h4>Total Dépenses</h4>
@@ -305,12 +305,12 @@
     <div class="details-grid">
         <div class="details-col">
             <div class="section">
-                <div class="section-title">Détails des Recettes (Popote/Subvention)</div>
+                <div class="section-title">Détails des recettes (hors Procure)</div>
                 @if(count($report['details_recettes']) > 0)
                     <table>
                         <thead>
                             <tr>
-                                <th>Type</th>
+                                <th>Catégorie</th>
                                 <th class="text-right">Montant</th>
                                 <th class="text-center">Nb</th>
                             </tr>
@@ -331,7 +331,7 @@
                         </tbody>
                     </table>
                 @else
-                    <p style="color: #666; font-style: italic;">Aucune recette popote/subvention pour cette période.</p>
+                    <p style="color: #666; font-style: italic;">Aucune recette dans les catégories retenues pour cette période.</p>
                 @endif
             </div>
         </div>
@@ -380,6 +380,7 @@
                 <thead>
                     <tr>
                         <th>Date</th>
+                        <th>Catégorie</th>
                         <th>Type</th>
                         <th>Méthode</th>
                         <th>Référence</th>
@@ -390,6 +391,7 @@
                     @foreach($report['revenues'] as $revenue)
                         <tr>
                             <td>{{ $revenue->date_recette?->format('d/m/Y') }}</td>
+                            <td>{{ $revenue->category->nom ?? '—' }}</td>
                             <td>{{ $revenue->type->nom ?? '—' }}</td>
                             <td>{{ $revenue->methode_paiement ?? '—' }}</td>
                             <td>{{ $revenue->reference_paiement ?? '—' }}</td>
@@ -403,6 +405,16 @@
 
     {{-- Liste détaillée des dépenses --}}
     @if($report['expenses']->count() > 0)
+        @php
+            $expenseCatsPdf = [
+                'charge_fixe' => 'Charge fixe',
+                'charge_variable' => 'Charge variable',
+                'charge_exceptionnelle' => 'Charge exceptionnelle',
+                'alimentation_popote' => 'Alimentation popote',
+            ];
+            $expenseTypesPdf = trans('expenses.types');
+            $expenseTypesPdf = is_array($expenseTypesPdf) ? $expenseTypesPdf : [];
+        @endphp
         <div class="section">
             <div class="section-title">Liste détaillée des Dépenses</div>
             <table>
@@ -421,33 +433,10 @@
                         <tr>
                             <td>{{ $expense->date_depense?->format('d/m/Y') }}</td>
                             <td>
-                                @php
-                                    $cats = [
-                                        'charge_fixe' => 'Charge fixe',
-                                        'charge_variable' => 'Charge variable',
-                                        'charge_exceptionnelle' => 'Charge exceptionnelle',
-                                        'alimentation_popote' => 'Alimentation popote',
-                                    ];
-                                @endphp
-                                {{ $cats[$expense->categorie_charge] ?? $expense->categorie_charge }}
+                                {{ $expenseCatsPdf[$expense->categorie_charge] ?? $expense->categorie_charge }}
                             </td>
                             <td>
-                                @php
-                                    $types = [
-                                        'carburant' => 'Carburant',
-                                        'hosties' => 'Hosties',
-                                        'internet' => 'Internet',
-                                        'maintenance_materiel' => 'Maintenance matériel',
-                                        'gaz' => 'Gaz',
-                                        'eau' => 'Eau',
-                                        'electricite' => 'Électricité',
-                                        'jardinage' => 'Jardinage',
-                                        'salaire_ouvrier' => 'Salaire ouvrier',
-                                        'autre' => 'Autre',
-                                        'alimentation' => 'Alimentation',
-                                    ];
-                                @endphp
-                                {{ $types[$expense->type_charge] ?? $expense->type_charge }}
+                                {{ $expenseTypesPdf[$expense->type_charge] ?? $expense->type_charge }}
                             </td>
                             <td>{{ $expense->fournisseur ?? '—' }}</td>
                             <td>{{ $expense->facture_reference ?? '—' }}</td>
@@ -461,7 +450,7 @@
 
     {{-- Pied de page --}}
     <div class="footer">
-        <p><strong>Note :</strong> Ce rapport justifie les dépenses effectuées contre les recettes popote/subvention reçues pour la période indiquée.</p>
+        <p><strong>Note :</strong> Le solde compare les recettes retenues (hors Procure) à l’ensemble des dépenses validées sur la période.</p>
         <p>Document généré le {{ now()->format('d/m/Y à H:i') }}</p>
     </div>
 </body>

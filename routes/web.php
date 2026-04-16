@@ -78,10 +78,10 @@ Route::middleware('auth')->group(function (): void {
     Route::get('financial-reports/revenues-weekly', [FinancialReportController::class, 'revenuesWeekly'])->name('financial-reports.revenues-weekly');
     Route::get('financial-reports/revenues-weekly/print', [FinancialReportController::class, 'revenuesWeeklyPrint'])->name('financial-reports.revenues-weekly-print');
     Route::match(['get', 'post'], 'financial-reports/revenues-weekly/pdf', [FinancialReportController::class, 'downloadRevenuesWeeklyPdf'])->name('financial-reports.revenues-weekly-pdf');
-    Route::get('financial-reports/popote', [FinancialReportController::class, 'popoteReport'])->name('financial-reports.popote');
-    Route::get('financial-reports/popote/print', [FinancialReportController::class, 'popotePrint'])->name('financial-reports.popote-print');
-    Route::post('financial-reports/popote/pdf', [FinancialReportController::class, 'downloadPopotePdf'])->name('financial-reports.popote-pdf');
     Route::get('financial-reports/charges-fixes', [FinancialReportController::class, 'chargesFixesReport'])->name('financial-reports.charges-fixes');
+    Route::post('financial-reports/expenses-by-category/calculate', [FinancialReportController::class, 'expensesByCategoryCalculate'])->name('financial-reports.expenses-by-category.calculate');
+    Route::get('financial-reports/expenses-by-category/pdf', [FinancialReportController::class, 'downloadExpensesByCategoryPdf'])->name('financial-reports.expenses-by-category.pdf');
+    Route::get('financial-reports/expenses-by-category', [FinancialReportController::class, 'expensesByCategory'])->name('financial-reports.expenses-by-category');
     Route::get('financial-reports/revenues-by-category/revenue-categories', [FinancialReportController::class, 'revenueCategoriesForParoisse'])->name('financial-reports.revenues-by-category.revenue-categories');
     Route::get('financial-reports/revenues-by-category/revenue-types', [FinancialReportController::class, 'revenueTypesForCategory'])->name('financial-reports.revenues-by-category.revenue-types');
     Route::post('financial-reports/revenues-by-category/calculate', [FinancialReportController::class, 'revenuesByCategoryCalculate'])->name('financial-reports.revenues-by-category.calculate');

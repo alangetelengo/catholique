@@ -7,9 +7,6 @@
     $isReportsRoute = request()->routeIs('financial-reports.*', 'revenue-reports.*', 'popote-reports.*', 'charges-fixes-reports.*');
     $isFinancialHub = request()->routeIs(
         'financial-reports.index',
-        'financial-reports.popote',
-        'financial-reports.popote-print',
-        'financial-reports.popote-pdf',
         'financial-reports.charges-fixes',
         'financial-reports.revenues-by-category',
         'financial-reports.revenues-by-category.store',
@@ -115,6 +112,7 @@
                         <li class="sidebar-sub-item"><a href="{{ route('financial-reports.index') }}" class="sidebar-sub-link {{ $isFinancialHub ? 'is-active' : '' }}">Hub rapports financiers</a></li>
                         <li class="sidebar-sub-item"><a href="{{ route('financial-reports.list') }}" class="sidebar-sub-link {{ $isFinancialList ? 'is-active' : '' }}">Liste des rapports</a></li>
                         <li class="sidebar-sub-item"><a href="{{ route('financial-reports.statistics') }}" class="sidebar-sub-link {{ $isFinancialStats ? 'is-active' : '' }}">Stats rapports</a></li>
+                        <li class="sidebar-sub-item"><a href="{{ route('financial-reports.expenses-by-category') }}" class="sidebar-sub-link {{ request()->routeIs('financial-reports.expenses-by-category*') ? 'is-active' : '' }}">Dépenses par catégorie</a></li>
                         {{-- <li class="sidebar-sub-item"><a href="{{ route('financial-reports.revenues-weekly') }}" class="sidebar-sub-link {{ $isFinancialQueteWeekly ? 'is-active' : '' }}">Rapport quête ordinaire</a></li> --}}
                         @endcan
                         {{-- <li class="sidebar-sub-item"><a href="{{ route('revenue-reports.create') }}" class="sidebar-sub-link {{ $isRevenueReportCreate ? 'is-active' : '' }}">Générer un rapport</a></li>

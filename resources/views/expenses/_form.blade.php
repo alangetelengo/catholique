@@ -3,7 +3,16 @@
     $gridClass = $gridColumns === 3 ? 'revenue-form-grid revenue-form-grid--three' : 'revenue-form-grid';
     $field = 'w-full rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900/90 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 shadow-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/35 focus:border-emerald-500/80 transition-shadow';
     $selectedCategory = old('categorie_charge', $expense->categorie_charge ?? 'charge_fixe');
-    $selectedType = old('type_charge', $expense->type_charge ?? 'autre');
+    $selectedType = old('type_charge', $expense->type_charge ?? \App\Support\ExpenseChargeCatalog::defaultTypeForCategory('charge_fixe'));
+    $typesForSelect = $selectedCategory === 'alimentation_popote'
+        ? []
+        : \App\Support\ExpenseChargeCatalog::labeledOptionsForCategory($selectedCategory);
+    if ($selectedCategory !== 'alimentation_popote' && $selectedType !== '' && ! isset($typesForSelect[$selectedType])) {
+        $allTypeLabels = trans('expenses.types');
+        $allTypeLabels = is_array($allTypeLabels) ? $allTypeLabels : [];
+        $typesForSelect[$selectedType] = $allTypeLabels[$selectedType] ?? $selectedType;
+    }
+    $typesByCategoryForJs = \App\Support\ExpenseChargeCatalog::labeledOptionsByCategoryExcludingPopote();
 @endphp
 
 <div class="{{ $gridClass }}">
@@ -21,12 +30,7 @@
     <div id="typeChargeWrapper">
         <label class="block text-sm font-semibold text-slate-800 dark:text-slate-200 mb-1.5">Type de charge <span class="text-red-600">*</span></label>
         <select name="type_charge" id="type_charge" class="{{ $field }}">
-            @foreach ([
-                'carburant' => 'Carburant', 'hosties' => 'Hosties', 'internet' => 'Internet',
-                'maintenance_materiel' => 'Maintenance matériel', 'gaz' => 'Gaz', 'eau' => 'Eau',
-                'electricite' => 'Électricité', 'gardiennage' => 'Gardiennage', 'salaire_ouvrier' => 'Salaire ouvrier',
-                'autre' => 'Autre'
-            ] as $value => $label)
+            @foreach ($typesForSelect as $value => $label)
                 <option value="{{ $value }}" {{ $selectedType === $value ? 'selected' : '' }}>{{ $label }}</option>
             @endforeach
         </select>
@@ -91,6 +95,8 @@
 @push('scripts')
 <script>
     (function () {
+        const typesByCategory = @json($typesByCategoryForJs);
+        const popoteTypeLabel = @json(__('expenses.types.alimentation'));
         const categorySelect = document.getElementById('categorie_charge');
         const typeWrapper = document.getElementById('typeChargeWrapper');
         const typeSelect = document.getElementById('type_charge');
@@ -117,6 +123,29 @@
             dayAuto.value = day ? day.charAt(0).toUpperCase() + day.slice(1) : '';
         }
 
+        function rebuildTypeOptions() {
+            if (!categorySelect || !typeSelect) return;
+            const cat = categorySelect.value;
+            if (cat === 'alimentation_popote') return;
+            const allowed = typesByCategory[cat] || {};
+            const keys = Object.keys(allowed);
+            const prev = typeSelect.value;
+            typeSelect.innerHTML = '';
+            keys.forEach(function (k) {
+                const o = document.createElement('option');
+                o.value = k;
+                o.textContent = allowed[k];
+                typeSelect.appendChild(o);
+            });
+            if (keys.indexOf(prev) !== -1) {
+                typeSelect.value = prev;
+            } else if (keys.indexOf('autre') !== -1) {
+                typeSelect.value = 'autre';
+            } else if (keys.length) {
+                typeSelect.value = keys[0];
+            }
+        }
+
         function toggleFields() {
             if (!categorySelect) return;
             const isPopote = categorySelect.value === 'alimentation_popote';
@@ -125,7 +154,14 @@
             if (libelleWrapper) libelleWrapper.style.display = isPopote ? '' : 'none';
 
             if (isPopote) {
-                if (typeSelect) typeSelect.value = 'alimentation';
+                if (typeSelect) {
+                    typeSelect.innerHTML = '';
+                    const o = document.createElement('option');
+                    o.value = 'alimentation';
+                    o.textContent = popoteTypeLabel || 'Alimentation';
+                    typeSelect.appendChild(o);
+                    typeSelect.value = 'alimentation';
+                }
                 if (libelleInput) libelleInput.setAttribute('required', 'required');
                 syncDay();
             } else {
@@ -135,7 +171,14 @@
             }
         }
 
-        if (categorySelect) categorySelect.addEventListener('change', toggleFields);
+        if (categorySelect) {
+            categorySelect.addEventListener('change', function () {
+                if (categorySelect.value !== 'alimentation_popote') {
+                    rebuildTypeOptions();
+                }
+                toggleFields();
+            });
+        }
         if (dateInput) {
             dateInput.addEventListener('change', syncDay);
             dateInput.addEventListener('input', syncDay);

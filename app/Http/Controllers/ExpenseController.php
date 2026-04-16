@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Expense;
+use App\Support\ExpenseChargeCatalog;
 use App\Support\PaginationPerPage;
 use App\Traits\LogsErrors;
 use Carbon\Carbon;
@@ -50,7 +51,7 @@ class ExpenseController extends Controller
         $expense = new Expense([
             'date_depense' => now()->toDateString(),
             'categorie_charge' => 'charge_fixe',
-            'type_charge' => 'autre',
+            'type_charge' => ExpenseChargeCatalog::defaultTypeForCategory('charge_fixe'),
             'methode_paiement' => 'especes',
         ]);
 
@@ -155,7 +156,7 @@ class ExpenseController extends Controller
     {
         $validated = $request->validate([
             'categorie_charge' => ['required', 'in:charge_fixe,charge_variable,charge_exceptionnelle,alimentation_popote'],
-            'type_charge' => ['nullable', 'in:carburant,hosties,internet,maintenance_materiel,gaz,eau,electricite,gardiennage,salaire_ouvrier,autre,alimentation'],
+            'type_charge' => ['nullable', 'in:'.implode(',', config('expenses.type_charge_codes', []))],
             'date_depense' => ['required', 'date'],
             'montant' => ['required', 'numeric', 'min:0'],
             'jour_semaine' => ['nullable', 'in:lundi,mardi,mercredi,jeudi,vendredi,samedi,dimanche'],
@@ -178,6 +179,11 @@ class ExpenseController extends Controller
             if (empty($validated['type_charge']) || $validated['type_charge'] === 'alimentation') {
                 throw ValidationException::withMessages([
                     'type_charge' => 'Le type de charge est obligatoire.',
+                ]);
+            }
+            if (! ExpenseChargeCatalog::typeAllowedForCategory($validated['categorie_charge'], $validated['type_charge'])) {
+                throw ValidationException::withMessages([
+                    'type_charge' => 'Ce type de charge n’est pas autorisé pour la catégorie choisie.',
                 ]);
             }
             $validated['jour_semaine'] = null;

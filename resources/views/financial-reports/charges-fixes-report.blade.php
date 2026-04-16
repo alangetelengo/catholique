@@ -6,6 +6,9 @@
 
 @section('btn-create')
     <div class="flex flex-wrap items-center gap-2">
+        <a href="{{ route('financial-reports.expenses-by-category') }}" class="adventiste-btn-secondary text-sm no-underline">
+            <i class="fas fa-receipt me-1.5" aria-hidden="true"></i>Dépenses par catégorie
+        </a>
         <a href="{{ route('financial-reports.index') }}" class="adventiste-btn-secondary text-sm no-underline">
             <i class="fas fa-chart-pie me-1.5" aria-hidden="true"></i>Hub rapports
         </a>

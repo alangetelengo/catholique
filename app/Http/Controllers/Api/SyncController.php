@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Expense;
 use App\Models\Revenue;
+use App\Models\RevenueCategory;
+use App\Support\ExpenseChargeCatalog;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -43,7 +45,7 @@ class SyncController extends Controller
             'expenses.*.data' => ['required', 'array'],
             'expenses.*.data.paroisse_id' => ['nullable', 'exists:paroisses,id'],
             'expenses.*.data.categorie_charge' => ['required', 'in:charge_fixe,charge_variable,charge_exceptionnelle,alimentation_popote'],
-            'expenses.*.data.type_charge' => ['nullable', 'in:carburant,hosties,internet,maintenance_materiel,gaz,eau,electricite,gardiennage,salaire_ouvrier,autre,alimentation'],
+            'expenses.*.data.type_charge' => ['nullable', 'in:'.implode(',', config('expenses.type_charge_codes', []))],
             'expenses.*.data.date_depense' => ['required', 'date'],
             'expenses.*.data.montant' => ['required', 'numeric', 'min:0'],
             'expenses.*.data.jour_semaine' => ['nullable', 'in:lundi,mardi,mercredi,jeudi,vendredi,samedi,dimanche'],
@@ -84,7 +86,7 @@ class SyncController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => 'Erreur lors de la synchronisation : ' . $e->getMessage(),
+                'message' => 'Erreur lors de la synchronisation : '.$e->getMessage(),
             ], 500);
         }
 
@@ -104,9 +106,9 @@ class SyncController extends Controller
         }
 
         $data['created_by'] = $user->id;
-        $data['reference_paiement'] = $data['reference_paiement'] ?? 'REV-' . now()->format('YmdHis') . '-' . strtoupper(str()->random(4));
+        $data['reference_paiement'] = $data['reference_paiement'] ?? 'REV-'.now()->format('YmdHis').'-'.strtoupper(str()->random(4));
 
-        $category = \App\Models\RevenueCategory::find($data['revenue_category_id']);
+        $category = RevenueCategory::find($data['revenue_category_id']);
         if ($category && $category->code === 'procure') {
             if (! empty($data['donateur_nom'])) {
                 $data['donateur_nom'] = mb_strtoupper($data['donateur_nom'], 'UTF-8');
@@ -144,6 +146,12 @@ class SyncController extends Controller
         } else {
             $data['libelle'] = null;
             $data['jour_semaine'] = null;
+            $type = $data['type_charge'] ?? '';
+            if ($type === '' || $type === 'alimentation' || ! ExpenseChargeCatalog::typeAllowedForCategory($data['categorie_charge'], (string) $type)) {
+                throw ValidationException::withMessages([
+                    'type_charge' => 'Type de charge invalide ou incompatible avec la catégorie.',
+                ]);
+            }
         }
 
         return array_intersect_key($data, array_flip((new Expense)->getFillable()));
@@ -153,7 +161,7 @@ class SyncController extends Controller
     {
         $digits = preg_replace('/\D/', '', $phone);
         if ($digits !== '' && ! str_starts_with($digits, '242')) {
-            $digits = '242' . $digits;
+            $digits = '242'.$digits;
         }
 
         return $digits;
