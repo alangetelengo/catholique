@@ -88,8 +88,8 @@
                 </select>
             </div>
             <div class="lg:col-span-3">
-                <label for="ebc_type" class="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-300" title="Choisir une catégorie précise pour activer le filtre par type.">Type de charge</label>
-                <select id="ebc_type" name="type_charge" class="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-slate-100 dark:bg-slate-900/50 text-slate-500 dark:text-slate-400 px-3 py-2.5 text-sm cursor-not-allowed border-dashed" disabled aria-describedby="ebc-filter-hint">
+                <label for="ebc_type" class="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-300">Type de charge</label>
+                <select id="ebc_type" name="type_charge" class="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2.5 text-sm" aria-describedby="ebc-filter-hint">
                     <option value="">Tous les types</option>
                 </select>
             </div>
@@ -98,7 +98,7 @@
                     <span class="block sm:inline">Choisissez d’abord une <strong class="font-medium text-slate-700 dark:text-slate-300">paroisse</strong> pour activer les filtres.</span>
                     <span class="hidden sm:inline text-slate-400 dark:text-slate-500" aria-hidden="true"> · </span>
                 @endif
-                <span class="block sm:inline">Le filtre <strong class="font-medium text-slate-700 dark:text-slate-300">Type</strong> s’active lorsqu’une <strong class="font-medium text-slate-700 dark:text-slate-300">catégorie</strong> précise est choisie.</span>
+                <span class="block sm:inline">Le filtre <strong class="font-medium text-slate-700 dark:text-slate-300">Type</strong> est indépendant de la catégorie : vous choisissez librement la combinaison.</span>
             </div>
             <div class="lg:col-span-12 flex flex-wrap gap-2 justify-end border-t border-slate-200/80 pt-3 dark:border-slate-600/60 lg:pt-4">
                 <button type="button" id="ebc-btn-calculate" class="adventiste-btn-primary">
@@ -129,7 +129,7 @@
         <script>
             (function () {
                 var calculateUrl = @json($ajaxCalculateRoute);
-                var typeOptionsByCategory = @json($typeOptionsByCategory ?? []);
+                var typeOptions = @json($typeOptions ?? []);
                 var token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
                 var isSuperAdmin = @json(auth()->user()->hasRole('super_admin'));
 
@@ -142,47 +142,25 @@
                     return h && h.value ? parseInt(h.value, 10) : null;
                 }
 
-                function setTypeDisabled(disabled) {
+                function fillTypes() {
                     var t = document.getElementById('ebc_type');
                     if (!t) return;
-                    t.disabled = !!disabled;
-                    t.classList.toggle('bg-slate-100', !!disabled);
-                    t.classList.toggle('dark:bg-slate-900/50', !!disabled);
-                    t.classList.toggle('text-slate-500', !!disabled);
-                    t.classList.toggle('cursor-not-allowed', !!disabled);
-                    t.classList.toggle('border-dashed', !!disabled);
-                    t.classList.toggle('bg-white', !disabled);
-                    t.classList.toggle('dark:bg-slate-800', !disabled);
-                }
-
-                function fillTypesForCategory(cid) {
-                    var t = document.getElementById('ebc_type');
-                    if (!t) return;
+                    var prev = t.value;
                     t.innerHTML = '';
                     var o0 = document.createElement('option');
                     o0.value = '';
                     o0.textContent = 'Tous les types';
                     t.appendChild(o0);
-                    var rows = (typeOptionsByCategory && typeOptionsByCategory[cid]) ? typeOptionsByCategory[cid] : [];
+                    var rows = Array.isArray(typeOptions) ? typeOptions : [];
                     rows.forEach(function (row) {
                         var o = document.createElement('option');
                         o.value = row.code;
                         o.textContent = row.nom;
                         t.appendChild(o);
                     });
-                    setTypeDisabled(false);
-                }
-
-                function resetTypesWhenNoCategory() {
-                    var t = document.getElementById('ebc_type');
-                    if (!t) return;
-                    t.innerHTML = '';
-                    var o = document.createElement('option');
-                    o.value = '';
-                    o.textContent = 'Choisir une catégorie…';
-                    t.appendChild(o);
-                    t.value = '';
-                    setTypeDisabled(true);
+                    if (prev && rows.some(function (row) { return row.code === prev; })) {
+                        t.value = prev;
+                    }
                 }
 
                 document.querySelectorAll('.ebc-shortcut').forEach(function (btn) {
@@ -204,18 +182,8 @@
                             cat.disabled = !pid;
                             if (!pid) cat.value = '';
                         }
-                        resetTypesWhenNoCategory();
                     });
                 }
-
-                document.getElementById('ebc_category')?.addEventListener('change', function () {
-                    var cid = this.value;
-                    if (cid) {
-                        fillTypesForCategory(cid);
-                    } else {
-                        resetTypesWhenNoCategory();
-                    }
-                });
 
                 document.getElementById('ebc-btn-calculate')?.addEventListener('click', function () {
                     var pid = paroisseId();
@@ -224,7 +192,7 @@
                     var catEl = document.getElementById('ebc_category');
                     var cid = catEl && !catEl.disabled ? catEl.value : '';
                     var tidEl = document.getElementById('ebc_type');
-                    var tid = (tidEl && !tidEl.disabled) ? tidEl.value : '';
+                    var tid = tidEl ? tidEl.value : '';
 
                     if (!pid) {
                         alert('Veuillez sélectionner une paroisse.');
@@ -294,6 +262,7 @@
                         /* catégorie déjà utilisable */
                     }
                 }
+                fillTypes();
             })();
         </script>
     @endpush

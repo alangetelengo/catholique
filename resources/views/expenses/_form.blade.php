@@ -6,13 +6,13 @@
     $selectedType = old('type_charge', $expense->type_charge ?? \App\Support\ExpenseChargeCatalog::defaultTypeForCategory('charge_fixe'));
     $typesForSelect = $selectedCategory === 'alimentation_popote'
         ? []
-        : \App\Support\ExpenseChargeCatalog::labeledOptionsForCategory($selectedCategory);
+        : \App\Support\ExpenseChargeCatalog::labeledOptionsForCategory('charge_fixe');
     if ($selectedCategory !== 'alimentation_popote' && $selectedType !== '' && ! isset($typesForSelect[$selectedType])) {
         $allTypeLabels = trans('expenses.types');
         $allTypeLabels = is_array($allTypeLabels) ? $allTypeLabels : [];
         $typesForSelect[$selectedType] = $allTypeLabels[$selectedType] ?? $selectedType;
     }
-    $typesByCategoryForJs = \App\Support\ExpenseChargeCatalog::labeledOptionsByCategoryExcludingPopote();
+    $typesForSelectForJs = $typesForSelect;
 @endphp
 
 <div class="{{ $gridClass }}">
@@ -95,7 +95,7 @@
 @push('scripts')
 <script>
     (function () {
-        const typesByCategory = @json($typesByCategoryForJs);
+        const typesForSelect = @json($typesForSelectForJs);
         const popoteTypeLabel = @json(__('expenses.types.alimentation'));
         const categorySelect = document.getElementById('categorie_charge');
         const typeWrapper = document.getElementById('typeChargeWrapper');
@@ -124,17 +124,14 @@
         }
 
         function rebuildTypeOptions() {
-            if (!categorySelect || !typeSelect) return;
-            const cat = categorySelect.value;
-            if (cat === 'alimentation_popote') return;
-            const allowed = typesByCategory[cat] || {};
-            const keys = Object.keys(allowed);
+            if (!typeSelect) return;
+            const keys = Object.keys(typesForSelect || {});
             const prev = typeSelect.value;
             typeSelect.innerHTML = '';
             keys.forEach(function (k) {
                 const o = document.createElement('option');
                 o.value = k;
-                o.textContent = allowed[k];
+                o.textContent = typesForSelect[k];
                 typeSelect.appendChild(o);
             });
             if (keys.indexOf(prev) !== -1) {

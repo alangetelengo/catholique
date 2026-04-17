@@ -3,32 +3,46 @@
 namespace App\Support;
 
 /**
- * Règles métier : types de charge (`type_charge`) autorisés par catégorie (`categorie_charge`).
- * Source : config/expenses.php (`types_by_categorie`).
+ * Catalogue des types de charge (`type_charge`) et helpers de validation.
  */
 final class ExpenseChargeCatalog
 {
     /**
      * @return list<string>
      */
+    public static function allTypeCodes(): array
+    {
+        $codes = config('expenses.type_charge_codes', []);
+
+        return array_values(array_filter(is_array($codes) ? $codes : [], 'is_string'));
+    }
+
+    /**
+     * @return list<string>
+     */
     public static function typesForCategory(string $categorieCharge): array
     {
-        $map = config('expenses.types_by_categorie', []);
-        if (! is_array($map) || ! isset($map[$categorieCharge]) || ! is_array($map[$categorieCharge])) {
-            return [];
+        if ($categorieCharge === 'alimentation_popote') {
+            return ['alimentation'];
         }
 
-        $allowedGlobal = config('expenses.type_charge_codes', []);
-        $allowedGlobal = is_array($allowedGlobal) ? $allowedGlobal : [];
-
-        $list = array_values(array_filter($map[$categorieCharge], 'is_string'));
-
-        return array_values(array_intersect($list, $allowedGlobal));
+        return array_values(array_filter(
+            self::allTypeCodes(),
+            static fn (string $code): bool => $code !== 'alimentation'
+        ));
     }
 
     public static function typeAllowedForCategory(string $categorieCharge, string $typeCharge): bool
     {
-        return in_array($typeCharge, self::typesForCategory($categorieCharge), true);
+        if (! in_array($typeCharge, self::allTypeCodes(), true)) {
+            return false;
+        }
+
+        if ($categorieCharge === 'alimentation_popote') {
+            return $typeCharge === 'alimentation';
+        }
+
+        return $typeCharge !== 'alimentation';
     }
 
     /**
@@ -68,28 +82,32 @@ final class ExpenseChargeCatalog
      */
     public static function typeOptionRowsByCategory(): array
     {
-        $map = config('expenses.types_by_categorie', []);
-        if (! is_array($map)) {
-            return [];
+        $rows = self::typeOptionRows();
+
+        return [
+            'charge_fixe' => $rows,
+            'charge_variable' => $rows,
+            'charge_exceptionnelle' => $rows,
+            'alimentation_popote' => $rows,
+        ];
+    }
+
+    /**
+     * @return list<array{code: string, nom: string}>
+     */
+    public static function typeOptionRows(): array
+    {
+        $labels = trans('expenses.types');
+        $labels = is_array($labels) ? $labels : [];
+        $rows = [];
+        foreach (self::allTypeCodes() as $code) {
+            $rows[] = [
+                'code' => $code,
+                'nom' => $labels[$code] ?? $code,
+            ];
         }
 
-        $result = [];
-        foreach (array_keys($map) as $cat) {
-            if (! is_string($cat)) {
-                continue;
-            }
-            $labeled = self::labeledOptionsForCategory($cat);
-            $rows = [];
-            foreach (self::typesForCategory($cat) as $code) {
-                $rows[] = [
-                    'code' => $code,
-                    'nom' => $labeled[$code] ?? $code,
-                ];
-            }
-            $result[$cat] = $rows;
-        }
-
-        return $result;
+        return $rows;
     }
 
     /**
@@ -97,8 +115,10 @@ final class ExpenseChargeCatalog
      */
     public static function defaultTypeForCategory(string $categorieCharge): string
     {
-        $types = self::typesForCategory($categorieCharge);
+        if ($categorieCharge === 'alimentation_popote') {
+            return 'alimentation';
+        }
 
-        return $types[0] ?? 'autre';
+        return 'autre';
     }
 }

@@ -181,11 +181,6 @@ class ExpenseController extends Controller
                     'type_charge' => 'Le type de charge est obligatoire.',
                 ]);
             }
-            if (! ExpenseChargeCatalog::typeAllowedForCategory($validated['categorie_charge'], $validated['type_charge'])) {
-                throw ValidationException::withMessages([
-                    'type_charge' => 'Ce type de charge n’est pas autorisé pour la catégorie choisie.',
-                ]);
-            }
             $validated['jour_semaine'] = null;
             $validated['libelle'] = null;
         }

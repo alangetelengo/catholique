@@ -6,7 +6,6 @@ use App\Http\Controllers\Controller;
 use App\Models\Expense;
 use App\Models\Revenue;
 use App\Models\RevenueCategory;
-use App\Support\ExpenseChargeCatalog;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -147,9 +146,9 @@ class SyncController extends Controller
             $data['libelle'] = null;
             $data['jour_semaine'] = null;
             $type = $data['type_charge'] ?? '';
-            if ($type === '' || $type === 'alimentation' || ! ExpenseChargeCatalog::typeAllowedForCategory($data['categorie_charge'], (string) $type)) {
+            if ($type === '' || $type === 'alimentation') {
                 throw ValidationException::withMessages([
-                    'type_charge' => 'Type de charge invalide ou incompatible avec la catégorie.',
+                    'type_charge' => 'Type de charge invalide.',
                 ]);
             }
         }

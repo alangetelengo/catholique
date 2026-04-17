@@ -1338,7 +1338,7 @@ class FinancialReportController extends Controller implements HasMiddleware
                 ];
             }
 
-            $typeOptionsByCategory = ExpenseChargeCatalog::typeOptionRowsByCategory();
+            $typeOptions = ExpenseChargeCatalog::typeOptionRows();
 
             return view('financial-reports.expenses-by-category', [
                 'paroisses' => $paroisses,
@@ -1349,7 +1349,7 @@ class FinancialReportController extends Controller implements HasMiddleware
                 'selectedTypeCharge' => null,
                 'report' => null,
                 'expenseCategories' => $expenseCategories,
-                'typeOptionsByCategory' => $typeOptionsByCategory,
+                'typeOptions' => $typeOptions,
                 'ajaxCalculateRoute' => route('financial-reports.expenses-by-category.calculate'),
             ]);
         } catch (Throwable $e) {
@@ -1365,7 +1365,7 @@ class FinancialReportController extends Controller implements HasMiddleware
                 'selectedTypeCharge' => null,
                 'report' => null,
                 'expenseCategories' => [],
-                'typeOptionsByCategory' => [],
+                'typeOptions' => [],
                 'ajaxCalculateRoute' => route('financial-reports.expenses-by-category.calculate'),
             ]);
         }
@@ -1394,11 +1394,6 @@ class FinancialReportController extends Controller implements HasMiddleware
             $categorieCharge = $validated['categorie_charge'] ?? null;
             $requestedType = $validated['type_charge'] ?? null;
 
-            if (($requestedType !== null && $requestedType !== '') && ($categorieCharge === null || $categorieCharge === '')) {
-                return response()->json([
-                    'message' => 'Choisissez une catégorie de charge pour filtrer par type.',
-                ], 422);
-            }
             $typeCharge = $this->resolveExpenseTypeChargeForReport($requestedType, $categorieCharge);
 
             if (($requestedType !== null && $requestedType !== '') && $typeCharge === null) {
@@ -1475,12 +1470,6 @@ class FinancialReportController extends Controller implements HasMiddleware
             $categorieCharge = $validated['categorie_charge'] ?? null;
             $requestedType = $validated['type_charge'] ?? null;
 
-            if (($requestedType !== null && $requestedType !== '') && ($categorieCharge === null || $categorieCharge === '')) {
-                FlashAlert::error('Choisissez une catégorie de charge pour filtrer par type.');
-
-                return redirect()->back();
-            }
-
             $typeCharge = $this->resolveExpenseTypeChargeForReport($requestedType, $categorieCharge);
 
             if ($requestedType !== null && $requestedType !== '' && $typeCharge === null) {
@@ -1528,15 +1517,7 @@ class FinancialReportController extends Controller implements HasMiddleware
             return null;
         }
 
-        if ($categorieCharge === null || $categorieCharge === '') {
-            return null;
-        }
-
         if (! in_array($typeCharge, self::expenseTypeChargeCodes(), true)) {
-            return null;
-        }
-
-        if (! ExpenseChargeCatalog::typeAllowedForCategory($categorieCharge, $typeCharge)) {
             return null;
         }
 
