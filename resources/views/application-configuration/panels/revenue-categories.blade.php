@@ -24,6 +24,7 @@
                     <tr class="text-left text-slate-700 dark:text-slate-200">
                         <th class="px-4 py-3 font-semibold">Code</th>
                         <th class="px-4 py-3 font-semibold">Nom</th>
+                        <th class="px-4 py-3 font-semibold">Paroisse</th>
                         <th class="px-4 py-3 font-semibold">Ordre</th>
                         <th class="px-4 py-3 font-semibold">Actif</th>
                         <th class="px-4 py-3 font-semibold text-right">Actions</th>
@@ -34,6 +35,7 @@
                         <tr>
                             <td class="px-4 py-3 font-mono text-xs">{{ $category->code }}</td>
                             <td class="px-4 py-3">{{ $category->nom }}</td>
+                            <td class="px-4 py-3">{{ $category->paroisse?->nom ?? '—' }}</td>
                             <td class="px-4 py-3">{{ $category->ordre }}</td>
                             <td class="px-4 py-3">
                                 @if ($category->actif)
@@ -60,7 +62,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="5" class="px-4 py-8 text-center text-slate-500">Aucune catégorie pour le moment.</td>
+                            <td colspan="6" class="px-4 py-8 text-center text-slate-500">Aucune catégorie pour le moment.</td>
                         </tr>
                     @endforelse
                 </tbody>

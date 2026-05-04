@@ -705,15 +705,15 @@ class FinancialReportController extends Controller implements HasMiddleware
      */
     public function calculateRevenuesWeeklyReport(int $paroisseId, Carbon $dateDebut, Carbon $dateFin): array
     {
-        $queteCategory = RevenueCategory::where('paroisse_id', $paroisseId)->where('code', 'quete_ordinaire')->first();
-
         $revenues = Revenue::query()
             ->with('type')
             ->where('paroisse_id', $paroisseId)
             ->whereDate('date_recette', '>=', $dateDebut)
             ->whereDate('date_recette', '<=', $dateFin)
-            ->when($queteCategory, function ($q) use ($queteCategory): void {
-                $q->where('revenue_category_id', $queteCategory->id);
+            ->where('statut', 'valide')
+            ->whereHas('category', function ($q) use ($paroisseId): void {
+                $q->where('paroisse_id', $paroisseId)
+                    ->where('code', 'quete_ordinaire');
             })
             ->get();
 

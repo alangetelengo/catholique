@@ -188,11 +188,16 @@ class ApplicationConfigurationController extends Controller
         $this->ensureTabAccess($request, 'revenue-categories');
 
         $perPage = PaginationPerPage::resolve($request);
-        $categories = RevenueCategory::query()
+        $query = RevenueCategory::query()
+            ->with('paroisse')
             ->orderBy('ordre')
-            ->orderBy('nom')
-            ->paginate($perPage)
-            ->withQueryString();
+            ->orderBy('nom');
+
+        if (! $request->user()?->hasRole('super_admin') && $request->user()?->paroisse_id) {
+            $query->where('paroisse_id', $request->user()->paroisse_id);
+        }
+
+        $categories = $query->paginate($perPage)->withQueryString();
 
         return view('application-configuration.panels.revenue-categories', compact('categories'));
     }
@@ -203,14 +208,22 @@ class ApplicationConfigurationController extends Controller
 
         $perPage = PaginationPerPage::resolve($request);
 
-        $query = RevenueType::query()->with('category')->orderBy('ordre')->orderBy('nom');
+        $query = RevenueType::query()->with(['category', 'paroisse'])->orderBy('ordre')->orderBy('nom');
+
+        if (! $request->user()?->hasRole('super_admin') && $request->user()?->paroisse_id) {
+            $query->where('paroisse_id', $request->user()->paroisse_id);
+        }
 
         if ($request->filled('revenue_category_id')) {
             $query->where('revenue_category_id', $request->integer('revenue_category_id'));
         }
 
         $types = $query->paginate($perPage)->withQueryString();
-        $categories = RevenueCategory::query()->orderBy('ordre')->orderBy('nom')->get();
+        $categoriesQuery = RevenueCategory::query()->with('paroisse')->orderBy('ordre')->orderBy('nom');
+        if (! $request->user()?->hasRole('super_admin') && $request->user()?->paroisse_id) {
+            $categoriesQuery->where('paroisse_id', $request->user()->paroisse_id);
+        }
+        $categories = $categoriesQuery->get();
 
         return view('application-configuration.panels.revenue-types', compact('types', 'categories'));
     }

@@ -10,16 +10,38 @@
 
 @section('content')
     <div class="adventiste-card-pro-static p-6">
-        <form method="post" action="{{ route('revenue-types.update', $type) }}" class="grid grid-cols-1 md:grid-cols-2 gap-5">
+        <form method="post" action="{{ route('revenue-types.update', $type) }}" class="grid grid-cols-1 md:grid-cols-2 gap-5" id="revenue-type-form-edit">
             @csrf
             @method('put')
-            <div>
-                <label class="block text-sm font-semibold mb-2">Catégorie</label>
-                <select name="revenue_category_id" class="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2.5 text-sm" required>
+            @if (auth()->user()?->hasRole('super_admin'))
+                <div class="md:col-span-2">
+                    <label class="block text-sm font-semibold mb-2">Paroisse <span class="text-red-600">*</span></label>
+                    <select name="paroisse_id" id="rt_paroisse" class="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2.5 text-sm" required>
+                        @foreach ($paroisses as $p)
+                            <option value="{{ $p->id }}" {{ (string) old('paroisse_id', $type->paroisse_id) === (string) $p->id ? 'selected' : '' }}>{{ $p->nom }}</option>
+                        @endforeach
+                    </select>
+                    @error('paroisse_id')<p class="text-xs text-red-600 mt-1">{{ $message }}</p>@enderror
+                    <p class="mt-1.5 text-xs text-slate-500 dark:text-slate-400">La catégorie doit appartenir à la même paroisse.</p>
+                </div>
+            @else
+                <input type="hidden" name="paroisse_id" id="rt_paroisse_hidden" value="{{ $type->paroisse_id }}">
+            @endif
+            <div class="md:col-span-2">
+                <label class="block text-sm font-semibold mb-2">Catégorie <span class="text-red-600">*</span></label>
+                <select name="revenue_category_id" id="rt_category" class="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2.5 text-sm" required>
                     <option value="">-- Choisir --</option>
                     @foreach ($categories as $category)
-                        <option value="{{ $category->id }}" {{ (string) old('revenue_category_id', $type->revenue_category_id) === (string) $category->id ? 'selected' : '' }}>
-                            {{ $category->nom }}
+                        <option
+                            value="{{ $category->id }}"
+                            data-paroisse-id="{{ $category->paroisse_id ?? '' }}"
+                            {{ (string) old('revenue_category_id', $type->revenue_category_id) === (string) $category->id ? 'selected' : '' }}
+                        >
+                            @if (auth()->user()?->hasRole('super_admin') && $category->paroisse)
+                                {{ $category->paroisse->nom }} — {{ $category->nom }}
+                            @else
+                                {{ $category->nom }}
+                            @endif
                         </option>
                     @endforeach
                 </select>
@@ -55,4 +77,38 @@
             </div>
         </form>
     </div>
+    @if (auth()->user()?->hasRole('super_admin'))
+        @push('scripts')
+            <script>
+                (function () {
+                    var paroisseEl = document.getElementById('rt_paroisse');
+                    var catEl = document.getElementById('rt_category');
+                    if (!paroisseEl || !catEl) return;
+
+                    function syncCategoryOptions() {
+                        var pid = paroisseEl.value;
+                        var prevCat = catEl.value;
+                        Array.from(catEl.options).forEach(function (opt) {
+                            if (!opt.value) {
+                                opt.hidden = false;
+                                return;
+                            }
+                            var opid = opt.getAttribute('data-paroisse-id') || '';
+                            var show = Boolean(pid) && opid === pid;
+                            opt.hidden = !show;
+                        });
+                        if (prevCat) {
+                            var selected = catEl.querySelector('option[value="' + prevCat + '"]');
+                            if (!selected || selected.hidden) {
+                                catEl.value = '';
+                            }
+                        }
+                    }
+
+                    paroisseEl.addEventListener('change', syncCategoryOptions);
+                    syncCategoryOptions();
+                })();
+            </script>
+        @endpush
+    @endif
 @endsection

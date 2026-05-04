@@ -27,7 +27,11 @@
                 <option value="">Toutes catégories</option>
                 @foreach ($categories as $category)
                     <option value="{{ $category->id }}" {{ (string) request('revenue_category_id') === (string) $category->id ? 'selected' : '' }}>
-                        {{ $category->nom }}
+                        @if (auth()->user()?->hasRole('super_admin') && $category->paroisse)
+                            {{ $category->paroisse->nom }} — {{ $category->nom }}
+                        @else
+                            {{ $category->nom }}
+                        @endif
                     </option>
                 @endforeach
             </select>
@@ -43,6 +47,7 @@
                     <tr class="text-left text-slate-700 dark:text-slate-200">
                         <th class="px-4 py-3 font-semibold">Code</th>
                         <th class="px-4 py-3 font-semibold">Nom</th>
+                        <th class="px-4 py-3 font-semibold">Paroisse</th>
                         <th class="px-4 py-3 font-semibold">Catégorie</th>
                         <th class="px-4 py-3 font-semibold">Ordre</th>
                         <th class="px-4 py-3 font-semibold">Actif</th>
@@ -54,6 +59,7 @@
                         <tr>
                             <td class="px-4 py-3 font-mono text-xs">{{ $type->code }}</td>
                             <td class="px-4 py-3">{{ $type->nom }}</td>
+                            <td class="px-4 py-3">{{ $type->paroisse?->nom ?? '—' }}</td>
                             <td class="px-4 py-3">{{ $type->category?->nom }}</td>
                             <td class="px-4 py-3">{{ $type->ordre }}</td>
                             <td class="px-4 py-3">
@@ -81,7 +87,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="6" class="px-4 py-8 text-center text-slate-500">Aucun type disponible.</td>
+                            <td colspan="7" class="px-4 py-8 text-center text-slate-500">Aucun type disponible.</td>
                         </tr>
                     @endforelse
                 </tbody>

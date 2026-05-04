@@ -10,6 +10,7 @@ use App\Support\PaginationPerPage;
 use App\Traits\LogsErrors;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
@@ -37,7 +38,10 @@ class RevenueController extends Controller
                 ->value('montant');
             $montantDerniereRecette = $montantDerniereRecette !== null ? (float) $montantDerniereRecette : null;
 
-            $categories = RevenueCategory::query()->with('types')->orderBy('ordre')->orderBy('nom')->get();
+            $paroisseId = $this->resolveParoisseIdForContext($request);
+            $categories = $paroisseId !== null
+                ? $this->revenueCategoriesWithTypesForParoisse($paroisseId)
+                : collect();
 
             return view('revenues.index', compact(
                 'revenues',
@@ -51,13 +55,14 @@ class RevenueController extends Controller
         }
     }
 
-    public function create(): View
+    public function create(Request $request): View
     {
         $revenue = new Revenue([
             'date_recette' => now()->toDateString(),
             'methode_paiement' => 'especes',
         ]);
-        $categories = RevenueCategory::query()->with('types')->where('actif', true)->orderBy('ordre')->orderBy('nom')->get();
+        $paroisseId = $this->resolveParoisseId($request);
+        $categories = $this->revenueCategoriesWithTypesForParoisse($paroisseId);
 
         return view('revenues.create', compact('revenue', 'categories'));
     }
@@ -65,7 +70,7 @@ class RevenueController extends Controller
     public function store(Request $request): RedirectResponse
     {
         try {
-            $validated = $this->validateRevenue($request);
+            $validated = $this->validateRevenue($request, null);
             $validated['paroisse_id'] = $this->resolveParoisseId($request);
             $validated['created_by'] = $request->user()?->id;
             $validated['reference_paiement'] = $this->generateReference();
@@ -80,9 +85,10 @@ class RevenueController extends Controller
         }
     }
 
-    public function edit(Revenue $revenue): View
+    public function edit(Request $request, Revenue $revenue): View
     {
-        $categories = RevenueCategory::query()->with('types')->where('actif', true)->orderBy('ordre')->orderBy('nom')->get();
+        $paroisseId = (int) ($revenue->paroisse_id ?: $this->resolveParoisseId($request));
+        $categories = $this->revenueCategoriesWithTypesForParoisse($paroisseId, $revenue->revenue_type_id);
 
         return view('revenues.edit', compact('revenue', 'categories'));
     }
@@ -90,7 +96,7 @@ class RevenueController extends Controller
     public function update(Request $request, Revenue $revenue): RedirectResponse
     {
         try {
-            $validated = $this->validateRevenue($request);
+            $validated = $this->validateRevenue($request, $revenue);
             $validated['paroisse_id'] = $revenue->paroisse_id ?: $this->resolveParoisseId($request);
             if (empty($revenue->reference_paiement)) {
                 $validated['reference_paiement'] = $this->generateReference();
@@ -162,7 +168,51 @@ class RevenueController extends Controller
         return $query;
     }
 
-    private function validateRevenue(Request $request): array
+    /**
+     * Catégories et types alignés sur le rapport « par catégories » (paroisse, actifs, tri).
+     * En édition, inclut le type courant même s'il est inactif pour conserver l'affichage cohérent.
+     *
+     * @return Collection<int, RevenueCategory>
+     */
+    private function revenueCategoriesWithTypesForParoisse(int $paroisseId, ?int $includeTypeIdIfInactive = null): Collection
+    {
+        return RevenueCategory::query()
+            ->where('paroisse_id', $paroisseId)
+            ->where('actif', true)
+            ->with([
+                'types' => function (Builder $query) use ($paroisseId, $includeTypeIdIfInactive): void {
+                    $query->where('paroisse_id', $paroisseId)
+                        ->where(function (Builder $q) use ($includeTypeIdIfInactive): void {
+                            $q->where('actif', true);
+                            if ($includeTypeIdIfInactive !== null) {
+                                $q->orWhere('id', $includeTypeIdIfInactive);
+                            }
+                        })
+                        ->orderBy('ordre')
+                        ->orderBy('nom');
+                },
+            ])
+            ->orderBy('ordre')
+            ->orderBy('nom')
+            ->get();
+    }
+
+    /**
+     * Paroisse pour charger les filtres de l'index (sans lever d'exception si aucune paroisse).
+     */
+    private function resolveParoisseIdForContext(Request $request): ?int
+    {
+        $userParoisseId = $request->user()?->paroisse_id;
+        if (! empty($userParoisseId)) {
+            return (int) $userParoisseId;
+        }
+
+        $fallback = Paroisse::query()->value('id');
+
+        return $fallback !== null ? (int) $fallback : null;
+    }
+
+    private function validateRevenue(Request $request, ?Revenue $existingRevenue): array
     {
         $validated = $request->validate([
             'revenue_category_id' => ['required', 'exists:revenue_categories,id'],
@@ -176,8 +226,36 @@ class RevenueController extends Controller
             'mois_location' => ['nullable', 'in:01,02,03,04,05,06,07,08,09,10,11,12'],
         ]);
 
+        $paroisseIdForRules = $existingRevenue !== null && ! empty($existingRevenue->paroisse_id)
+            ? (int) $existingRevenue->paroisse_id
+            : $this->resolveParoisseId($request);
+
         $category = RevenueCategory::find($validated['revenue_category_id']);
         $revenueType = RevenueType::find($validated['revenue_type_id']);
+
+        if (! $category || (int) $category->paroisse_id !== $paroisseIdForRules) {
+            throw ValidationException::withMessages([
+                'revenue_category_id' => 'La catégorie choisie n\'appartient pas à votre paroisse ou n\'est pas utilisable.',
+            ]);
+        }
+
+        if (! $revenueType
+            || (int) $revenueType->paroisse_id !== $paroisseIdForRules
+            || (int) $revenueType->revenue_category_id !== (int) $category->id) {
+            throw ValidationException::withMessages([
+                'revenue_type_id' => 'Le type choisi n\'est pas valide pour cette catégorie et cette paroisse.',
+            ]);
+        }
+
+        $keepsSameInactiveType = $existingRevenue !== null
+            && (int) $existingRevenue->revenue_type_id === (int) $validated['revenue_type_id']
+            && ! $revenueType->actif;
+
+        if (! $revenueType->actif && ! $keepsSameInactiveType) {
+            throw ValidationException::withMessages([
+                'revenue_type_id' => 'Ce type de recette est inactif. Choisissez un type actif ou contactez l\'administrateur.',
+            ]);
+        }
 
         $jourDepuisDate = $this->jourSemaineKeyFromDate($validated['date_recette']);
         $validated['jour_semaine'] = $jourDepuisDate;
