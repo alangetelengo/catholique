@@ -35,8 +35,8 @@ class Expense extends Model
 
     protected $fillable = [
         'paroisse_id',
-        'categorie_charge',
-        'type_charge',
+        'revenue_category_id',
+        'revenue_type_id',
         'montant',
         'date_depense',
         'jour_semaine',
@@ -63,6 +63,16 @@ class Expense extends Model
         return $this->belongsTo(Paroisse::class);
     }
 
+    public function revenueCategory(): BelongsTo
+    {
+        return $this->belongsTo(RevenueCategory::class, 'revenue_category_id');
+    }
+
+    public function revenueType(): BelongsTo
+    {
+        return $this->belongsTo(RevenueType::class, 'revenue_type_id');
+    }
+
     public function createdBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
@@ -72,17 +82,4 @@ class Expense extends Model
     {
         return $this->belongsTo(User::class, 'validated_by');
     }
-
-    /** Dépenses alimentation (subvention popote) — réservées à l'alimentation de la paroisse. */
-    public function scopeAlimentationPopote($query)
-    {
-        return $query->where('categorie_charge', 'alimentation_popote');
-    }
-
-    /** Charges fixes — non comptabilisées dans la subvention popote, pour rapport à la hiérarchie. */
-    public function scopeChargesFixes($query)
-    {
-        return $query->where('categorie_charge', 'charge_fixe');
-    }
 }
-

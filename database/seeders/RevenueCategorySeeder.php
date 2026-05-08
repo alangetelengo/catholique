@@ -33,9 +33,9 @@ class RevenueCategorySeeder extends Seeder
                 'ordre' => 3,
             ],
             [
-                'code' => 'popote_subvention',
-                'nom' => 'Popote / Subvention',
-                'description' => 'Subventions mensuelles récurrentes venant de la hiérarchie',
+                'code' => 'subvention',
+                'nom' => 'Subvention',
+                'description' => 'Subventions mensuelles reçues de la hiérarchie (carburant, hosties, gardiennage, gaz, internet, eau, électricité, salaires, alimentation popote)',
                 'ordre' => 4,
             ],
             [
@@ -43,6 +43,12 @@ class RevenueCategorySeeder extends Seeder
                 'nom' => 'Procure',
                 'description' => 'Dîmes, denier du culte, casuel (baptêmes des enfants)',
                 'ordre' => 5,
+            ],
+            [
+                'code' => 'fete',
+                'nom' => 'Fête',
+                'description' => 'Fêtes de la paroisse',
+                'ordre' => 6,
             ],
         ];
 

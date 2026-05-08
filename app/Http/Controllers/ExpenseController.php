@@ -3,14 +3,14 @@
 namespace App\Http\Controllers;
 
 use App\Models\Expense;
-use App\Support\ExpenseChargeCatalog;
+use App\Models\RevenueCategory;
+use App\Models\RevenueType;
 use App\Support\PaginationPerPage;
 use App\Traits\LogsErrors;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 use Throwable;
 
@@ -22,7 +22,7 @@ class ExpenseController extends Controller
     {
         try {
             $expenses = $this->expensesIndexFilteredQuery($request)
-                ->with('createdBy')
+                ->with(['createdBy', 'revenueCategory', 'revenueType'])
                 ->orderByDesc('date_depense')
                 ->orderByDesc('id')
                 ->paginate(PaginationPerPage::resolve($request))
@@ -46,16 +46,30 @@ class ExpenseController extends Controller
         }
     }
 
-    public function create(): View
+    public function create(Request $request): View
     {
+        $userParoisseId = $request->user()?->paroisse_id;
+
+        // Récupérer les catégories de recettes (sources des fonds)
+        $revenueCategories = RevenueCategory::where('paroisse_id', $userParoisseId)
+            ->where('actif', true)
+            ->orderBy('ordre')
+            ->orderBy('nom')
+            ->get();
+
+        // Récupérer tous les types de recettes
+        $revenueTypes = RevenueType::where('paroisse_id', $userParoisseId)
+            ->where('actif', true)
+            ->orderBy('ordre')
+            ->orderBy('nom')
+            ->get();
+
         $expense = new Expense([
             'date_depense' => now()->toDateString(),
-            'categorie_charge' => 'charge_fixe',
-            'type_charge' => ExpenseChargeCatalog::defaultTypeForCategory('charge_fixe'),
             'methode_paiement' => 'especes',
         ]);
 
-        return view('expenses.create', compact('expense'));
+        return view('expenses.create', compact('expense', 'revenueCategories', 'revenueTypes'));
     }
 
     public function store(Request $request): RedirectResponse
@@ -82,9 +96,25 @@ class ExpenseController extends Controller
         return redirect()->route('expenses.edit', $expense);
     }
 
-    public function edit(Expense $expense): View
+    public function edit(Request $request, Expense $expense): View
     {
-        return view('expenses.edit', compact('expense'));
+        $userParoisseId = $request->user()?->paroisse_id;
+
+        // Récupérer les catégories de recettes (sources des fonds)
+        $revenueCategories = RevenueCategory::where('paroisse_id', $userParoisseId)
+            ->where('actif', true)
+            ->orderBy('ordre')
+            ->orderBy('nom')
+            ->get();
+
+        // Récupérer tous les types de recettes
+        $revenueTypes = RevenueType::where('paroisse_id', $userParoisseId)
+            ->where('actif', true)
+            ->orderBy('ordre')
+            ->orderBy('nom')
+            ->get();
+
+        return view('expenses.edit', compact('expense', 'revenueCategories', 'revenueTypes'));
     }
 
     public function update(Request $request, Expense $expense): RedirectResponse
@@ -122,12 +152,14 @@ class ExpenseController extends Controller
     {
         $query = Expense::query();
 
-        if ($request->filled('categorie_charge')) {
-            $query->where('categorie_charge', $request->string('categorie_charge')->value());
+        // Filtrer par catégorie de recette (source des fonds)
+        if ($request->filled('revenue_category_id')) {
+            $query->where('revenue_category_id', $request->integer('revenue_category_id'));
         }
 
-        if ($request->filled('type_charge')) {
-            $query->where('type_charge', $request->string('type_charge')->value());
+        // Filtrer par type de recette (source précise des fonds)
+        if ($request->filled('revenue_type_id')) {
+            $query->where('revenue_type_id', $request->integer('revenue_type_id'));
         }
 
         if ($request->filled('date_from')) {
@@ -155,35 +187,19 @@ class ExpenseController extends Controller
     private function validateExpense(Request $request): array
     {
         $validated = $request->validate([
-            'categorie_charge' => ['required', 'in:charge_fixe,charge_variable,charge_exceptionnelle,alimentation_popote'],
-            'type_charge' => ['nullable', 'in:'.implode(',', config('expenses.type_charge_codes', []))],
+            'revenue_category_id' => ['required', 'integer', 'exists:revenue_categories,id'],
+            'revenue_type_id' => ['required', 'integer', 'exists:revenue_types,id'],
             'date_depense' => ['required', 'date'],
             'montant' => ['required', 'numeric', 'min:0'],
-            'jour_semaine' => ['nullable', 'in:lundi,mardi,mercredi,jeudi,vendredi,samedi,dimanche'],
-            'libelle' => ['nullable', 'string', 'max:500'],
+            'libelle' => ['required', 'string', 'max:500'],
             'facture_reference' => ['nullable', 'string', 'max:255'],
             'fournisseur' => ['nullable', 'string', 'max:255'],
             'methode_paiement' => ['required', 'in:especes,cheque,virement,carte,mobile_money'],
             'notes' => ['nullable', 'string'],
         ]);
 
-        if ($validated['categorie_charge'] === 'alimentation_popote') {
-            if (empty($validated['libelle'])) {
-                throw ValidationException::withMessages([
-                    'libelle' => 'Le libellé est obligatoire pour une dépense alimentation popote.',
-                ]);
-            }
-            $validated['type_charge'] = 'alimentation';
-            $validated['jour_semaine'] = $this->weekdayFromDate($validated['date_depense']);
-        } else {
-            if (empty($validated['type_charge']) || $validated['type_charge'] === 'alimentation') {
-                throw ValidationException::withMessages([
-                    'type_charge' => 'Le type de charge est obligatoire.',
-                ]);
-            }
-            $validated['jour_semaine'] = null;
-            $validated['libelle'] = null;
-        }
+        // Calculer automatiquement le jour de la semaine
+        $validated['jour_semaine'] = $this->weekdayFromDate($validated['date_depense']);
 
         return $validated;
     }

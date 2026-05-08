@@ -180,9 +180,9 @@ class RevenueController extends Controller
             ->where('paroisse_id', $paroisseId)
             ->where('actif', true)
             ->with([
-                'types' => function (Builder $query) use ($paroisseId, $includeTypeIdIfInactive): void {
+                'types' => function ($query) use ($paroisseId, $includeTypeIdIfInactive): void {
                     $query->where('paroisse_id', $paroisseId)
-                        ->where(function (Builder $q) use ($includeTypeIdIfInactive): void {
+                        ->where(function ($q) use ($includeTypeIdIfInactive): void {
                             $q->where('actif', true);
                             if ($includeTypeIdIfInactive !== null) {
                                 $q->orWhere('id', $includeTypeIdIfInactive);
