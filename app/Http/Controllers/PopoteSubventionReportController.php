@@ -234,10 +234,14 @@ class PopoteSubventionReportController extends Controller
             ->orderBy('id')
             ->get();
 
-        // Règle métier: dépenses popote = uniquement categorie_charge "alimentation_popote".
+        // Règle métier: dépenses popote = dépenses financées par la subvention popote
+        $popoteType = RevenueType::where('paroisse_id', (int) $validated['paroisse_id'])
+            ->where('code', 'subvention_popote')
+            ->first();
+
         $depensesAlimentation = Expense::query()
             ->where('paroisse_id', (int) $validated['paroisse_id'])
-            ->where('categorie_charge', 'alimentation_popote')
+            ->when($popoteType, fn ($q) => $q->where('revenue_type_id', $popoteType->id))
             ->where('statut', 'valide')
             ->whereDate('date_depense', '>=', $dateDebut)
             ->whereDate('date_depense', '<=', $dateFin)

@@ -222,12 +222,14 @@ class FinancialReportController extends Controller implements HasMiddleware
 
         $totalDepenses = (float) $expenses->sum('montant');
 
-        $detailsDepenses = [
-            'charge_fixe' => (float) $expenses->where('categorie_charge', 'charge_fixe')->sum('montant'),
-            'charge_variable' => (float) $expenses->where('categorie_charge', 'charge_variable')->sum('montant'),
-            'charge_exceptionnelle' => (float) $expenses->where('categorie_charge', 'charge_exceptionnelle')->sum('montant'),
-            'alimentation_popote' => (float) $expenses->where('categorie_charge', 'alimentation_popote')->sum('montant'),
-        ];
+        // Regroupement des dépenses par catégorie de revenu source
+        $detailsDepenses = [];
+        foreach ($expenses->groupBy('revenue_category_id') as $categoryId => $categoryExpenses) {
+            $category = RevenueCategory::find($categoryId);
+            if ($category) {
+                $detailsDepenses[$category->code] = (float) $categoryExpenses->sum('montant');
+            }
+        }
 
         $detailsRecettes = [];
         foreach (self::REVENUE_CATEGORY_CODES_HUB as $code) {

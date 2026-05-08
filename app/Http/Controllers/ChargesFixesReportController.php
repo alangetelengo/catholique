@@ -187,6 +187,21 @@ class ChargesFixesReportController extends Controller
             : Carbon::create((int) $validated['year'], 1, 1)->startOfYear();
         $dateFin = $isMonthly ? $dateDebut->copy()->endOfMonth() : $dateDebut->copy()->endOfYear();
 
+        // NOTE: Le rapport "Charges Fixes" n'existe plus avec le nouveau système de dépenses
+        // Les dépenses sont maintenant liées à des sources de revenus (revenue_category_id, revenue_type_id)
+        // Ce rapport est temporairement désactivé en attendant une refonte complète
+
+        return [
+            'date_debut' => $dateDebut,
+            'date_fin' => $dateFin,
+            'by_type' => [],
+            'items' => collect([]),
+            'total_amount' => 0,
+            'disabled' => true,
+            'message' => 'Ce rapport est temporairement indisponible suite à la mise à jour du système de dépenses.',
+        ];
+
+        /* ANCIEN CODE - À REFACTORISER
         $expenses = Expense::query()
             ->where('paroisse_id', (int) $validated['paroisse_id'])
             ->where('categorie_charge', 'charge_fixe')
@@ -201,8 +216,9 @@ class ChargesFixesReportController extends Controller
         foreach ($expenses->groupBy('type_charge') as $type => $items) {
             $byType[] = ['type' => (string) $type, 'count' => $items->count(), 'montant' => (float) $items->sum('montant')];
         }
+        */
 
-        return [
+        /*  return [
             'date_debut' => $dateDebut,
             'date_fin' => $dateFin,
             'total_depenses' => (float) $expenses->sum('montant'),
@@ -220,7 +236,7 @@ class ChargesFixesReportController extends Controller
                     'montant' => (float) $e->montant,
                 ])->values()->all(),
             ],
-        ];
+        ]; */
     }
 
     private function authorizeAccess(FinancialReport $report, ?int $userParoisseId, bool $isSuperAdmin): void
