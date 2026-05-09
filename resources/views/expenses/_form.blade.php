@@ -254,12 +254,14 @@
         const totalAlloueSpan = document.getElementById('total-alloue');
         const montantTotalInput = document.getElementById('montant_total');
 
-        const revenueTypesData = @json($revenueTypes->map(fn($type) => [
-            'id' => $type->id,
-            'nom' => $type->nom,
-            'revenue_category_id' => $type->revenue_category_id,
-            'solde_disponible' => $type->solde_disponible ?? 0
-        ])->values());
+        const revenueTypesData = @json($revenueTypes->map(function($type) {
+            return [
+                'id' => $type->id,
+                'nom' => $type->nom,
+                'revenue_category_id' => $type->revenue_category_id,
+                'solde_disponible' => $type->solde_disponible ?? 0
+            ];
+        })->values());
 
         const categorySelect = document.getElementById('revenue_category');
         let selectedCategoryId = categorySelect ? categorySelect.value : null;
