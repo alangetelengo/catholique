@@ -246,6 +246,7 @@
 </div>
 
 @push('scripts')
+@verbatim
 <script>
     (function () {
         let fundingSourceIndex = document.querySelectorAll('.funding-source-row').length;
@@ -253,7 +254,9 @@
         const addButton = document.getElementById('add-funding-source');
         const totalAlloueSpan = document.getElementById('total-alloue');
         const montantTotalInput = document.getElementById('montant_total');
-
+</script>
+@endverbatim
+<script>
         const revenueTypesData = @json($revenueTypes->map(function($type) {
             return [
                 'id' => $type->id,
@@ -262,7 +265,9 @@
                 'solde_disponible' => $type->solde_disponible ?? 0
             ];
         })->values());
-
+</script>
+@verbatim
+<script>
         const categorySelect = document.getElementById('revenue_category');
         let selectedCategoryId = categorySelect ? categorySelect.value : null;
 
@@ -440,4 +445,5 @@
         filterUsedSources();
     })();
 </script>
+@endverbatim
 @endpush
