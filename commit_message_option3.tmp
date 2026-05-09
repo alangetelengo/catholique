@@ -1,0 +1,26 @@
+Réorganisation menu Option 3 - Regroupement rapports exportables
+
+Suite aux retours utilisateurs sur l'usage réel, réorganisation du menu 
+pour regrouper tous les rapports exportables (PDF) dans un seul menu.
+
+Structure finale:
+- Menu "Rapports mensuels" (4 items):
+  * Génération mensuelle (rapport global)
+  * Historique
+  * Recettes par catégorie
+  * Dépenses par catégorie
+  
+- Lien direct "Statistiques" (vue d'ensemble graphique)
+
+Avantages:
+- Cohérence: tous les documents exportables au même endroit
+- Navigation simplifiée: 1 seul menu pour tous les rapports
+- Workflow logique: "Rapports" = documents, "Statistiques" = tableaux de bord
+- Moins de confusion entre rapports figés et analyses dynamiques
+
+Fichiers modifiés:
+- resources/views/partials/sidebar.blade.php (variables + structure)
+- resources/views/financial-statistics/index.blade.php (titre, suppression boutons)
+- resources/views/financial-reports/index.blade.php (bouton "Statistiques")
+
+Documentation: REORGANISATION_MENU_OPTION3.md

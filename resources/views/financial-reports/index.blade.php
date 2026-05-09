@@ -18,7 +18,7 @@
         <span class="mx-0.5 hidden h-6 w-px shrink-0 self-center bg-slate-200 dark:bg-slate-600 sm:block" role="presentation" aria-hidden="true"></span>
         <a href="{{ route('financial-statistics.index') }}" class="adventiste-btn-secondary text-sm no-underline inline-flex items-center gap-1.5">
             <i class="fas fa-chart-line text-slate-500 dark:text-slate-400" aria-hidden="true"></i>
-            <span>Analyses & Stats</span>
+            <span>Statistiques</span>
         </a>
     </nav>
 @endsection

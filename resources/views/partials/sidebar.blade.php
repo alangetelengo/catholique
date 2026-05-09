@@ -5,16 +5,23 @@
     $isRevenueRoute = request()->routeIs('revenues.*');
     $isExpenseRoute = request()->routeIs('expenses.*');
     
-    // Rapports mensuels (officiels)
-    $isMonthlyReportsRoute = request()->routeIs('financial-reports.index', 'financial-reports.list', 'financial-reports.show', 'financial-reports.statistics', 'financial-reports.download-pdf');
+    // Rapports mensuels (tous les rapports exportables)
+    $isMonthlyReportsRoute = request()->routeIs(
+        'financial-reports.index',
+        'financial-reports.list',
+        'financial-reports.show',
+        'financial-reports.statistics',
+        'financial-reports.download-pdf',
+        'financial-reports.revenues-by-category*',
+        'financial-reports.expenses-by-category*'
+    );
     $isMonthlyReportsGeneration = request()->routeIs('financial-reports.index');
     $isMonthlyReportsHistory = request()->routeIs('financial-reports.list', 'financial-reports.show', 'financial-reports.statistics', 'financial-reports.download-pdf');
+    $isMonthlyReportsRevenues = request()->routeIs('financial-reports.revenues-by-category*');
+    $isMonthlyReportsExpenses = request()->routeIs('financial-reports.expenses-by-category*');
     
-    // Analyses & Statistiques (décisionnel)
-    $isAnalyticsRoute = request()->routeIs('financial-statistics.*', 'financial-reports.revenues-by-category*', 'financial-reports.expenses-by-category*');
-    $isAnalyticsOverview = request()->routeIs('financial-statistics.*');
-    $isAnalyticsRevenues = request()->routeIs('financial-reports.revenues-by-category*');
-    $isAnalyticsExpenses = request()->routeIs('financial-reports.expenses-by-category*');
+    // Statistiques (vue d'ensemble uniquement)
+    $isStatsRoute = request()->routeIs('financial-statistics.*');
     
     $isDashboardRoute = request()->routeIs('home');
     $isAppConfigRoute = request()->routeIs('application-configuration.*');
@@ -107,28 +114,20 @@
                     </summary>
                     <ul class="sidebar-sub-menu mt-1">
                         @can('view_financial_reports')
-                        <li class="sidebar-sub-item"><a href="{{ route('financial-reports.index') }}" class="sidebar-sub-link {{ $isMonthlyReportsGeneration ? 'is-active' : '' }}">Génération</a></li>
+                        <li class="sidebar-sub-item"><a href="{{ route('financial-reports.index') }}" class="sidebar-sub-link {{ $isMonthlyReportsGeneration ? 'is-active' : '' }}">Génération mensuelle</a></li>
                         <li class="sidebar-sub-item"><a href="{{ route('financial-reports.list') }}" class="sidebar-sub-link {{ $isMonthlyReportsHistory ? 'is-active' : '' }}">Historique</a></li>
+                        <li class="sidebar-sub-item"><a href="{{ route('financial-reports.revenues-by-category') }}" class="sidebar-sub-link {{ $isMonthlyReportsRevenues ? 'is-active' : '' }}">Recettes par catégorie</a></li>
+                        <li class="sidebar-sub-item"><a href="{{ route('financial-reports.expenses-by-category') }}" class="sidebar-sub-link {{ $isMonthlyReportsExpenses ? 'is-active' : '' }}">Dépenses par catégorie</a></li>
                         @endcan
                     </ul>
                 </details>
             </li>
 
             <li>
-                <details class="group" @if($isAnalyticsRoute) open @endif>
-                    <summary class="{{ $isAnalyticsRoute ? $navBase . ' nav-link-active' : $navBase }} cursor-pointer list-none">
-                        <span>📊</span>
-                        <span class="nav-text">Analyses & Stats</span>
-                        <span class="sidebar-chevron" aria-hidden="true"></span>
-                    </summary>
-                    <ul class="sidebar-sub-menu mt-1">
-                        <li class="sidebar-sub-item"><a href="{{ route('financial-statistics.index') }}" class="sidebar-sub-link {{ $isAnalyticsOverview ? 'is-active' : '' }}">Vue d'ensemble</a></li>
-                        @can('view_financial_reports')
-                        <li class="sidebar-sub-item"><a href="{{ route('financial-reports.revenues-by-category') }}" class="sidebar-sub-link {{ $isAnalyticsRevenues ? 'is-active' : '' }}">Recettes par catégorie</a></li>
-                        <li class="sidebar-sub-item"><a href="{{ route('financial-reports.expenses-by-category') }}" class="sidebar-sub-link {{ $isAnalyticsExpenses ? 'is-active' : '' }}">Dépenses par catégorie</a></li>
-                        @endcan
-                    </ul>
-                </details>
+                <a href="{{ route('financial-statistics.index') }}" class="{{ $isStatsRoute ? $navBase . ' nav-link-active' : $navBase }}">
+                    <span>📈</span>
+                    <span class="nav-text">Statistiques</span>
+                </a>
             </li>
 
             @auth

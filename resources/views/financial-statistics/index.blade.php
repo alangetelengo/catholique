@@ -1,25 +1,12 @@
 @extends('layouts.app')
 
-@section('title', 'Analyses & Statistiques - Catholique')
+@section('title', 'Statistiques financières - Catholique')
 @section('page-title', 'Vue d'ensemble financière')
 @section('page-title-info')
     <p class="text-slate-600 dark:text-slate-400">
         Le <strong>solde</strong> affiché correspond aux <strong>recettes moins les dépenses « Alimentation popote »</strong> uniquement.
         Les charges fixes, variables et exceptionnelles sont comptabilisées à titre <strong>informatif</strong> pour la hiérarchie et ne réduisent pas ce solde.
     </p>
-@endsection
-
-@section('btn-create')
-    <div class="flex flex-wrap items-center gap-2">
-        @can('view_financial_reports')
-        <a href="{{ route('financial-reports.revenues-by-category') }}" class="adventiste-btn-secondary text-sm">
-            <i class="fas fa-layer-group me-1.5" aria-hidden="true"></i>Recettes par catégorie
-        </a>
-        <a href="{{ route('financial-reports.expenses-by-category') }}" class="adventiste-btn-secondary text-sm">
-            <i class="fas fa-receipt me-1.5" aria-hidden="true"></i>Dépenses par catégorie
-        </a>
-        @endcan
-    </div>
 @endsection
 
 @section('content')
