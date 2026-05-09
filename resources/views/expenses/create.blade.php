@@ -15,7 +15,7 @@
         <p class="text-sm text-slate-600 dark:text-slate-400 mb-6 leading-relaxed border-b border-slate-200/80 dark:border-slate-600/60 pb-6">
             Enregistrez la dépense avec la catégorie et le type exacts. Le jour de la semaine est calculé automatiquement selon la date choisie.
         </p>
-        <form method="post" action="{{ route('expenses.store') }}" class="space-y-8">
+        <form method="post" action="{{ route('expenses.store') }}" enctype="multipart/form-data" class="space-y-8">
             @csrf
             @include('expenses._form', ['formColumns' => 3])
             <div class="flex flex-wrap gap-3 pt-2 border-t border-slate-200/80 dark:border-slate-600/60">

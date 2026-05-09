@@ -134,6 +134,7 @@
                         <th class="px-4 py-3 font-semibold">Montant</th>
                         <th class="px-4 py-3 font-semibold">Paiement</th>
                         <th class="px-4 py-3 font-semibold">Fournisseur</th>
+                        <th class="px-4 py-3 font-semibold">Documents</th>
                         <th class="px-4 py-3 font-semibold text-right">Actions</th>
                     </tr>
                 </thead>
@@ -154,6 +155,44 @@
                                 </span>
                             </td>
                             <td class="px-4 py-3">{{ $expense->fournisseur ?: ($expense->libelle ?: '-') }}</td>
+                            <td class="px-4 py-3">
+                                <div class="flex items-center gap-1.5 text-xs">
+                                    @if($expense->piece_facture_path)
+                                        <a href="{{ Storage::url($expense->piece_facture_path) }}" 
+                                           target="_blank" 
+                                           title="Facture"
+                                           class="inline-flex items-center gap-0.5 text-emerald-600 hover:text-emerald-700 dark:text-emerald-400">
+                                            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                                <path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clip-rule="evenodd"></path>
+                                            </svg>
+                                        </a>
+                                    @endif
+                                    @if($expense->piece_recu_path)
+                                        <a href="{{ Storage::url($expense->piece_recu_path) }}" 
+                                           target="_blank" 
+                                           title="Reçu"
+                                           class="inline-flex items-center gap-0.5 text-sky-600 hover:text-sky-700 dark:text-sky-400">
+                                            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                                <path d="M9 2a2 2 0 00-2 2v8a2 2 0 002 2h6a2 2 0 002-2V6.414A2 2 0 0016.414 5L14 2.586A2 2 0 0012.586 2H9z"></path>
+                                                <path d="M3 8a2 2 0 012-2v10h8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z"></path>
+                                            </svg>
+                                        </a>
+                                    @endif
+                                    @if($expense->piece_autre_path)
+                                        <a href="{{ Storage::url($expense->piece_autre_path) }}" 
+                                           target="_blank" 
+                                           title="Autre"
+                                           class="inline-flex items-center gap-0.5 text-amber-600 hover:text-amber-700 dark:text-amber-400">
+                                            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                                <path fill-rule="evenodd" d="M8 4a3 3 0 00-3 3v4a5 5 0 0010 0V7a1 1 0 112 0v4a7 7 0 11-14 0V7a5 5 0 0110 0v4a3 3 0 11-6 0V7a1 1 0 012 0v4a1 1 0 102 0V7a3 3 0 00-3-3z" clip-rule="evenodd"></path>
+                                            </svg>
+                                        </a>
+                                    @endif
+                                    @if(!$expense->piece_facture_path && !$expense->piece_recu_path && !$expense->piece_autre_path)
+                                        <span class="text-slate-400 dark:text-slate-500">—</span>
+                                    @endif
+                                </div>
+                            </td>
                             <td class="px-4 py-3">
                                 <div class="flex items-center justify-end gap-2">
                                     <x-action-button

@@ -16,7 +16,7 @@
             Enregistrez la dépense avec la catégorie et le type exacts. Le jour de la semaine est calculé automatiquement selon la date choisie.
             Référence: <span class="font-mono">{{ $expense->facture_reference ?? 'N/A' }}</span>
         </p>
-        <form method="post" action="{{ route('expenses.update', $expense) }}" class="space-y-8">
+        <form method="post" action="{{ route('expenses.update', $expense) }}" enctype="multipart/form-data" class="space-y-8">
             @csrf
             @method('put')
             @include('expenses._form', ['formColumns' => 3])

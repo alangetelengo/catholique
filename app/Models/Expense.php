@@ -44,6 +44,7 @@ class Expense extends Model
         'facture_reference',
         'piece_facture_path',
         'piece_recu_path',
+        'piece_autre_path',
         'fournisseur',
         'methode_paiement',
         'statut',

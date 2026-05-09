@@ -196,10 +196,29 @@ class ExpenseController extends Controller
             'fournisseur' => ['nullable', 'string', 'max:255'],
             'methode_paiement' => ['required', 'in:especes,cheque,virement,carte,mobile_money'],
             'notes' => ['nullable', 'string'],
+            'piece_facture' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:5120'],
+            'piece_recu' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:5120'],
+            'piece_autre' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:5120'],
         ]);
 
         // Calculer automatiquement le jour de la semaine
         $validated['jour_semaine'] = $this->weekdayFromDate($validated['date_depense']);
+
+        // Gérer l'upload des documents justificatifs
+        if ($request->hasFile('piece_facture')) {
+            $validated['piece_facture_path'] = $request->file('piece_facture')
+                ->store('expenses/factures', 'public');
+        }
+
+        if ($request->hasFile('piece_recu')) {
+            $validated['piece_recu_path'] = $request->file('piece_recu')
+                ->store('expenses/recus', 'public');
+        }
+
+        if ($request->hasFile('piece_autre')) {
+            $validated['piece_autre_path'] = $request->file('piece_autre')
+                ->store('expenses/autres', 'public');
+        }
 
         return $validated;
     }
