@@ -34,23 +34,6 @@
     @php
         $fmt = static fn ($n) => \App\Helpers\ParoisseConfig::formatMontant($n);
         $payLabel = static fn ($v) => ucfirst(str_replace('_', ' ', (string) $v));
-        $cats = [
-            'charge_fixe' => 'Charge fixe',
-            'charge_variable' => 'Charge variable',
-            'charge_exceptionnelle' => 'Charge exceptionnelle',
-            'alimentation_popote' => 'Alimentation popote',
-        ];
-        $types = trans('expenses.types');
-        $types = is_array($types) ? $types : [];
-        $badgeCat = static function (string $key): string {
-            return match ($key) {
-                'charge_fixe' => 'bg-rose-500/10 dark:bg-rose-500/20 text-rose-800 dark:text-rose-200',
-                'charge_variable' => 'bg-amber-500/10 dark:bg-amber-500/20 text-amber-900 dark:text-amber-200',
-                'charge_exceptionnelle' => 'bg-violet-500/10 dark:bg-violet-500/20 text-violet-800 dark:text-violet-200',
-                'alimentation_popote' => 'bg-sky-500/10 dark:bg-sky-500/20 text-sky-800 dark:text-sky-200',
-                default => 'bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200',
-            };
-        };
     @endphp
 
     <div class="rounded-xl border border-emerald-200/90 dark:border-emerald-900/40 bg-emerald-50/90 dark:bg-emerald-950/20 px-4 py-3 mb-6 text-sm text-emerald-950 dark:text-emerald-100 leading-relaxed print:hidden">
@@ -164,27 +147,32 @@
                             <table class="min-w-full text-sm">
                                 <thead>
                                     <tr class="text-left text-slate-700 dark:text-slate-200">
-                                        <th class="px-4 py-3 font-semibold">Catégorie</th>
+                                        <th class="px-4 py-3 font-semibold">Source de financement</th>
                                         <th class="px-4 py-3 font-semibold text-right">Montant</th>
                                     </tr>
                                 </thead>
                                 <tbody class="divide-y divide-slate-200/70 dark:divide-slate-700/70">
-                                    <tr class="text-slate-700 dark:text-slate-200">
-                                        <td class="px-4 py-3">Charges fixes</td>
-                                        <td class="px-4 py-3 text-right font-medium tabular-nums">{{ $fmt($report['details_depenses']['charge_fixe']) }}</td>
-                                    </tr>
-                                    <tr class="text-slate-700 dark:text-slate-200">
-                                        <td class="px-4 py-3">Charges variables</td>
-                                        <td class="px-4 py-3 text-right font-medium tabular-nums">{{ $fmt($report['details_depenses']['charge_variable']) }}</td>
-                                    </tr>
-                                    <tr class="text-slate-700 dark:text-slate-200">
-                                        <td class="px-4 py-3">Charges exceptionnelles</td>
-                                        <td class="px-4 py-3 text-right font-medium tabular-nums">{{ $fmt($report['details_depenses']['charge_exceptionnelle']) }}</td>
-                                    </tr>
-                                    <tr class="text-slate-700 dark:text-slate-200">
-                                        <td class="px-4 py-3">Alimentation popote</td>
-                                        <td class="px-4 py-3 text-right font-medium tabular-nums">{{ $fmt($report['details_depenses']['alimentation_popote'] ?? 0) }}</td>
-                                    </tr>
+                                    @php
+                                        $revenueCategories = \App\Models\RevenueCategory::where('paroisse_id', $financialReport->paroisse_id)
+                                            ->where('actif', 1)
+                                            ->orderBy('ordre')
+                                            ->get();
+                                    @endphp
+                                    @forelse ($revenueCategories as $category)
+                                        @php
+                                            $montant = $report['details_depenses'][$category->code] ?? 0;
+                                        @endphp
+                                        @if ($montant > 0)
+                                        <tr class="text-slate-700 dark:text-slate-200">
+                                            <td class="px-4 py-3">{{ $category->nom }}</td>
+                                            <td class="px-4 py-3 text-right font-medium tabular-nums">{{ $fmt($montant) }}</td>
+                                        </tr>
+                                        @endif
+                                    @empty
+                                        <tr class="text-slate-700 dark:text-slate-200">
+                                            <td colspan="2" class="px-4 py-3 text-center text-slate-500 italic">Aucune dépense enregistrée</td>
+                                        </tr>
+                                    @endforelse
                                 </tbody>
                                 <tfoot>
                                     <tr class="bg-rose-50/90 dark:bg-rose-950/30 font-bold text-slate-900 dark:text-slate-100">
@@ -260,7 +248,7 @@
                             <thead>
                                 <tr class="text-left text-slate-700 dark:text-slate-200">
                                     <th class="px-4 py-3 font-semibold">Date</th>
-                                    <th class="px-4 py-3 font-semibold">Catégorie</th>
+                                    <th class="px-4 py-3 font-semibold">Source</th>
                                     <th class="px-4 py-3 font-semibold">Type</th>
                                     <th class="px-4 py-3 font-semibold">Fournisseur</th>
                                     <th class="px-4 py-3 font-semibold">Réf. facture</th>
@@ -269,13 +257,12 @@
                             </thead>
                             <tbody class="divide-y divide-slate-200/70 dark:divide-slate-700/70">
                                 @foreach ($report['expenses'] as $expense)
-                                    @php $ck = $expense->categorie_charge; @endphp
                                     <tr class="text-slate-700 dark:text-slate-200">
                                         <td class="px-4 py-3 whitespace-nowrap">{{ $expense->date_depense?->format('d/m/Y') }}</td>
                                         <td class="px-4 py-3">
-                                            <span class="inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium {{ $badgeCat($ck) }}">{{ $cats[$ck] ?? $ck }}</span>
+                                            <span class="inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium bg-emerald-50 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-200">{{ $expense->revenueCategory?->nom ?? '—' }}</span>
                                         </td>
-                                        <td class="px-4 py-3">{{ $types[$expense->type_charge] ?? $expense->type_charge }}</td>
+                                        <td class="px-4 py-3">{{ $expense->revenueType?->nom ?? '—' }}</td>
                                         <td class="px-4 py-3">{{ $expense->fournisseur ?? '—' }}</td>
                                         <td class="px-4 py-3 font-mono text-xs">{{ $expense->facture_reference ?? '—' }}</td>
                                         <td class="px-4 py-3 text-right font-semibold text-rose-700 dark:text-rose-400 tabular-nums">{{ $fmt($expense->montant) }}</td>

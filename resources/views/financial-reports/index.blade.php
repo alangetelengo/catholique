@@ -1,7 +1,7 @@
 @extends('layouts.app')
 
-@section('title', 'Rapports financiers — Catholique')
-@section('page-title', 'Rapports financiers')
+@section('title', 'Génération de rapport mensuel — Catholique')
+@section('page-title', 'Génération de rapport mensuel')
 @section('page-title-info', 'Justification mensuelle : recettes validées hors Procure (quêtes, locations, popote/subvention), dépenses validées toutes catégories, solde = recettes − dépenses. Enregistrement possible selon les droits.')
 
 @section('btn-create')
@@ -11,22 +11,14 @@
             <span>Aide</span>
         </button>
         <span class="mx-0.5 hidden h-6 w-px shrink-0 self-center bg-slate-200 dark:bg-slate-600 sm:block" role="presentation" aria-hidden="true"></span>
-        <a href="{{ route('financial-reports.statistics') }}" class="adventiste-btn-secondary text-sm no-underline inline-flex items-center gap-1.5">
-            <i class="fas fa-chart-line text-slate-500 dark:text-slate-400" aria-hidden="true"></i>
-            <span>Stats rapports</span>
-        </a>
         <a href="{{ route('financial-reports.list') }}" class="adventiste-btn-primary text-sm no-underline inline-flex items-center gap-1.5 shadow-sm">
             <i class="fas fa-folder-open" aria-hidden="true"></i>
-            <span>Rapports enregistrés</span>
+            <span>Historique</span>
         </a>
         <span class="mx-0.5 hidden h-6 w-px shrink-0 self-center bg-slate-200 dark:bg-slate-600 sm:block" role="presentation" aria-hidden="true"></span>
-        <a href="{{ route('financial-reports.revenues-by-category') }}" class="adventiste-btn-secondary text-sm no-underline inline-flex items-center gap-1.5">
-            <i class="fas fa-layer-group text-slate-500 dark:text-slate-400" aria-hidden="true"></i>
-            <span>Recettes par catégorie</span>
-        </a>
-        <a href="{{ route('financial-reports.expenses-by-category') }}" class="adventiste-btn-secondary text-sm no-underline inline-flex items-center gap-1.5">
-            <i class="fas fa-receipt text-slate-500 dark:text-slate-400" aria-hidden="true"></i>
-            <span>Dépenses par catégorie</span>
+        <a href="{{ route('financial-statistics.index') }}" class="adventiste-btn-secondary text-sm no-underline inline-flex items-center gap-1.5">
+            <i class="fas fa-chart-line text-slate-500 dark:text-slate-400" aria-hidden="true"></i>
+            <span>Analyses & Stats</span>
         </a>
     </nav>
 @endsection
@@ -178,9 +170,9 @@
                 <div class="px-4 py-3 border-b border-slate-200/80 dark:border-slate-600/80 bg-slate-50/80 dark:bg-slate-800/50">
                     <h3 class="text-sm font-semibold text-slate-900 dark:text-white m-0 flex items-center gap-2">
                         <i class="fas fa-receipt text-slate-500 dark:text-slate-400" aria-hidden="true"></i>
-                        Dépenses par catégorie
+                        Dépenses par source de financement
                     </h3>
-                    <p class="text-xs text-slate-500 dark:text-slate-400 m-0 mt-1">Ventilation des charges (somme = total dépenses)</p>
+                    <p class="text-xs text-slate-500 dark:text-slate-400 m-0 mt-1">Ventilation selon les catégories de revenus (somme = total dépenses)</p>
                 </div>
                 <div class="p-4">
                     <div class="adventiste-table-shell border-0 rounded-none shadow-none">
@@ -188,27 +180,32 @@
                             <table class="min-w-full text-sm">
                                 <thead>
                                     <tr class="text-left text-slate-700 dark:text-slate-200">
-                                        <th class="px-4 py-3 font-semibold">Catégorie</th>
+                                        <th class="px-4 py-3 font-semibold">Source de financement</th>
                                         <th class="px-4 py-3 font-semibold text-right">Montant</th>
                                     </tr>
                                 </thead>
                                 <tbody class="divide-y divide-slate-200/70 dark:divide-slate-700/70">
-                                    <tr class="text-slate-700 dark:text-slate-200">
-                                        <td class="px-4 py-3">Charges fixes</td>
-                                        <td class="px-4 py-3 text-right font-semibold">{{ $fmt($report['details_depenses']['charge_fixe']) }}</td>
-                                    </tr>
-                                    <tr class="text-slate-700 dark:text-slate-200">
-                                        <td class="px-4 py-3">Charges variables</td>
-                                        <td class="px-4 py-3 text-right font-semibold">{{ $fmt($report['details_depenses']['charge_variable']) }}</td>
-                                    </tr>
-                                    <tr class="text-slate-700 dark:text-slate-200">
-                                        <td class="px-4 py-3">Charges exceptionnelles</td>
-                                        <td class="px-4 py-3 text-right font-semibold">{{ $fmt($report['details_depenses']['charge_exceptionnelle']) }}</td>
-                                    </tr>
-                                    <tr class="text-slate-700 dark:text-slate-200">
-                                        <td class="px-4 py-3">Alimentation popote</td>
-                                        <td class="px-4 py-3 text-right font-semibold">{{ $fmt($report['details_depenses']['alimentation_popote'] ?? 0) }}</td>
-                                    </tr>
+                                    @php
+                                        $revenueCategories = \App\Models\RevenueCategory::where('paroisse_id', $selectedParoisseId)
+                                            ->where('actif', 1)
+                                            ->orderBy('ordre')
+                                            ->get();
+                                    @endphp
+                                    @forelse ($revenueCategories as $category)
+                                        @php
+                                            $montant = $report['details_depenses'][$category->code] ?? 0;
+                                        @endphp
+                                        @if ($montant > 0)
+                                        <tr class="text-slate-700 dark:text-slate-200">
+                                            <td class="px-4 py-3">{{ $category->nom }}</td>
+                                            <td class="px-4 py-3 text-right font-semibold">{{ $fmt($montant) }}</td>
+                                        </tr>
+                                        @endif
+                                    @empty
+                                        <tr class="text-slate-700 dark:text-slate-200">
+                                            <td colspan="2" class="px-4 py-3 text-center text-slate-500 italic">Aucune dépense enregistrée</td>
+                                        </tr>
+                                    @endforelse
                                 </tbody>
                                 <tfoot>
                                     <tr class="bg-rose-50/90 dark:bg-rose-950/30 font-bold text-slate-900 dark:text-slate-100">
@@ -282,23 +279,13 @@
             </div>
             <div class="p-0 sm:p-0">
                 @if ($report['expenses']->count() > 0)
-                    @php
-                        $cats = [
-                            'charge_fixe' => 'Charge fixe',
-                            'charge_variable' => 'Charge variable',
-                            'charge_exceptionnelle' => 'Charge exceptionnelle',
-                            'alimentation_popote' => 'Alimentation popote',
-                        ];
-                        $types = trans('expenses.types');
-                        $types = is_array($types) ? $types : [];
-                    @endphp
                     <div class="adventiste-table-shell border-0 rounded-none shadow-none">
                         <div class="overflow-x-auto">
                             <table class="min-w-full text-sm">
                                 <thead>
                                     <tr class="text-left text-slate-700 dark:text-slate-200">
                                         <th class="px-4 py-3 font-semibold">Date</th>
-                                        <th class="px-4 py-3 font-semibold">Catégorie</th>
+                                        <th class="px-4 py-3 font-semibold">Source</th>
                                         <th class="px-4 py-3 font-semibold">Type</th>
                                         <th class="px-4 py-3 font-semibold">Fournisseur</th>
                                         <th class="px-4 py-3 font-semibold text-right">Montant</th>
@@ -309,9 +296,9 @@
                                         <tr class="text-slate-700 dark:text-slate-200">
                                             <td class="px-4 py-3 whitespace-nowrap">{{ $expense->date_depense?->format('d/m/Y') }}</td>
                                             <td class="px-4 py-3">
-                                                <span class="inline-flex rounded-full bg-emerald-50 dark:bg-emerald-900/30 px-2.5 py-0.5 text-xs font-medium text-emerald-800 dark:text-emerald-200">{{ $cats[$expense->categorie_charge] ?? $expense->categorie_charge }}</span>
+                                                <span class="inline-flex rounded-full bg-emerald-50 dark:bg-emerald-900/30 px-2.5 py-0.5 text-xs font-medium text-emerald-800 dark:text-emerald-200">{{ $expense->revenueCategory?->nom ?? '—' }}</span>
                                             </td>
-                                            <td class="px-4 py-3">{{ $types[$expense->type_charge] ?? $expense->type_charge }}</td>
+                                            <td class="px-4 py-3">{{ $expense->revenueType?->nom ?? '—' }}</td>
                                             <td class="px-4 py-3">{{ $expense->fournisseur ?? '—' }}</td>
                                             <td class="px-4 py-3 text-right font-semibold text-rose-700 dark:text-rose-400">{{ $fmt($expense->montant) }}</td>
                                         </tr>

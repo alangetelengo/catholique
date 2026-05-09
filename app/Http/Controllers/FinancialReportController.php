@@ -205,6 +205,7 @@ class FinancialReportController extends Controller implements HasMiddleware
         $totalRecettes = (float) $revenues->sum('montant');
 
         $expenses = Expense::query()
+            ->with(['revenueCategory', 'revenueType'])
             ->where('paroisse_id', $paroisseId)
             ->where('statut', 'valide')
             ->whereDate('date_depense', '>=', $dateDebut)

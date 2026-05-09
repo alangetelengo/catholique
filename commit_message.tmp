@@ -1,0 +1,23 @@
+Refonte navigation et correction rapports mensuels
+
+- Simplification menu sidebar (Option 2):
+  * "Rapports mensuels" (Génération + Historique)
+  * "Analyses & Stats" (Vue d'ensemble + Recettes/Dépenses par catégorie)
+  * Mise à jour des icônes et titres de pages
+  
+- Correction rapports mensuels (/financial-reports):
+  * Résolution erreur "Undefined array key charge_fixe"
+  * Remplacement affichage anciennes catégories (charges fixes/variables)
+  * Affichage dynamique par sources de financement (catégories de revenus)
+  * Utilisation relations Eloquent revenueCategory/revenueType
+  * Mise à jour des vues: index, show, pdf
+  
+- Fichiers modifiés:
+  * app/Http/Controllers/FinancialReportController.php (eager loading)
+  * resources/views/partials/sidebar.blade.php (nouvelle structure)
+  * resources/views/financial-reports/*.blade.php (4 vues)
+  * resources/views/financial-statistics/index.blade.php (boutons navigation)
+  
+- Documentation: SIMPLIFICATION_MENU_NAVIGATION.md, CORRECTION_RAPPORTS_MENSUELS.md
+
+Cohérence totale avec le refactoring du module dépenses.

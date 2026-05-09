@@ -348,27 +348,28 @@
                 <table>
                     <thead>
                         <tr>
-                            <th>Catégorie</th>
+                            <th>Source de financement</th>
                             <th class="text-right">Montant</th>
                         </tr>
                     </thead>
                     <tbody>
-                        <tr>
-                            <td>Charges fixes</td>
-                            <td class="text-right">{{ \App\Helpers\ParoisseConfig::formatMontant($report['details_depenses']['charge_fixe']) }}</td>
-                        </tr>
-                        <tr>
-                            <td>Charges variables</td>
-                            <td class="text-right">{{ \App\Helpers\ParoisseConfig::formatMontant($report['details_depenses']['charge_variable']) }}</td>
-                        </tr>
-                        <tr>
-                            <td>Charges exceptionnelles</td>
-                            <td class="text-right">{{ \App\Helpers\ParoisseConfig::formatMontant($report['details_depenses']['charge_exceptionnelle']) }}</td>
-                        </tr>
-                        <tr>
-                            <td>Alimentation popote</td>
-                            <td class="text-right">{{ \App\Helpers\ParoisseConfig::formatMontant($report['details_depenses']['alimentation_popote'] ?? 0) }}</td>
-                        </tr>
+                        @php
+                            $revenueCategories = \App\Models\RevenueCategory::where('paroisse_id', $report['paroisse_id'])
+                                ->where('actif', 1)
+                                ->orderBy('ordre')
+                                ->get();
+                        @endphp
+                        @foreach ($revenueCategories as $category)
+                            @php
+                                $montant = $report['details_depenses'][$category->code] ?? 0;
+                            @endphp
+                            @if ($montant > 0)
+                            <tr>
+                                <td>{{ $category->nom }}</td>
+                                <td class="text-right">{{ \App\Helpers\ParoisseConfig::formatMontant($montant) }}</td>
+                            </tr>
+                            @endif
+                        @endforeach
                         <tr class="total-row">
                             <td>TOTAL</td>
                             <td class="text-right">{{ \App\Helpers\ParoisseConfig::formatMontant($report['total_depenses']) }}</td>
@@ -410,23 +411,13 @@
 
     {{-- Liste détaillée des dépenses --}}
     @if($report['expenses']->count() > 0)
-        @php
-            $expenseCatsPdf = [
-                'charge_fixe' => 'Charge fixe',
-                'charge_variable' => 'Charge variable',
-                'charge_exceptionnelle' => 'Charge exceptionnelle',
-                'alimentation_popote' => 'Alimentation popote',
-            ];
-            $expenseTypesPdf = trans('expenses.types');
-            $expenseTypesPdf = is_array($expenseTypesPdf) ? $expenseTypesPdf : [];
-        @endphp
         <div class="section section--compact">
             <div class="section-title">Liste détaillée des Dépenses</div>
             <table>
                 <thead>
                     <tr>
                         <th>Date</th>
-                        <th>Catégorie</th>
+                        <th>Source</th>
                         <th>Type</th>
                         <th>Fournisseur</th>
                         <th>Réf. Facture</th>
@@ -438,10 +429,10 @@
                         <tr>
                             <td>{{ $expense->date_depense?->format('d/m/Y') }}</td>
                             <td>
-                                {{ $expenseCatsPdf[$expense->categorie_charge] ?? $expense->categorie_charge }}
+                                {{ $expense->revenueCategory?->nom ?? '—' }}
                             </td>
                             <td>
-                                {{ $expenseTypesPdf[$expense->type_charge] ?? $expense->type_charge }}
+                                {{ $expense->revenueType?->nom ?? '—' }}
                             </td>
                             <td>{{ $expense->fournisseur ?? '—' }}</td>
                             <td>{{ $expense->facture_reference ?? '—' }}</td>

@@ -1,11 +1,14 @@
 @extends('layouts.app')
 
-@section('title', 'Rapports financiers enregistrés — Catholique')
-@section('page-title', 'Rapports financiers enregistrés')
-@section('page-title-info', 'Versions enregistrées du rapport mensuel : totaux figés (recettes hors Procure, dépenses toutes catégories, solde). Filtrez par paroisse (super admin) et par année.')
+@section('title', 'Historique des rapports — Catholique')
+@section('page-title', 'Historique des rapports mensuels')
+@section('page-title-info', 'Tous les rapports mensuels enregistrés avec leurs statistiques. Versions figées : recettes hors Procure, dépenses toutes catégories, solde. Filtrez par paroisse et année.')
 
 @section('btn-create')
     <div class="flex flex-wrap items-center gap-2">
+        <a href="{{ route('financial-reports.statistics') }}" class="adventiste-btn-secondary text-sm">
+            <i class="fas fa-chart-bar me-1.5" aria-hidden="true"></i>Statistiques détaillées
+        </a>
         <a href="{{ route('financial-reports.list') }}" class="adventiste-btn-secondary text-sm">Rafraîchir</a>
         <a href="{{ route('financial-reports.index') }}" class="adventiste-btn-primary">
             <i class="fas fa-file-invoice-dollar me-2" aria-hidden="true"></i>Générer un rapport
