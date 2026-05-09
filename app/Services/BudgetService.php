@@ -34,7 +34,7 @@ class BudgetService
     {
         $revenueTypes = RevenueType::where('paroisse_id', $paroisseId)
             ->where('actif', true)
-            ->with('revenueCategory')
+            ->with('category')
             ->orderBy('ordre')
             ->orderBy('nom')
             ->get();
