@@ -6,6 +6,7 @@ use App\Models\Expense;
 use App\Models\Paroisse;
 use App\Models\Revenue;
 use App\Models\RevenueCategory;
+use App\Models\RevenueType;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
@@ -124,7 +125,14 @@ class FinancialStatisticsService
 
         $totalRevenues = (float) (clone $revQ)->sum('montant');
         $totalExpensesAll = (float) (clone $expQ)->sum('montant');
-        $totalPopote = (float) (clone $expQ)->where('categorie_charge', self::POPOTE_CATEGORY)->sum('montant');
+
+        // Dépenses Popote = dépenses liées au type "subvention_popote"
+        $popoteType = RevenueType::where('code', 'subvention_popote')
+            ->when($paroisseId, fn ($q) => $q->where('paroisse_id', $paroisseId))
+            ->first();
+        $totalPopote = $popoteType
+            ? (float) (clone $expQ)->where('revenue_type_id', $popoteType->id)->sum('montant')
+            : 0;
         $solde = $totalRevenues - $totalPopote;
 
         $revenueByCategory = $this->revenueBreakdown($fromStr, $toStr, $paroisseId);
@@ -200,18 +208,19 @@ class FinancialStatisticsService
         $rows = Expense::query()
             ->whereBetween('date_depense', [$from, $to])
             ->when($paroisseId !== null, fn (Builder $q) => $q->where('paroisse_id', $paroisseId))
-            ->selectRaw('categorie_charge, SUM(montant) as total')
-            ->groupBy('categorie_charge')
+            ->selectRaw('revenue_category_id, SUM(montant) as total')
+            ->groupBy('revenue_category_id')
             ->get();
 
         return $rows->map(function ($row) {
-            $key = (string) $row->categorie_charge;
+            $category = RevenueCategory::find($row->revenue_category_id);
+            $key = $category ? $category->code : 'sans_categorie';
 
             return [
                 'key' => $key,
-                'label' => self::EXPENSE_CATEGORY_LABELS[$key] ?? $key,
+                'label' => $category ? $category->nom : 'Sans catégorie',
                 'total' => (float) $row->total,
-                'deductible' => $key === self::POPOTE_CATEGORY,
+                'deductible' => false, // Plus de notion de déductible
             ];
         })->sortByDesc('total')->values();
     }
@@ -240,10 +249,18 @@ class FinancialStatisticsService
      */
     private function monthlyPopoteExpenses(string $from, string $to, ?int $paroisseId): array
     {
+        $popoteType = RevenueType::where('code', 'subvention_popote')
+            ->when($paroisseId, fn ($q) => $q->where('paroisse_id', $paroisseId))
+            ->first();
+
+        if (! $popoteType) {
+            return $this->fillMonthRange($from, $to, collect());
+        }
+
         $expr = $this->monthSqlExpression('date_depense');
         $rows = Expense::query()
             ->whereBetween('date_depense', [$from, $to])
-            ->where('categorie_charge', self::POPOTE_CATEGORY)
+            ->where('revenue_type_id', $popoteType->id)
             ->when($paroisseId !== null, fn (Builder $q) => $q->where('paroisse_id', $paroisseId))
             ->selectRaw("{$expr} as ym, SUM(montant) as total")
             ->groupByRaw($expr)
@@ -258,10 +275,14 @@ class FinancialStatisticsService
      */
     private function monthlyNonPopoteExpenses(string $from, string $to, ?int $paroisseId): array
     {
+        $popoteType = RevenueType::where('code', 'subvention_popote')
+            ->when($paroisseId, fn ($q) => $q->where('paroisse_id', $paroisseId))
+            ->first();
+
         $expr = $this->monthSqlExpression('date_depense');
         $rows = Expense::query()
             ->whereBetween('date_depense', [$from, $to])
-            ->where('categorie_charge', '!=', self::POPOTE_CATEGORY)
+            ->when($popoteType, fn (Builder $q) => $q->where('revenue_type_id', '!=', $popoteType->id))
             ->when($paroisseId !== null, fn (Builder $q) => $q->where('paroisse_id', $paroisseId))
             ->selectRaw("{$expr} as ym, SUM(montant) as total")
             ->groupByRaw($expr)
@@ -350,7 +371,14 @@ class FinancialStatisticsService
         $expQ = $this->scopedExpenses($fromStr, $toStr, $paroisseId);
         $totalRevenues = (float) (clone $revQ)->sum('montant');
         $totalExpensesAll = (float) (clone $expQ)->sum('montant');
-        $totalPopote = (float) (clone $expQ)->where('categorie_charge', self::POPOTE_CATEGORY)->sum('montant');
+
+        // Dépenses Popote = dépenses liées au type "subvention_popote"
+        $popoteType = RevenueType::where('code', 'subvention_popote')
+            ->when($paroisseId, fn ($q) => $q->where('paroisse_id', $paroisseId))
+            ->first();
+        $totalPopote = $popoteType
+            ? (float) (clone $expQ)->where('revenue_type_id', $popoteType->id)->sum('montant')
+            : 0;
 
         return [
             'total_revenues' => $totalRevenues,
@@ -411,9 +439,13 @@ class FinancialStatisticsService
             ->groupByRaw($dayExprRev)
             ->pluck('total', 'd');
 
+        $popoteType = RevenueType::where('code', 'subvention_popote')
+            ->when($paroisseId, fn ($q) => $q->where('paroisse_id', $paroisseId))
+            ->first();
+
         $popRows = Expense::query()
             ->whereBetween('date_depense', [$fromStr, $toStr])
-            ->where('categorie_charge', self::POPOTE_CATEGORY)
+            ->when($popoteType, fn (Builder $q) => $q->where('revenue_type_id', $popoteType->id))
             ->when($paroisseId !== null, fn (Builder $q) => $q->where('paroisse_id', $paroisseId))
             ->selectRaw("{$dayExprExp} as d, SUM(montant) as total")
             ->groupByRaw($dayExprExp)
