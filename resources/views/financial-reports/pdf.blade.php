@@ -432,7 +432,15 @@
                                 {{ $expense->revenueCategory?->nom ?? '—' }}
                             </td>
                             <td>
-                                {{ $expense->revenueType?->nom ?? '—' }}
+                                @php
+                                    $sourceLabels = $expense->fundingSources
+                                        ? $expense->fundingSources
+                                            ->map(fn ($source) => $source->revenueType?->nom)
+                                            ->filter()
+                                            ->values()
+                                        : collect();
+                                @endphp
+                                {{ $sourceLabels->isNotEmpty() ? $sourceLabels->join(', ') : ($expense->revenueType?->nom ?? '—') }}
                             </td>
                             <td>{{ $expense->fournisseur ?? '—' }}</td>
                             <td>{{ $expense->facture_reference ?? '—' }}</td>

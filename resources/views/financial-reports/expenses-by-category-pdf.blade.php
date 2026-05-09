@@ -339,7 +339,17 @@
                         <tr>
                             <td>{{ $ex->date_depense?->format('d/m/Y') }}</td>
                             <td>{{ $ex->revenueCategory?->nom ?? '—' }}</td>
-                            <td>{{ $ex->revenueType?->nom ?? '—' }}</td>
+                            <td>
+                                @php
+                                    $sourceLabels = $ex->fundingSources
+                                        ? $ex->fundingSources
+                                            ->map(fn ($source) => $source->revenueType?->nom)
+                                            ->filter()
+                                            ->values()
+                                        : collect();
+                                @endphp
+                                {{ $sourceLabels->isNotEmpty() ? $sourceLabels->join(', ') : ($ex->revenueType?->nom ?? '—') }}
+                            </td>
                             <td>{{ \Illuminate\Support\Str::limit($ex->libelle ?? '—', 36) }}</td>
                             <td>{{ \Illuminate\Support\Str::limit($ex->fournisseur ?? '—', 28) }}</td>
                             <td class="text-right">{{ \App\Helpers\ParoisseConfig::formatMontant($ex->montant) }}</td>

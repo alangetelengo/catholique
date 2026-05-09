@@ -205,7 +205,7 @@ class FinancialReportController extends Controller implements HasMiddleware
         $totalRecettes = (float) $revenues->sum('montant');
 
         $expenses = Expense::query()
-            ->with(['revenueCategory', 'revenueType'])
+            ->with(['revenueCategory', 'fundingSources.revenueType'])
             ->where('paroisse_id', $paroisseId)
             ->where('statut', 'valide')
             ->whereDate('date_depense', '>=', $dateDebut)
@@ -1415,7 +1415,7 @@ class FinancialReportController extends Controller implements HasMiddleware
         ?int $revenueTypeId = null
     ): array {
         $query = Expense::query()
-            ->with(['revenueCategory', 'revenueType'])
+            ->with(['revenueCategory', 'fundingSources.revenueType'])
             ->where('paroisse_id', $paroisseId)
             ->where('statut', 'valide')
             ->whereDate('date_depense', '>=', $dateDebut)
@@ -1426,7 +1426,9 @@ class FinancialReportController extends Controller implements HasMiddleware
         }
 
         if ($revenueTypeId) {
-            $query->where('revenue_type_id', $revenueTypeId);
+            $query->whereHas('fundingSources', function ($fundingQuery) use ($revenueTypeId): void {
+                $fundingQuery->where('revenue_type_id', $revenueTypeId);
+            });
         }
 
         $expenses = $query->orderBy('date_depense')->orderBy('id')->get();
@@ -1445,17 +1447,31 @@ class FinancialReportController extends Controller implements HasMiddleware
             }
         }
 
-        // Grouper par type de recettes (source précise des fonds)
+        // Grouper par type de recettes (source précise des fonds) via allocations multi-sources
         $byType = [];
-        foreach ($expenses->groupBy('revenue_type_id') as $typeId => $items) {
-            $type = RevenueType::find($typeId);
-            if ($type) {
-                $byType[$typeId] = [
-                    'id' => $typeId,
-                    'nom' => $type->nom,
-                    'montant' => (float) $items->sum('montant'),
-                    'count' => $items->count(),
-                ];
+        foreach ($expenses as $expense) {
+            foreach ($expense->fundingSources as $fundingSource) {
+                $type = $fundingSource->revenueType;
+                if (! $type) {
+                    continue;
+                }
+
+                if ($revenueTypeId && (int) $type->id !== (int) $revenueTypeId) {
+                    continue;
+                }
+
+                $typeId = (int) $type->id;
+                if (! isset($byType[$typeId])) {
+                    $byType[$typeId] = [
+                        'id' => $typeId,
+                        'nom' => $type->nom,
+                        'montant' => 0.0,
+                        'count' => 0,
+                    ];
+                }
+
+                $byType[$typeId]['montant'] += (float) $fundingSource->montant_alloue;
+                $byType[$typeId]['count']++;
             }
         }
 

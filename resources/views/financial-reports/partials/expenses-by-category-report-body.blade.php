@@ -115,7 +115,17 @@
                             <tr class="text-slate-700 dark:text-slate-200">
                                 <td class="px-4 py-3 whitespace-nowrap">{{ $ex->date_depense?->format('d/m/Y') }}</td>
                                 <td class="px-4 py-3">{{ $ex->revenueCategory?->nom ?? '—' }}</td>
-                                <td class="px-4 py-3">{{ $ex->revenueType?->nom ?? '—' }}</td>
+                                <td class="px-4 py-3">
+                                    @php
+                                        $sourceLabels = $ex->fundingSources
+                                            ? $ex->fundingSources
+                                                ->map(fn ($source) => $source->revenueType?->nom)
+                                                ->filter()
+                                                ->values()
+                                            : collect();
+                                    @endphp
+                                    {{ $sourceLabels->isNotEmpty() ? $sourceLabels->join(', ') : ($ex->revenueType?->nom ?? '—') }}
+                                </td>
                                 <td class="px-4 py-3">{{ $ex->libelle ?: '—' }}</td>
                                 <td class="px-4 py-3">{{ $ex->fournisseur ?? '—' }}</td>
                                 <td class="px-4 py-3 text-right font-semibold text-rose-700 dark:text-rose-400 tabular-nums">{{ $fmt($ex->montant) }}</td>

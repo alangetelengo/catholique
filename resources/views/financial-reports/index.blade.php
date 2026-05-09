@@ -298,7 +298,17 @@
                                             <td class="px-4 py-3">
                                                 <span class="inline-flex rounded-full bg-emerald-50 dark:bg-emerald-900/30 px-2.5 py-0.5 text-xs font-medium text-emerald-800 dark:text-emerald-200">{{ $expense->revenueCategory?->nom ?? '—' }}</span>
                                             </td>
-                                            <td class="px-4 py-3">{{ $expense->revenueType?->nom ?? '—' }}</td>
+                                            <td class="px-4 py-3">
+                                                @php
+                                                    $sourceLabels = $expense->fundingSources
+                                                        ? $expense->fundingSources
+                                                            ->map(fn ($source) => $source->revenueType?->nom)
+                                                            ->filter()
+                                                            ->values()
+                                                        : collect();
+                                                @endphp
+                                                {{ $sourceLabels->isNotEmpty() ? $sourceLabels->join(', ') : ($expense->revenueType?->nom ?? '—') }}
+                                            </td>
                                             <td class="px-4 py-3">{{ $expense->fournisseur ?? '—' }}</td>
                                             <td class="px-4 py-3 text-right font-semibold text-rose-700 dark:text-rose-400">{{ $fmt($expense->montant) }}</td>
                                         </tr>

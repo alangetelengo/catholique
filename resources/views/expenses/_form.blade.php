@@ -32,6 +32,13 @@
         @error('montant')<p class="mt-1.5 text-sm text-red-600 dark:text-red-400">{{ $message }}</p>@enderror
     </div>
 
+    <div>
+        <label class="block text-sm font-semibold text-slate-800 dark:text-slate-200 mb-1.5">Libellé (description de la dépense) <span class="text-red-600">*</span></label>
+        <input type="text" name="libelle" id="libelle" value="{{ old('libelle', $expense->libelle) }}" class="{{ $field }}" placeholder="Ex: Achat de riz pour popote" required>
+        <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Décrivez précisément l'achat effectué</p>
+        @error('libelle')<p class="mt-1.5 text-sm text-red-600 dark:text-red-400">{{ $message }}</p>@enderror
+    </div>
+
     {{-- Section Sources de financement --}}
     <div class="revenue-form-grid__full">
         <div class="border-t border-slate-200 dark:border-slate-700 pt-4 mt-2">
@@ -66,8 +73,8 @@
                 @endphp
 
                 @forelse($existingSources as $index => $source)
-                    <div class="funding-source-row grid grid-cols-1 md:grid-cols-12 gap-3 mb-3 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg" data-index="{{ $index }}">
-                        <div class="md:col-span-6">
+                    <div class="funding-source-row grid grid-cols-1 md:grid-cols-3 gap-4 mb-3 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg" data-index="{{ $index }}">
+                        <div>
                             <label class="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Type de recette (source précise)</label>
                             <select name="funding_sources[{{ $index }}][revenue_type_id]" class="funding-source-type w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-2 text-sm" required>
                                 <option value="">-- Choisir une source --</option>
@@ -81,7 +88,7 @@
                                 @endforeach
                             </select>
                         </div>
-                        <div class="md:col-span-4">
+                        <div>
                             <label class="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Montant alloué (FCFA)</label>
                             <input type="number" 
                                 name="funding_sources[{{ $index }}][montant_alloue]" 
@@ -92,16 +99,17 @@
                                 placeholder="0" 
                                 required>
                         </div>
-                        <div class="md:col-span-2 flex items-end">
-                            <button type="button" class="remove-funding-source w-full px-3 py-2 text-sm font-medium text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/40">
+                        <div>
+                            <label class="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Action</label>
+                            <button type="button" class="remove-funding-source w-full px-3 py-2.5 text-sm font-medium text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/40">
                                 Retirer
                             </button>
                         </div>
                     </div>
                 @empty
                     {{-- Première source par défaut --}}
-                    <div class="funding-source-row grid grid-cols-1 md:grid-cols-12 gap-3 mb-3 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg" data-index="0">
-                        <div class="md:col-span-6">
+                    <div class="funding-source-row grid grid-cols-1 md:grid-cols-3 gap-4 mb-3 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg" data-index="0">
+                        <div>
                             <label class="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Type de recette (source précise)</label>
                             <select name="funding_sources[0][revenue_type_id]" class="funding-source-type w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-2 text-sm" required>
                                 <option value="">-- Choisir une source --</option>
@@ -114,7 +122,7 @@
                                 @endforeach
                             </select>
                         </div>
-                        <div class="md:col-span-4">
+                        <div>
                             <label class="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Montant alloué (FCFA)</label>
                             <input type="number" 
                                 name="funding_sources[0][montant_alloue]" 
@@ -124,8 +132,9 @@
                                 placeholder="0" 
                                 required>
                         </div>
-                        <div class="md:col-span-2 flex items-end">
-                            <button type="button" class="remove-funding-source w-full px-3 py-2 text-sm font-medium text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/40">
+                        <div>
+                            <label class="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Action</label>
+                            <button type="button" class="remove-funding-source w-full px-3 py-2.5 text-sm font-medium text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/40">
                                 Retirer
                             </button>
                         </div>
@@ -147,13 +156,6 @@
                 </div>
             </div>
         </div>
-    </div>
-
-    <div class="revenue-form-grid__full">
-        <label class="block text-sm font-semibold text-slate-800 dark:text-slate-200 mb-1.5">Libellé (description de la dépense) <span class="text-red-600">*</span></label>
-        <input type="text" name="libelle" id="libelle" value="{{ old('libelle', $expense->libelle) }}" class="{{ $field }}" placeholder="Ex: Achat de riz pour popote" required>
-        <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Décrivez précisément l'achat effectué</p>
-        @error('libelle')<p class="mt-1.5 text-sm text-red-600 dark:text-red-400">{{ $message }}</p>@enderror
     </div>
 
     <div class="hidden">
@@ -246,7 +248,6 @@
 </div>
 
 @push('scripts')
-@verbatim
 <script>
     (function () {
         let fundingSourceIndex = document.querySelectorAll('.funding-source-row').length;
@@ -254,26 +255,13 @@
         const addButton = document.getElementById('add-funding-source');
         const totalAlloueSpan = document.getElementById('total-alloue');
         const montantTotalInput = document.getElementById('montant_total');
-</script>
-@endverbatim
-<script>
-        const revenueTypesData = @json($revenueTypes->map(function($type) {
-            return [
-                'id' => $type->id,
-                'nom' => $type->nom,
-                'revenue_category_id' => $type->revenue_category_id,
-                'solde_disponible' => $type->solde_disponible ?? 0
-            ];
-        })->values());
-</script>
-@verbatim
-<script>
+        const revenueTypesData = @json($revenueTypes->values());
         const categorySelect = document.getElementById('revenue_category');
         let selectedCategoryId = categorySelect ? categorySelect.value : null;
 
         function createFundingSourceRow(index) {
             const row = document.createElement('div');
-            row.className = 'funding-source-row grid grid-cols-1 md:grid-cols-12 gap-3 mb-3 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg';
+            row.className = 'funding-source-row grid grid-cols-1 md:grid-cols-3 gap-4 mb-3 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg';
             row.dataset.index = index;
 
             let optionsHTML = '<option value="">-- Choisir une source --</option>';
@@ -288,13 +276,13 @@
             });
 
             row.innerHTML = `
-                <div class="md:col-span-6">
+                <div>
                     <label class="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Type de recette (source précise)</label>
                     <select name="funding_sources[${index}][revenue_type_id]" class="funding-source-type w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-2 text-sm" required>
                         ${optionsHTML}
                     </select>
                 </div>
-                <div class="md:col-span-4">
+                <div>
                     <label class="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Montant alloué (FCFA)</label>
                     <input type="number" 
                         name="funding_sources[${index}][montant_alloue]" 
@@ -304,8 +292,9 @@
                         placeholder="0" 
                         required>
                 </div>
-                <div class="md:col-span-2 flex items-end">
-                    <button type="button" class="remove-funding-source w-full px-3 py-2 text-sm font-medium text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/40">
+                <div>
+                    <label class="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Action</label>
+                    <button type="button" class="remove-funding-source w-full px-3 py-2.5 text-sm font-medium text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/40">
                         Retirer
                     </button>
                 </div>
@@ -445,5 +434,4 @@
         filterUsedSources();
     })();
 </script>
-@endverbatim
 @endpush

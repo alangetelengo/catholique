@@ -118,13 +118,11 @@ class FinancialStatisticsService
         $totalRevenues = (float) (clone $revQ)->sum('montant');
         $totalExpensesAll = (float) (clone $expQ)->sum('montant');
 
-        // Dépenses Popote = dépenses liées au type "subvention_popote"
-        $popoteType = RevenueType::where('code', 'subvention_popote')
-            ->when($paroisseId, fn ($q) => $q->where('paroisse_id', $paroisseId))
-            ->first();
-        $totalPopote = $popoteType
-            ? (float) (clone $expQ)->where('revenue_type_id', $popoteType->id)->sum('montant')
-            : 0;
+        // Dépenses Popote = allocations liées au type "subvention_popote"
+        $popoteTypeId = $this->popoteTypeId($paroisseId);
+        $totalPopote = $popoteTypeId
+            ? $this->sumAllocatedByType($fromStr, $toStr, $paroisseId, $popoteTypeId)
+            : 0.0;
         $solde = $totalRevenues - $totalPopote;
 
         $revenueByCategory = $this->revenueBreakdown($fromStr, $toStr, $paroisseId);
@@ -228,7 +226,7 @@ class FinancialStatisticsService
         $rows = $model
             ->whereBetween($dateColumn, [$from, $to])
             ->when($paroisseId !== null, fn (Builder $q) => $q->where('paroisse_id', $paroisseId))
-            ->selectRaw("{$expr} as ym, SUM(montant) as total")
+            ->selectRaw("{$expr} as ym, SUM(efs.montant_alloue) as total")
             ->groupByRaw($expr)
             ->orderBy('ym')
             ->get();
@@ -241,20 +239,19 @@ class FinancialStatisticsService
      */
     private function monthlyPopoteExpenses(string $from, string $to, ?int $paroisseId): array
     {
-        $popoteType = RevenueType::where('code', 'subvention_popote')
-            ->when($paroisseId, fn ($q) => $q->where('paroisse_id', $paroisseId))
-            ->first();
-
-        if (! $popoteType) {
+        $popoteTypeId = $this->popoteTypeId($paroisseId);
+        if (! $popoteTypeId) {
             return $this->fillMonthRange($from, $to, collect());
         }
 
         $expr = $this->monthSqlExpression('date_depense');
-        $rows = Expense::query()
-            ->whereBetween('date_depense', [$from, $to])
-            ->where('revenue_type_id', $popoteType->id)
-            ->when($paroisseId !== null, fn (Builder $q) => $q->where('paroisse_id', $paroisseId))
-            ->selectRaw("{$expr} as ym, SUM(montant) as total")
+        $rows = DB::table('expense_funding_sources as efs')
+            ->join('expenses as e', 'e.id', '=', 'efs.expense_id')
+            ->whereBetween('e.date_depense', [$from, $to])
+            ->whereNull('e.deleted_at')
+            ->where('efs.revenue_type_id', $popoteTypeId)
+            ->when($paroisseId !== null, fn ($q) => $q->where('e.paroisse_id', $paroisseId))
+            ->selectRaw("{$expr} as ym, SUM(efs.montant_alloue) as total")
             ->groupByRaw($expr)
             ->orderBy('ym')
             ->get();
@@ -267,15 +264,14 @@ class FinancialStatisticsService
      */
     private function monthlyNonPopoteExpenses(string $from, string $to, ?int $paroisseId): array
     {
-        $popoteType = RevenueType::where('code', 'subvention_popote')
-            ->when($paroisseId, fn ($q) => $q->where('paroisse_id', $paroisseId))
-            ->first();
-
+        $popoteTypeId = $this->popoteTypeId($paroisseId);
         $expr = $this->monthSqlExpression('date_depense');
-        $rows = Expense::query()
-            ->whereBetween('date_depense', [$from, $to])
-            ->when($popoteType, fn (Builder $q) => $q->where('revenue_type_id', '!=', $popoteType->id))
-            ->when($paroisseId !== null, fn (Builder $q) => $q->where('paroisse_id', $paroisseId))
+        $rows = DB::table('expense_funding_sources as efs')
+            ->join('expenses as e', 'e.id', '=', 'efs.expense_id')
+            ->whereBetween('e.date_depense', [$from, $to])
+            ->whereNull('e.deleted_at')
+            ->when($popoteTypeId !== null, fn ($q) => $q->where('efs.revenue_type_id', '!=', $popoteTypeId))
+            ->when($paroisseId !== null, fn ($q) => $q->where('e.paroisse_id', $paroisseId))
             ->selectRaw("{$expr} as ym, SUM(montant) as total")
             ->groupByRaw($expr)
             ->orderBy('ym')
@@ -364,13 +360,11 @@ class FinancialStatisticsService
         $totalRevenues = (float) (clone $revQ)->sum('montant');
         $totalExpensesAll = (float) (clone $expQ)->sum('montant');
 
-        // Dépenses Popote = dépenses liées au type "subvention_popote"
-        $popoteType = RevenueType::where('code', 'subvention_popote')
-            ->when($paroisseId, fn ($q) => $q->where('paroisse_id', $paroisseId))
-            ->first();
-        $totalPopote = $popoteType
-            ? (float) (clone $expQ)->where('revenue_type_id', $popoteType->id)->sum('montant')
-            : 0;
+        // Dépenses Popote = allocations liées au type "subvention_popote"
+        $popoteTypeId = $this->popoteTypeId($paroisseId);
+        $totalPopote = $popoteTypeId
+            ? $this->sumAllocatedByType($fromStr, $toStr, $paroisseId, $popoteTypeId)
+            : 0.0;
 
         return [
             'total_revenues' => $totalRevenues,
@@ -431,15 +425,14 @@ class FinancialStatisticsService
             ->groupByRaw($dayExprRev)
             ->pluck('total', 'd');
 
-        $popoteType = RevenueType::where('code', 'subvention_popote')
-            ->when($paroisseId, fn ($q) => $q->where('paroisse_id', $paroisseId))
-            ->first();
-
-        $popRows = Expense::query()
-            ->whereBetween('date_depense', [$fromStr, $toStr])
-            ->when($popoteType, fn (Builder $q) => $q->where('revenue_type_id', $popoteType->id))
-            ->when($paroisseId !== null, fn (Builder $q) => $q->where('paroisse_id', $paroisseId))
-            ->selectRaw("{$dayExprExp} as d, SUM(montant) as total")
+        $popoteTypeId = $this->popoteTypeId($paroisseId);
+        $popRows = DB::table('expense_funding_sources as efs')
+            ->join('expenses as e', 'e.id', '=', 'efs.expense_id')
+            ->whereBetween('e.date_depense', [$fromStr, $toStr])
+            ->whereNull('e.deleted_at')
+            ->when($popoteTypeId !== null, fn ($q) => $q->where('efs.revenue_type_id', $popoteTypeId))
+            ->when($paroisseId !== null, fn ($q) => $q->where('e.paroisse_id', $paroisseId))
+            ->selectRaw("{$dayExprExp} as d, SUM(efs.montant_alloue) as total")
             ->groupByRaw($dayExprExp)
             ->pluck('total', 'd');
 
@@ -461,6 +454,25 @@ class FinancialStatisticsService
             'revenues' => $revenues,
             'popote' => $popote,
         ];
+    }
+
+    private function popoteTypeId(?int $paroisseId): ?int
+    {
+        return RevenueType::query()
+            ->where('code', self::POPOTE_TYPE_CODE)
+            ->when($paroisseId, fn ($q) => $q->where('paroisse_id', $paroisseId))
+            ->value('id');
+    }
+
+    private function sumAllocatedByType(string $from, string $to, ?int $paroisseId, int $revenueTypeId): float
+    {
+        return (float) DB::table('expense_funding_sources as efs')
+            ->join('expenses as e', 'e.id', '=', 'efs.expense_id')
+            ->whereBetween('e.date_depense', [$from, $to])
+            ->whereNull('e.deleted_at')
+            ->where('efs.revenue_type_id', $revenueTypeId)
+            ->when($paroisseId !== null, fn ($q) => $q->where('e.paroisse_id', $paroisseId))
+            ->sum('efs.montant_alloue');
     }
 
     private function daySqlExpression(string $column): string
