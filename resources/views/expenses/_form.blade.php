@@ -74,6 +74,7 @@
                                 @foreach ($revenueTypes as $type)
                                     <option value="{{ $type->id }}" 
                                         data-solde="{{ $type->solde_disponible ?? 0 }}"
+                                        data-category-id="{{ $type->revenue_category_id }}"
                                         {{ (is_array($source) ? ($source['revenue_type_id'] ?? '') : ($source->revenue_type_id ?? '')) == $type->id ? 'selected' : '' }}>
                                         {{ $type->nom }} ({{ number_format($type->solde_disponible ?? 0, 0, ',', ' ') }} FCFA disponible)
                                     </option>
@@ -105,7 +106,9 @@
                             <select name="funding_sources[0][revenue_type_id]" class="funding-source-type w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-2 text-sm" required>
                                 <option value="">-- Choisir une source --</option>
                                 @foreach ($revenueTypes as $type)
-                                    <option value="{{ $type->id }}" data-solde="{{ $type->solde_disponible ?? 0 }}">
+                                    <option value="{{ $type->id }}" 
+                                        data-solde="{{ $type->solde_disponible ?? 0 }}"
+                                        data-category-id="{{ $type->revenue_category_id }}">
                                         {{ $type->nom }} ({{ number_format($type->solde_disponible ?? 0, 0, ',', ' ') }} FCFA disponible)
                                     </option>
                                 @endforeach
@@ -254,8 +257,12 @@
         const revenueTypesData = @json($revenueTypes->map(fn($type) => [
             'id' => $type->id,
             'nom' => $type->nom,
+            'revenue_category_id' => $type->revenue_category_id,
             'solde_disponible' => $type->solde_disponible ?? 0
         ])->values());
+
+        const categorySelect = document.getElementById('revenue_category');
+        let selectedCategoryId = categorySelect ? categorySelect.value : null;
 
         function createFundingSourceRow(index) {
             const row = document.createElement('div');
@@ -264,8 +271,13 @@
 
             let optionsHTML = '<option value="">-- Choisir une source --</option>';
             revenueTypesData.forEach(type => {
+                // Filtrer par catégorie si une catégorie est sélectionnée
+                if (selectedCategoryId && type.revenue_category_id != selectedCategoryId) {
+                    return;
+                }
+                
                 const formatted = new Intl.NumberFormat('fr-FR').format(type.solde_disponible);
-                optionsHTML += `<option value="${type.id}" data-solde="${type.solde_disponible}">${type.nom} (${formatted} FCFA disponible)</option>`;
+                optionsHTML += `<option value="${type.id}" data-solde="${type.solde_disponible}" data-category-id="${type.revenue_category_id}">${type.nom} (${formatted} FCFA disponible)</option>`;
             });
 
             row.innerHTML = `
@@ -337,6 +349,42 @@
                     }
                 });
             });
+        }
+
+        function filterTypesByCategory() {
+            selectedCategoryId = categorySelect ? categorySelect.value : null;
+            
+            // Filtrer toutes les sources de financement existantes
+            document.querySelectorAll('.funding-source-type').forEach(select => {
+                const currentValue = select.value;
+                
+                Array.from(select.options).forEach(option => {
+                    if (!option.value) {
+                        option.hidden = false;
+                        return;
+                    }
+                    
+                    const optCategoryId = option.getAttribute('data-category-id');
+                    if (selectedCategoryId && optCategoryId != selectedCategoryId) {
+                        option.hidden = true;
+                        if (option.value === currentValue) {
+                            select.value = '';
+                        }
+                    } else {
+                        option.hidden = false;
+                    }
+                });
+            });
+
+            updateTotalAlloue();
+            filterUsedSources();
+        }
+
+        // Event listener pour le changement de catégorie
+        if (categorySelect) {
+            categorySelect.addEventListener('change', filterTypesByCategory);
+            // Filtrer initialement
+            filterTypesByCategory();
         }
 
         // Ajouter une source
