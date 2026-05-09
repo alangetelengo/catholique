@@ -130,7 +130,7 @@
                     <tr class="text-left text-slate-700 dark:text-slate-200">
                         <th class="px-4 py-3 font-semibold">Date</th>
                         <th class="px-4 py-3 font-semibold">Catégorie</th>
-                        <th class="px-4 py-3 font-semibold">Type</th>
+                        <th class="px-4 py-3 font-semibold">Sources de financement</th>
                         <th class="px-4 py-3 font-semibold">Montant</th>
                         <th class="px-4 py-3 font-semibold">Paiement</th>
                         <th class="px-4 py-3 font-semibold">Fournisseur</th>
@@ -145,8 +145,22 @@
                             <td class="px-4 py-3">
                                 {{ $expense->revenueCategory?->nom ?? '-' }}
                             </td>
-                            <td class="px-4 py-3">
-                                {{ $expense->revenueType?->nom ?? '-' }}
+                            <td class="px-4 py-3 text-xs">
+                                @if($expense->fundingSources->isNotEmpty())
+                                    <div class="space-y-1">
+                                        @foreach($expense->fundingSources as $source)
+                                            <div class="inline-flex items-center gap-1 bg-emerald-50 dark:bg-emerald-900/20 px-2 py-0.5 rounded">
+                                                <span class="text-emerald-700 dark:text-emerald-300">{{ $source->revenueType?->nom ?? '-' }}</span>
+                                                <span class="text-emerald-600 dark:text-emerald-400 font-semibold">({{ number_format($source->montant_alloue, 0, ',', ' ') }})</span>
+                                            </div>
+                                        @endforeach
+                                    </div>
+                                @elseif($expense->revenueType)
+                                    {{-- Ancien système --}}
+                                    <span class="text-slate-500 dark:text-slate-400 italic">{{ $expense->revenueType->nom }}</span>
+                                @else
+                                    <span class="text-slate-400">-</span>
+                                @endif
                             </td>
                             <td class="px-4 py-3 font-semibold">{{ $formatFcfa((float) $expense->montant) }}</td>
                             <td class="px-4 py-3">

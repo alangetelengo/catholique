@@ -16,24 +16,8 @@
                 </option>
             @endforeach
         </select>
-        <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">D'où proviennent les fonds pour cette dépense ?</p>
+        <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Catégorie générale de la dépense</p>
         @error('revenue_category_id')<p class="mt-1.5 text-sm text-red-600 dark:text-red-400">{{ $message }}</p>@enderror
-    </div>
-
-    <div>
-        <label class="block text-sm font-semibold text-slate-800 dark:text-slate-200 mb-1.5">Type de recette (source précise) <span class="text-red-600">*</span></label>
-        <select name="revenue_type_id" id="revenue_type" class="{{ $field }}" required>
-            <option value="">-- Choisir le type --</option>
-            @foreach ($revenueTypes as $type)
-                <option value="{{ $type->id }}" 
-                    data-category-id="{{ $type->revenue_category_id }}"
-                    {{ (string) old('revenue_type_id', $expense->revenue_type_id) === (string) $type->id ? 'selected' : '' }}>
-                    {{ $type->nom }}
-                </option>
-            @endforeach
-        </select>
-        <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Type précis de la recette source</p>
-        @error('revenue_type_id')<p class="mt-1.5 text-sm text-red-600 dark:text-red-400">{{ $message }}</p>@enderror
     </div>
 
     <div>
@@ -43,9 +27,123 @@
     </div>
 
     <div>
-        <label class="block text-sm font-semibold text-slate-800 dark:text-slate-200 mb-1.5">Montant (FCFA) <span class="text-red-600">*</span></label>
-        <input type="text" name="montant" value="{{ old('montant', $expense->montant) }}" class="{{ $field }} js-montant-fcfa" placeholder="10 000 fcfa" required>
+        <label class="block text-sm font-semibold text-slate-800 dark:text-slate-200 mb-1.5">Montant total (FCFA) <span class="text-red-600">*</span></label>
+        <input type="text" name="montant" id="montant_total" value="{{ old('montant', $expense->montant) }}" class="{{ $field }} js-montant-fcfa" placeholder="10 000 fcfa" required>
         @error('montant')<p class="mt-1.5 text-sm text-red-600 dark:text-red-400">{{ $message }}</p>@enderror
+    </div>
+
+    {{-- Section Sources de financement --}}
+    <div class="revenue-form-grid__full">
+        <div class="border-t border-slate-200 dark:border-slate-700 pt-4 mt-2">
+            <h3 class="text-sm font-semibold text-slate-800 dark:text-slate-200 mb-3 flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                </svg>
+                Sources de financement <span class="text-red-600">*</span>
+            </h3>
+            <p class="text-xs text-slate-600 dark:text-slate-400 mb-4">
+                Indiquez d'où proviennent les fonds pour cette dépense. Vous pouvez utiliser plusieurs sources si nécessaire.
+            </p>
+
+            @error('funding_sources')
+                <div class="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+                    @if(is_array($message))
+                        @foreach($message as $error)
+                            <p class="text-sm text-red-600 dark:text-red-400">• {{ $error }}</p>
+                        @endforeach
+                    @else
+                        <p class="text-sm text-red-600 dark:text-red-400">{{ $message }}</p>
+                    @endif
+                </div>
+            @enderror
+
+            <div id="funding-sources-container">
+                @php
+                    $existingSources = old('funding_sources', $expense->fundingSources ?? collect());
+                    if (!is_array($existingSources) && !($existingSources instanceof \Illuminate\Support\Collection)) {
+                        $existingSources = [];
+                    }
+                @endphp
+
+                @forelse($existingSources as $index => $source)
+                    <div class="funding-source-row grid grid-cols-1 md:grid-cols-12 gap-3 mb-3 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg" data-index="{{ $index }}">
+                        <div class="md:col-span-6">
+                            <label class="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Type de recette (source précise)</label>
+                            <select name="funding_sources[{{ $index }}][revenue_type_id]" class="funding-source-type w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-2 text-sm" required>
+                                <option value="">-- Choisir une source --</option>
+                                @foreach ($revenueTypes as $type)
+                                    <option value="{{ $type->id }}" 
+                                        data-solde="{{ $type->solde_disponible ?? 0 }}"
+                                        {{ (is_array($source) ? ($source['revenue_type_id'] ?? '') : ($source->revenue_type_id ?? '')) == $type->id ? 'selected' : '' }}>
+                                        {{ $type->nom }} ({{ number_format($type->solde_disponible ?? 0, 0, ',', ' ') }} FCFA disponible)
+                                    </option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div class="md:col-span-4">
+                            <label class="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Montant alloué (FCFA)</label>
+                            <input type="number" 
+                                name="funding_sources[{{ $index }}][montant_alloue]" 
+                                class="funding-source-amount w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-2 text-sm" 
+                                step="0.01" 
+                                min="0"
+                                value="{{ is_array($source) ? ($source['montant_alloue'] ?? '') : ($source->montant_alloue ?? '') }}"
+                                placeholder="0" 
+                                required>
+                        </div>
+                        <div class="md:col-span-2 flex items-end">
+                            <button type="button" class="remove-funding-source w-full px-3 py-2 text-sm font-medium text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/40">
+                                Retirer
+                            </button>
+                        </div>
+                    </div>
+                @empty
+                    {{-- Première source par défaut --}}
+                    <div class="funding-source-row grid grid-cols-1 md:grid-cols-12 gap-3 mb-3 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg" data-index="0">
+                        <div class="md:col-span-6">
+                            <label class="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Type de recette (source précise)</label>
+                            <select name="funding_sources[0][revenue_type_id]" class="funding-source-type w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-2 text-sm" required>
+                                <option value="">-- Choisir une source --</option>
+                                @foreach ($revenueTypes as $type)
+                                    <option value="{{ $type->id }}" data-solde="{{ $type->solde_disponible ?? 0 }}">
+                                        {{ $type->nom }} ({{ number_format($type->solde_disponible ?? 0, 0, ',', ' ') }} FCFA disponible)
+                                    </option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div class="md:col-span-4">
+                            <label class="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Montant alloué (FCFA)</label>
+                            <input type="number" 
+                                name="funding_sources[0][montant_alloue]" 
+                                class="funding-source-amount w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-2 text-sm" 
+                                step="0.01" 
+                                min="0"
+                                placeholder="0" 
+                                required>
+                        </div>
+                        <div class="md:col-span-2 flex items-end">
+                            <button type="button" class="remove-funding-source w-full px-3 py-2 text-sm font-medium text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/40">
+                                Retirer
+                            </button>
+                        </div>
+                    </div>
+                @endforelse
+            </div>
+
+            <div class="flex items-center justify-between mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
+                <button type="button" id="add-funding-source" class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-lg hover:bg-emerald-100 dark:hover:bg-emerald-900/40">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                    </svg>
+                    Ajouter une source
+                </button>
+
+                <div class="text-sm">
+                    <span class="text-slate-600 dark:text-slate-400">Total alloué:</span>
+                    <span id="total-alloue" class="ml-2 font-bold text-lg text-slate-900 dark:text-slate-100">0 FCFA</span>
+                </div>
+            </div>
+        </div>
     </div>
 
     <div class="revenue-form-grid__full">
@@ -147,35 +245,149 @@
 @push('scripts')
 <script>
     (function () {
-        const categorySelect = document.getElementById('revenue_category');
-        const typeSelect = document.getElementById('revenue_type');
+        let fundingSourceIndex = document.querySelectorAll('.funding-source-row').length;
+        const container = document.getElementById('funding-sources-container');
+        const addButton = document.getElementById('add-funding-source');
+        const totalAlloueSpan = document.getElementById('total-alloue');
+        const montantTotalInput = document.getElementById('montant_total');
 
-        function filterTypesByCategory() {
-            if (!categorySelect || !typeSelect) return;
-            
-            const selectedCategoryId = categorySelect.value;
-            const allOptions = Array.from(typeSelect.options);
+        const revenueTypesData = @json($revenueTypes->map(fn($type) => [
+            'id' => $type->id,
+            'nom' => $type->nom,
+            'solde_disponible' => $type->solde_disponible ?? 0
+        ])->values());
 
-            allOptions.forEach(opt => {
-                if (!opt.value) {
-                    opt.hidden = false;
-                    return;
-                }
-                const optCategoryId = opt.getAttribute('data-category-id');
-                opt.hidden = optCategoryId !== selectedCategoryId;
+        function createFundingSourceRow(index) {
+            const row = document.createElement('div');
+            row.className = 'funding-source-row grid grid-cols-1 md:grid-cols-12 gap-3 mb-3 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg';
+            row.dataset.index = index;
+
+            let optionsHTML = '<option value="">-- Choisir une source --</option>';
+            revenueTypesData.forEach(type => {
+                const formatted = new Intl.NumberFormat('fr-FR').format(type.solde_disponible);
+                optionsHTML += `<option value="${type.id}" data-solde="${type.solde_disponible}">${type.nom} (${formatted} FCFA disponible)</option>`;
             });
 
-            // Réinitialiser la sélection si l'option n'est plus visible
-            const selectedOption = typeSelect.querySelector(`option[value="${typeSelect.value}"]`);
-            if (selectedOption && selectedOption.hidden) {
-                typeSelect.value = '';
+            row.innerHTML = `
+                <div class="md:col-span-6">
+                    <label class="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Type de recette (source précise)</label>
+                    <select name="funding_sources[${index}][revenue_type_id]" class="funding-source-type w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-2 text-sm" required>
+                        ${optionsHTML}
+                    </select>
+                </div>
+                <div class="md:col-span-4">
+                    <label class="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Montant alloué (FCFA)</label>
+                    <input type="number" 
+                        name="funding_sources[${index}][montant_alloue]" 
+                        class="funding-source-amount w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-2 text-sm" 
+                        step="0.01" 
+                        min="0"
+                        placeholder="0" 
+                        required>
+                </div>
+                <div class="md:col-span-2 flex items-end">
+                    <button type="button" class="remove-funding-source w-full px-3 py-2 text-sm font-medium text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/40">
+                        Retirer
+                    </button>
+                </div>
+            `;
+
+            return row;
+        }
+
+        function updateTotalAlloue() {
+            let total = 0;
+            document.querySelectorAll('.funding-source-amount').forEach(input => {
+                const value = parseFloat(input.value) || 0;
+                total += value;
+            });
+
+            const formatted = new Intl.NumberFormat('fr-FR').format(total);
+            totalAlloueSpan.textContent = `${formatted} FCFA`;
+
+            // Vérifier si le total correspond au montant
+            const montantTotal = parseFloat(montantTotalInput.value.replace(/\s/g, '').replace(',', '.')) || 0;
+            if (Math.abs(total - montantTotal) > 0.01 && total > 0) {
+                totalAlloueSpan.classList.add('text-red-600', 'dark:text-red-400');
+                totalAlloueSpan.classList.remove('text-emerald-600', 'dark:text-emerald-400', 'text-slate-900', 'dark:text-slate-100');
+            } else if (Math.abs(total - montantTotal) <= 0.01 && total > 0) {
+                totalAlloueSpan.classList.add('text-emerald-600', 'dark:text-emerald-400');
+                totalAlloueSpan.classList.remove('text-red-600', 'dark:text-red-400', 'text-slate-900', 'dark:text-slate-100');
+            } else {
+                totalAlloueSpan.classList.add('text-slate-900', 'dark:text-slate-100');
+                totalAlloueSpan.classList.remove('text-red-600', 'dark:text-red-400', 'text-emerald-600', 'dark:text-emerald-400');
             }
         }
 
-        if (categorySelect) {
-            categorySelect.addEventListener('change', filterTypesByCategory);
-            filterTypesByCategory(); // Initial filter
+        function filterUsedSources() {
+            const usedTypes = new Set();
+            document.querySelectorAll('.funding-source-type').forEach(select => {
+                if (select.value) {
+                    usedTypes.add(select.value);
+                }
+            });
+
+            document.querySelectorAll('.funding-source-type').forEach(select => {
+                const currentValue = select.value;
+                Array.from(select.options).forEach(option => {
+                    if (option.value && option.value !== currentValue && usedTypes.has(option.value)) {
+                        option.disabled = true;
+                    } else {
+                        option.disabled = false;
+                    }
+                });
+            });
         }
+
+        // Ajouter une source
+        if (addButton) {
+            addButton.addEventListener('click', () => {
+                const newRow = createFundingSourceRow(fundingSourceIndex);
+                container.appendChild(newRow);
+                fundingSourceIndex++;
+                updateTotalAlloue();
+                filterUsedSources();
+            });
+        }
+
+        // Délégation d'événements pour retirer une source
+        if (container) {
+            container.addEventListener('click', (e) => {
+                if (e.target.classList.contains('remove-funding-source')) {
+                    const row = e.target.closest('.funding-source-row');
+                    if (container.querySelectorAll('.funding-source-row').length > 1) {
+                        row.remove();
+                        updateTotalAlloue();
+                        filterUsedSources();
+                    } else {
+                        alert('Vous devez avoir au moins une source de financement.');
+                    }
+                }
+            });
+
+            // Écouter les changements de montant
+            container.addEventListener('input', (e) => {
+                if (e.target.classList.contains('funding-source-amount')) {
+                    updateTotalAlloue();
+                }
+            });
+
+            // Écouter les changements de type
+            container.addEventListener('change', (e) => {
+                if (e.target.classList.contains('funding-source-type')) {
+                    filterUsedSources();
+                }
+            });
+        }
+
+        // Écouter les changements du montant total
+        if (montantTotalInput) {
+            montantTotalInput.addEventListener('input', updateTotalAlloue);
+        }
+
+        // Initialiser
+        updateTotalAlloue();
+        filterUsedSources();
     })();
 </script>
 @endpush

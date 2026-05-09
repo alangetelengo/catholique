@@ -36,4 +36,3 @@ class RevenueType extends Model
         return $this->hasMany(Revenue::class);
     }
 }
-

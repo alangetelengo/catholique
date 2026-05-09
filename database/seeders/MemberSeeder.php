@@ -4,7 +4,6 @@ namespace Database\Seeders;
 
 use App\Models\Member;
 use App\Models\Paroisse;
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
 class MemberSeeder extends Seeder
@@ -18,6 +17,7 @@ class MemberSeeder extends Seeder
 
         if (! $paroisse) {
             $this->command?->warn('Aucune paroisse trouvée, MemberSeeder ignoré.');
+
             return;
         }
 

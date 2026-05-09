@@ -33,6 +33,7 @@ class InventaireMagasin extends Model
         if ($this->quantite_min_alerte === null) {
             return false;
         }
+
         return $this->quantite <= $this->quantite_min_alerte;
     }
 }

@@ -15,4 +15,3 @@ return new class extends Migration
         DB::statement("ALTER TABLE financial_reports MODIFY COLUMN periode_type ENUM('semaine', 'dimanche', 'total', 'revenues_by_category') NOT NULL DEFAULT 'total'");
     }
 };
-

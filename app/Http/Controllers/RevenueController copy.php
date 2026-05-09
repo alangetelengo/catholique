@@ -2,18 +2,18 @@
 
 namespace App\Http\Controllers;
 
-use Throwable;
-use Carbon\Carbon;
-use App\Models\Revenue;
-use App\Models\Paroisse;
-use Illuminate\View\View;
-use App\Traits\LogsErrors;
 use App\Helpers\FlashAlert;
-use App\Models\RevenueType;
-use Illuminate\Http\Request;
+use App\Models\Paroisse;
+use App\Models\Revenue;
 use App\Models\RevenueCategory;
+use App\Models\RevenueType;
+use App\Traits\LogsErrors;
+use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
+use Illuminate\View\View;
+use Throwable;
 
 class RevenueController extends Controller
 {
@@ -121,7 +121,7 @@ class RevenueController extends Controller
             : RevenueCategory::with('types')->orderBy('ordre')->get();
 
         return view('revenues.create', [
-            'revenue' => new Revenue(),
+            'revenue' => new Revenue,
             'paroisses' => $paroisses,
             'categories' => $categories,
         ]);
@@ -182,7 +182,7 @@ class RevenueController extends Controller
                 $expectedJour = $weekdayMap[Carbon::parse($validated['date_recette'])->dayOfWeek] ?? null;
                 if ($expectedJour !== null && $jourData['jour_semaine'] !== $expectedJour) {
                     throw ValidationException::withMessages([
-                        'jour_semaine' => 'Le jour choisi ne correspond pas à la date de la recette (devrait être ' . ucfirst($expectedJour) . ').',
+                        'jour_semaine' => 'Le jour choisi ne correspond pas à la date de la recette (devrait être '.ucfirst($expectedJour).').',
                     ]);
                 }
                 $validated['mois_location'] = null;
@@ -206,7 +206,7 @@ class RevenueController extends Controller
             }
 
             // Référence paiement générée automatiquement par le contrôleur
-            $validated['reference_paiement'] = 'REV-' . now()->format('YmdHis') . '-' . strtoupper(str()->random(4));
+            $validated['reference_paiement'] = 'REV-'.now()->format('YmdHis').'-'.strtoupper(str()->random(4));
 
             $validated['created_by'] = $user->id;
 
@@ -310,7 +310,7 @@ class RevenueController extends Controller
                 $expectedJour = $weekdayMap[Carbon::parse($validated['date_recette'])->dayOfWeek] ?? null;
                 if ($expectedJour !== null && $jourData['jour_semaine'] !== $expectedJour) {
                     throw ValidationException::withMessages([
-                        'jour_semaine' => 'Le jour choisi ne correspond pas à la date de la recette (devrait être ' . ucfirst($expectedJour) . ').',
+                        'jour_semaine' => 'Le jour choisi ne correspond pas à la date de la recette (devrait être '.ucfirst($expectedJour).').',
                     ]);
                 }
                 $validated['mois_location'] = null;
@@ -335,7 +335,7 @@ class RevenueController extends Controller
 
             // Référence paiement : générer uniquement si pas encore définie
             if (empty($revenue->reference_paiement)) {
-                $validated['reference_paiement'] = 'REV-' . now()->format('YmdHis') . '-' . strtoupper(str()->random(4));
+                $validated['reference_paiement'] = 'REV-'.now()->format('YmdHis').'-'.strtoupper(str()->random(4));
             }
 
             $revenue->update($validated);
@@ -383,10 +383,9 @@ class RevenueController extends Controller
             return '';
         }
         if (str_starts_with($digits, '242')) {
-            return '242' . substr($digits, 3);
+            return '242'.substr($digits, 3);
         }
 
-        return '242' . $digits;
+        return '242'.$digits;
     }
 }
-

@@ -35,4 +35,3 @@ class RevenueCategory extends Model
         return $this->hasMany(Revenue::class);
     }
 }
-

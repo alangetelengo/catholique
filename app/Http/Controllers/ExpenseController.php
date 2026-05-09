@@ -4,13 +4,15 @@ namespace App\Http\Controllers;
 
 use App\Models\Expense;
 use App\Models\RevenueCategory;
-use App\Models\RevenueType;
+use App\Services\BudgetService;
 use App\Support\PaginationPerPage;
 use App\Traits\LogsErrors;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 use Throwable;
 
@@ -18,11 +20,15 @@ class ExpenseController extends Controller
 {
     use LogsErrors;
 
+    public function __construct(
+        protected BudgetService $budgetService
+    ) {}
+
     public function index(Request $request): View
     {
         try {
             $expenses = $this->expensesIndexFilteredQuery($request)
-                ->with(['createdBy', 'revenueCategory', 'revenueType'])
+                ->with(['createdBy', 'revenueCategory', 'fundingSources.revenueType'])
                 ->orderByDesc('date_depense')
                 ->orderByDesc('id')
                 ->paginate(PaginationPerPage::resolve($request))
@@ -57,12 +63,8 @@ class ExpenseController extends Controller
             ->orderBy('nom')
             ->get();
 
-        // Récupérer tous les types de recettes
-        $revenueTypes = RevenueType::where('paroisse_id', $userParoisseId)
-            ->where('actif', true)
-            ->orderBy('ordre')
-            ->orderBy('nom')
-            ->get();
+        // Récupérer les types de recettes avec solde disponible > 0
+        $revenueTypes = $this->budgetService->getSourcesAvecSolde($userParoisseId);
 
         $expense = new Expense([
             'date_depense' => now()->toDateString(),
@@ -78,7 +80,26 @@ class ExpenseController extends Controller
             $validated = $this->validateExpense($request);
             $validated['created_by'] = $request->user()?->id;
 
-            $expense = Expense::create($validated);
+            $fundingSources = $request->input('funding_sources', []);
+
+            DB::transaction(function () use ($validated, $fundingSources, &$expense) {
+                // Créer la dépense
+                $expense = Expense::create($validated);
+
+                // Créer les sources de financement
+                if (! empty($fundingSources)) {
+                    foreach ($fundingSources as $index => $source) {
+                        if (! empty($source['revenue_type_id']) && ! empty($source['montant_alloue'])) {
+                            $expense->fundingSources()->create([
+                                'revenue_type_id' => $source['revenue_type_id'],
+                                'montant_alloue' => $source['montant_alloue'],
+                                'ordre' => $index + 1,
+                            ]);
+                        }
+                    }
+                }
+            });
+
             $this->logInfo('Dépense créée', ['expense_id' => $expense->id, 'montant' => $expense->montant]);
 
             return redirect()->route('expenses.index')->with('success', 'Dépense enregistrée avec succès.');
@@ -107,12 +128,11 @@ class ExpenseController extends Controller
             ->orderBy('nom')
             ->get();
 
-        // Récupérer tous les types de recettes
-        $revenueTypes = RevenueType::where('paroisse_id', $userParoisseId)
-            ->where('actif', true)
-            ->orderBy('ordre')
-            ->orderBy('nom')
-            ->get();
+        // Récupérer les types de recettes avec solde disponible > 0 (en excluant la dépense actuelle)
+        $revenueTypes = $this->budgetService->getSourcesAvecSolde($userParoisseId, $expense);
+
+        // Charger les sources de financement existantes
+        $expense->load('fundingSources.revenueType');
 
         return view('expenses.edit', compact('expense', 'revenueCategories', 'revenueTypes'));
     }
@@ -120,12 +140,34 @@ class ExpenseController extends Controller
     public function update(Request $request, Expense $expense): RedirectResponse
     {
         try {
-            $validated = $this->validateExpense($request);
+            $validated = $this->validateExpense($request, $expense);
             if (empty($expense->created_by) && $request->user()?->id) {
                 $validated['created_by'] = $request->user()?->id;
             }
 
-            $expense->update($validated);
+            $fundingSources = $request->input('funding_sources', []);
+
+            DB::transaction(function () use ($expense, $validated, $fundingSources) {
+                // Mettre à jour la dépense
+                $expense->update($validated);
+
+                // Supprimer les anciennes sources
+                $expense->fundingSources()->delete();
+
+                // Créer les nouvelles sources de financement
+                if (! empty($fundingSources)) {
+                    foreach ($fundingSources as $index => $source) {
+                        if (! empty($source['revenue_type_id']) && ! empty($source['montant_alloue'])) {
+                            $expense->fundingSources()->create([
+                                'revenue_type_id' => $source['revenue_type_id'],
+                                'montant_alloue' => $source['montant_alloue'],
+                                'ordre' => $index + 1,
+                            ]);
+                        }
+                    }
+                }
+            });
+
             $this->logInfo('Dépense mise à jour', ['expense_id' => $expense->id, 'montant' => $expense->montant]);
 
             return redirect()->route('expenses.index')->with('success', 'Dépense mise à jour.');
@@ -184,11 +226,10 @@ class ExpenseController extends Controller
         return $query;
     }
 
-    private function validateExpense(Request $request): array
+    private function validateExpense(Request $request, ?Expense $expense = null): array
     {
         $validated = $request->validate([
             'revenue_category_id' => ['required', 'integer', 'exists:revenue_categories,id'],
-            'revenue_type_id' => ['required', 'integer', 'exists:revenue_types,id'],
             'date_depense' => ['required', 'date'],
             'montant' => ['required', 'numeric', 'min:0'],
             'libelle' => ['required', 'string', 'max:500'],
@@ -199,7 +240,36 @@ class ExpenseController extends Controller
             'piece_facture' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:5120'],
             'piece_recu' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:5120'],
             'piece_autre' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:5120'],
+            'funding_sources' => ['required', 'array', 'min:1'],
+            'funding_sources.*.revenue_type_id' => ['required', 'integer', 'exists:revenue_types,id'],
+            'funding_sources.*.montant_alloue' => ['required', 'numeric', 'min:0'],
         ]);
+
+        // Valider les sources de financement avec le BudgetService
+        $fundingSources = $request->input('funding_sources', []);
+        $validation = $this->budgetService->validateFundingSources($fundingSources, $expense);
+
+        if (! $validation['valid']) {
+            throw ValidationException::withMessages([
+                'funding_sources' => $validation['errors'],
+            ]);
+        }
+
+        // Vérifier que le total des sources = montant de la dépense
+        $montantDepense = (float) $validated['montant'];
+        $totalAlloue = $validation['total_alloue'];
+
+        if (abs($montantDepense - $totalAlloue) > 0.01) {
+            throw ValidationException::withMessages([
+                'funding_sources' => [
+                    sprintf(
+                        'Le total des sources (%s FCFA) doit être égal au montant de la dépense (%s FCFA)',
+                        number_format($totalAlloue, 0, ',', ' '),
+                        number_format($montantDepense, 0, ',', ' ')
+                    ),
+                ],
+            ]);
+        }
 
         // Calculer automatiquement le jour de la semaine
         $validated['jour_semaine'] = $this->weekdayFromDate($validated['date_depense']);

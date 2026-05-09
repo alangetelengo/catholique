@@ -93,7 +93,8 @@ class ParoisseConfig
             return '—';
         }
         $monnaie = self::get($paroisseId, 'monnaie', 'FCFA');
-        return number_format(round($montant, 0), 0, ',', ' ') . ' ' . $monnaie;
+
+        return number_format(round($montant, 0), 0, ',', ' ').' '.$monnaie;
     }
 
     /**
@@ -105,6 +106,7 @@ class ParoisseConfig
         if ($montant === null || $montant === 0.0) {
             return '';
         }
+
         return number_format(round($montant, 0), 0, ',', ' ');
     }
 
@@ -174,9 +176,9 @@ class ParoisseConfig
             --action-voir: {$couleurActionVoir};
             --action-modifier: {$couleurActionModifier};
             --action-supprimer: {$couleurActionSupprimer};
-            --loader-bg: ".self::get($paroisseId, 'loader_couleur_fond', '#003366').";
-            --loader-text: ".self::get($paroisseId, 'loader_couleur_texte', '#FFFFFF').";
-        ";
+            --loader-bg: ".self::get($paroisseId, 'loader_couleur_fond', '#003366').';
+            --loader-text: '.self::get($paroisseId, 'loader_couleur_texte', '#FFFFFF').';
+        ';
     }
 
     /**

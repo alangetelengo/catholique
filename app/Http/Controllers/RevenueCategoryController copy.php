@@ -8,6 +8,7 @@ use App\Models\RevenueCategory;
 use App\Traits\LogsErrors;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use Illuminate\View\View;
 use Throwable;
 
@@ -80,7 +81,7 @@ class RevenueCategoryController extends Controller
             $validated['paroisse_id'] = $user->paroisse_id;
         }
 
-        $validated['code'] = \Illuminate\Support\Str::slug($validated['code']);
+        $validated['code'] = Str::slug($validated['code']);
         $validated['actif'] = $request->boolean('actif');
         $validated['ordre'] = (int) ($validated['ordre'] ?? 0);
 
@@ -93,10 +94,12 @@ class RevenueCategoryController extends Controller
         try {
             RevenueCategory::create($validated);
             FlashAlert::success('Catégorie de recette créée avec succès.');
+
             return redirect()->route('revenue-categories.index', ['paroisse_id' => $validated['paroisse_id']]);
         } catch (Throwable $e) {
             $this->logError($e, 'Erreur création catégorie recette');
             FlashAlert::error('Une erreur est survenue.');
+
             return back()->withInput();
         }
     }
@@ -106,6 +109,7 @@ class RevenueCategoryController extends Controller
         $user = $request->user();
         if (! $user->hasRole('super_admin') && $revenue_category->paroisse_id !== $user->paroisse_id) {
             FlashAlert::error('Accès non autorisé.');
+
             return redirect()->route('revenue-categories.index');
         }
 
@@ -119,6 +123,7 @@ class RevenueCategoryController extends Controller
         $user = $request->user();
         if (! $user->hasRole('super_admin') && $revenue_category->paroisse_id !== $user->paroisse_id) {
             FlashAlert::error('Accès non autorisé.');
+
             return redirect()->route('revenue-categories.index');
         }
 
@@ -134,10 +139,12 @@ class RevenueCategoryController extends Controller
         try {
             $revenue_category->update($validated);
             FlashAlert::success('Catégorie mise à jour.');
+
             return redirect()->route('revenue-categories.index', ['paroisse_id' => $revenue_category->paroisse_id]);
         } catch (Throwable $e) {
             $this->logError($e, 'Erreur mise à jour catégorie recette');
             FlashAlert::error('Une erreur est survenue.');
+
             return back()->withInput();
         }
     }
@@ -147,11 +154,13 @@ class RevenueCategoryController extends Controller
         $user = $request->user();
         if (! $user->hasRole('super_admin') && $revenue_category->paroisse_id !== $user->paroisse_id) {
             FlashAlert::error('Accès non autorisé.');
+
             return redirect()->route('revenue-categories.index');
         }
 
         if ($revenue_category->types()->exists() || $revenue_category->revenues()->exists()) {
             FlashAlert::error('Impossible de supprimer : des types ou recettes utilisent cette catégorie.');
+
             return back();
         }
 
@@ -159,10 +168,12 @@ class RevenueCategoryController extends Controller
             $paroisseId = $revenue_category->paroisse_id;
             $revenue_category->delete();
             FlashAlert::success('Catégorie supprimée.');
+
             return redirect()->route('revenue-categories.index', ['paroisse_id' => $paroisseId]);
         } catch (Throwable $e) {
             $this->logError($e, 'Erreur suppression catégorie recette');
             FlashAlert::error('Une erreur est survenue.');
+
             return back();
         }
     }

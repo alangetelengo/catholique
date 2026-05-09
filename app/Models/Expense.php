@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Facades\Auth;
 
@@ -82,5 +83,20 @@ class Expense extends Model
     public function validatedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'validated_by');
+    }
+
+    public function fundingSources(): HasMany
+    {
+        return $this->hasMany(ExpenseFundingSource::class)->orderBy('ordre');
+    }
+
+    public function getMontantTotalFromSourcesAttribute(): float
+    {
+        return (float) $this->fundingSources->sum('montant_alloue');
+    }
+
+    public function hasFundingSources(): bool
+    {
+        return $this->fundingSources()->exists();
     }
 }

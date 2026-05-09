@@ -9,6 +9,7 @@ use App\Models\RevenueType;
 use App\Traits\LogsErrors;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use Illuminate\View\View;
 use Throwable;
 
@@ -107,7 +108,7 @@ class RevenueTypeController extends Controller
         }
 
         $validated['paroisse_id'] = $category ? $category->paroisse_id : $validated['paroisse_id'];
-        $validated['code'] = \Illuminate\Support\Str::slug($validated['code']);
+        $validated['code'] = Str::slug($validated['code']);
         $validated['actif'] = $request->boolean('actif');
         $validated['ordre'] = (int) ($validated['ordre'] ?? 0);
 
@@ -120,10 +121,12 @@ class RevenueTypeController extends Controller
         try {
             RevenueType::create($validated);
             FlashAlert::success('Type de recette créé avec succès.');
+
             return redirect()->route('revenue-types.index', ['paroisse_id' => $validated['paroisse_id']]);
         } catch (Throwable $e) {
             $this->logError($e, 'Erreur création type recette');
             FlashAlert::error('Une erreur est survenue.');
+
             return back()->withInput();
         }
     }
@@ -133,6 +136,7 @@ class RevenueTypeController extends Controller
         $user = $request->user();
         if (! $user->hasRole('super_admin') && $revenue_type->paroisse_id !== $user->paroisse_id) {
             FlashAlert::error('Accès non autorisé.');
+
             return redirect()->route('revenue-types.index');
         }
 
@@ -149,6 +153,7 @@ class RevenueTypeController extends Controller
         $user = $request->user();
         if (! $user->hasRole('super_admin') && $revenue_type->paroisse_id !== $user->paroisse_id) {
             FlashAlert::error('Accès non autorisé.');
+
             return redirect()->route('revenue-types.index');
         }
 
@@ -166,7 +171,7 @@ class RevenueTypeController extends Controller
             return back()->withErrors(['revenue_category_id' => 'La catégorie doit appartenir à la même paroisse.'])->withInput();
         }
 
-        $validated['code'] = \Illuminate\Support\Str::slug($validated['code']);
+        $validated['code'] = Str::slug($validated['code']);
         $exists = RevenueType::where('paroisse_id', $revenue_type->paroisse_id)
             ->where('code', $validated['code'])
             ->where('id', '!=', $revenue_type->id)
@@ -181,10 +186,12 @@ class RevenueTypeController extends Controller
         try {
             $revenue_type->update($validated);
             FlashAlert::success('Type mis à jour.');
+
             return redirect()->route('revenue-types.index', ['paroisse_id' => $revenue_type->paroisse_id]);
         } catch (Throwable $e) {
             $this->logError($e, 'Erreur mise à jour type recette');
             FlashAlert::error('Une erreur est survenue.');
+
             return back()->withInput();
         }
     }
@@ -194,11 +201,13 @@ class RevenueTypeController extends Controller
         $user = $request->user();
         if (! $user->hasRole('super_admin') && $revenue_type->paroisse_id !== $user->paroisse_id) {
             FlashAlert::error('Accès non autorisé.');
+
             return redirect()->route('revenue-types.index');
         }
 
         if ($revenue_type->revenues()->exists()) {
             FlashAlert::error('Impossible de supprimer : des recettes utilisent ce type.');
+
             return back();
         }
 
@@ -206,10 +215,12 @@ class RevenueTypeController extends Controller
             $paroisseId = $revenue_type->paroisse_id;
             $revenue_type->delete();
             FlashAlert::success('Type supprimé.');
+
             return redirect()->route('revenue-types.index', ['paroisse_id' => $paroisseId]);
         } catch (Throwable $e) {
             $this->logError($e, 'Erreur suppression type recette');
             FlashAlert::error('Une erreur est survenue.');
+
             return back();
         }
     }

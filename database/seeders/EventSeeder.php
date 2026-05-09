@@ -5,7 +5,6 @@ namespace Database\Seeders;
 use App\Models\Event;
 use App\Models\Member;
 use App\Models\Paroisse;
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
 class EventSeeder extends Seeder
@@ -19,6 +18,7 @@ class EventSeeder extends Seeder
 
         if (! $paroisse) {
             $this->command?->warn('Aucune paroisse trouvée, EventSeeder ignoré.');
+
             return;
         }
 
