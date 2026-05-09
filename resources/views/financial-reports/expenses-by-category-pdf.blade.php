@@ -9,13 +9,13 @@
             $pdfTitle .= ' — '.$paroisse->nom;
         }
         $pdfTitle .= ' — '.$dateDebut->format('d/m/Y').' au '.$dateFin->format('d/m/Y');
-        $labelsCat = trans('expenses.categories');
-        $labelsType = trans('expenses.types');
-        if (! is_array($labelsCat)) {
-            $labelsCat = [];
+        $selectedCategory = null;
+        if (!empty($selectedRevenueCategoryId)) {
+            $selectedCategory = \App\Models\RevenueCategory::find($selectedRevenueCategoryId);
         }
-        if (! is_array($labelsType)) {
-            $labelsType = [];
+        $selectedType = null;
+        if (!empty($selectedRevenueTypeId)) {
+            $selectedType = \App\Models\RevenueType::find($selectedRevenueTypeId);
         }
     @endphp
     <title>{{ $pdfTitle }}</title>
@@ -242,11 +242,11 @@
             <br>
             Généré le : {{ now()->format('d/m/Y à H:i') }}
         </p>
-        @if ($selectedCategorieCharge)
+        @if ($selectedCategory)
             <p style="margin-top:8px;">
-                Filtre catégorie : <strong>{{ $labelsCat[$selectedCategorieCharge] ?? $selectedCategorieCharge }}</strong>
-                @if ($selectedTypeCharge)
-                    — type : <strong>{{ $labelsType[$selectedTypeCharge] ?? $selectedTypeCharge }}</strong>
+                Filtre catégorie : <strong>{{ $selectedCategory->nom }}</strong>
+                @if ($selectedType)
+                    — type : <strong>{{ $selectedType->nom }}</strong>
                 @endif
             </p>
         @endif
@@ -262,9 +262,9 @@
         </div>
     </div>
 
-    @if (! $selectedCategorieCharge && count($report['by_category']) > 0)
+    @if (! $selectedRevenueCategoryId && count($report['by_category']) > 0)
         <div class="section">
-            <div class="section-title">Répartition par catégorie</div>
+            <div class="section-title">Répartition par catégorie (source des fonds)</div>
             <table>
                 <thead>
                     <tr>
@@ -293,9 +293,9 @@
         </div>
     @endif
 
-    @if ($selectedCategorieCharge && count($report['by_type']) > 0)
+    @if ($selectedRevenueCategoryId && count($report['by_type']) > 0)
         <div class="section">
-            <div class="section-title">Répartition par type</div>
+            <div class="section-title">Répartition par type (précision de la source)</div>
             <table>
                 <thead>
                     <tr>
@@ -338,8 +338,8 @@
                     @foreach ($rowsPdf as $ex)
                         <tr>
                             <td>{{ $ex->date_depense?->format('d/m/Y') }}</td>
-                            <td>{{ $labelsCat[$ex->categorie_charge] ?? $ex->categorie_charge }}</td>
-                            <td>{{ $labelsType[$ex->type_charge] ?? $ex->type_charge }}</td>
+                            <td>{{ $ex->revenueCategory?->nom ?? '—' }}</td>
+                            <td>{{ $ex->revenueType?->nom ?? '—' }}</td>
                             <td>{{ \Illuminate\Support\Str::limit($ex->libelle ?? '—', 36) }}</td>
                             <td>{{ \Illuminate\Support\Str::limit($ex->fournisseur ?? '—', 28) }}</td>
                             <td class="text-right">{{ \App\Helpers\ParoisseConfig::formatMontant($ex->montant) }}</td>

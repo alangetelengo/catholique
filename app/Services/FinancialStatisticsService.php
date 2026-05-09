@@ -16,21 +16,13 @@ use Illuminate\Support\Facades\DB;
 /**
  * Agrégations recettes / dépenses pour la page Statistiques financières.
  *
- * Règle comptable : le solde affiché = total recettes − dépenses « alimentation_popote » uniquement.
- * Les charges fixes, variables et exceptionnelles sont suivies à part (information hiérarchie) sans impacter ce solde.
+ * Règle comptable : le solde affiché = total recettes − dépenses liées au type "subvention_popote" uniquement.
+ * Les autres dépenses sont suivies à part (information hiérarchie) sans impacter ce solde.
  */
 class FinancialStatisticsService
 {
-    /** Catégorie de dépense déductible du solde (subvention popote / alimentation). */
-    public const POPOTE_CATEGORY = 'alimentation_popote';
-
-    /** @var array<string, string> */
-    public const EXPENSE_CATEGORY_LABELS = [
-        'charge_fixe' => 'Charges fixes',
-        'charge_variable' => 'Charges variables',
-        'charge_exceptionnelle' => 'Charges exceptionnelles',
-        'alimentation_popote' => 'Alimentation popote (déductible)',
-    ];
+    /** Code du type de recette pour les dépenses popote (déductibles du solde). */
+    public const POPOTE_TYPE_CODE = 'subvention_popote';
 
     /**
      * @return array{

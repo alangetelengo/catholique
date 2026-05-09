@@ -10,7 +10,6 @@ use App\Models\Paroisse;
 use App\Models\Revenue;
 use App\Models\RevenueCategory;
 use App\Models\RevenueType;
-use App\Support\ExpenseChargeCatalog;
 use App\Support\FinancialReportSignatories;
 use App\Support\PaginationPerPage;
 use App\Traits\LogsErrors;
@@ -48,13 +47,6 @@ class FinancialReportController extends Controller implements HasMiddleware
     /**
      * @return list<string>
      */
-    private static function expenseTypeChargeCodes(): array
-    {
-        $codes = config('expenses.type_charge_codes', []);
-
-        return is_array($codes) ? array_values(array_filter($codes, 'is_string')) : [];
-    }
-
     /**
      * @return array<int, Middleware>
      */
@@ -63,7 +55,7 @@ class FinancialReportController extends Controller implements HasMiddleware
         return [
             new Middleware('permission:view_financial_reports', only: [
                 'index', 'list', 'show', 'statistics', 'revenuesWeekly', 'revenuesWeeklyPrint',
-                'chargesFixesReport', 'revenuesByCategory',
+                'revenuesByCategory',
                 'revenueCategoriesForParoisse', 'revenueTypesForCategory', 'revenuesByCategoryCalculate',
                 'expensesByCategory', 'expensesByCategoryCalculate',
             ]),
@@ -779,55 +771,6 @@ class FinancialReportController extends Controller implements HasMiddleware
      * Rapport des charges fixes (mensuel / annuel) — pour la hiérarchie.
      * Les charges fixes ne sont déduites d'aucune recette ; ce rapport liste les dépenses enregistrées.
      */
-    public function chargesFixesReport(Request $request): View
-    {
-        try {
-            $user = $request->user();
-
-            $paroisses = $user->hasRole('super_admin')
-                ? Paroisse::orderBy('nom')->get()
-                : Paroisse::whereKey($user->paroisse_id)->get();
-
-            $selectedParoisseId = $request->integer('paroisse_id', $user->hasRole('super_admin') ? null : $user->paroisse_id);
-            $periodType = $request->input('period_type', 'month');
-            $selectedMonth = $request->integer('month', now()->month);
-            $selectedYear = $request->integer('year', now()->year);
-
-            $report = null;
-            if ($selectedParoisseId) {
-                if ($periodType === 'year') {
-                    $dateDebut = Carbon::create($selectedYear, 1, 1)->startOfMonth();
-                    $dateFin = Carbon::create($selectedYear, 12, 31)->endOfDay();
-                } else {
-                    $dateDebut = Carbon::create($selectedYear, $selectedMonth, 1)->startOfMonth();
-                    $dateFin = $dateDebut->copy()->endOfMonth();
-                }
-                $report = $this->calculateChargesFixesReport($selectedParoisseId, $dateDebut, $dateFin);
-            }
-
-            return view('financial-reports.charges-fixes-report', [
-                'paroisses' => $paroisses,
-                'selectedParoisseId' => $selectedParoisseId,
-                'periodType' => $periodType,
-                'selectedMonth' => $selectedMonth,
-                'selectedYear' => $selectedYear,
-                'report' => $report,
-            ]);
-        } catch (Throwable $e) {
-            $this->logError($e, 'Erreur rapport charges fixes');
-            FlashAlert::error('Une erreur est survenue.');
-
-            return view('financial-reports.charges-fixes-report', [
-                'paroisses' => collect(),
-                'selectedParoisseId' => null,
-                'periodType' => 'month',
-                'selectedMonth' => now()->month,
-                'selectedYear' => now()->year,
-                'report' => null,
-            ]);
-        }
-    }
-
     /**
      * Rapport par catégories de recettes — page initiale (sans requête GET longue) ; calcul via AJAX.
      */
@@ -1278,40 +1221,6 @@ class FinancialReportController extends Controller implements HasMiddleware
     /**
      * @return list<string>
      */
-    private static function expenseCategorieChargeCodes(): array
-    {
-        return [
-            'charge_fixe',
-            'charge_variable',
-            'charge_exceptionnelle',
-            'alimentation_popote',
-        ];
-    }
-
-    /**
-     * Libellés modifiables dans lang/{locale}/expenses.php (clé `categories`).
-     *
-     * @return array<string, string>
-     */
-    private static function expenseCategorieChargeLabels(): array
-    {
-        $v = trans('expenses.categories');
-
-        return is_array($v) ? $v : [];
-    }
-
-    /**
-     * Libellés modifiables dans lang/{locale}/expenses.php (clé `types`).
-     *
-     * @return array<string, string>
-     */
-    private static function expenseTypeChargeLabels(): array
-    {
-        $v = trans('expenses.types');
-
-        return is_array($v) ? $v : [];
-    }
-
     /**
      * Rapport par catégories de dépenses — page initiale ; calcul via AJAX.
      */
@@ -1332,26 +1241,25 @@ class FinancialReportController extends Controller implements HasMiddleware
             $dateDebut = $now->copy()->startOfMonth()->format('Y-m-d');
             $dateFin = $now->copy()->endOfMonth()->format('Y-m-d');
 
-            $expenseCategories = [];
-            foreach (self::expenseCategorieChargeCodes() as $code) {
-                $expenseCategories[] = [
-                    'code' => $code,
-                    'nom' => self::expenseCategorieChargeLabels()[$code] ?? $code,
-                ];
-            }
+            // Récupérer les catégories de recettes (sources de fonds pour dépenses)
+            $revenueCategories = RevenueCategory::where('actif', 1)
+                ->orderBy('ordre')
+                ->orderBy('nom')
+                ->get();
 
-            $typeOptions = ExpenseChargeCatalog::typeOptionRows();
+            // Récupérer les types de recettes
+            $revenueTypes = RevenueType::where('actif', 1)
+                ->orderBy('ordre')
+                ->orderBy('nom')
+                ->get();
 
             return view('financial-reports.expenses-by-category', [
                 'paroisses' => $paroisses,
                 'selectedParoisseId' => $selectedParoisseId,
                 'dateDebut' => $dateDebut,
                 'dateFin' => $dateFin,
-                'selectedCategorieCharge' => null,
-                'selectedTypeCharge' => null,
-                'report' => null,
-                'expenseCategories' => $expenseCategories,
-                'typeOptions' => $typeOptions,
+                'revenueCategories' => $revenueCategories,
+                'revenueTypes' => $revenueTypes,
                 'ajaxCalculateRoute' => route('financial-reports.expenses-by-category.calculate'),
             ]);
         } catch (Throwable $e) {
@@ -1363,11 +1271,8 @@ class FinancialReportController extends Controller implements HasMiddleware
                 'selectedParoisseId' => null,
                 'dateDebut' => now()->startOfMonth()->format('Y-m-d'),
                 'dateFin' => now()->endOfMonth()->format('Y-m-d'),
-                'selectedCategorieCharge' => null,
-                'selectedTypeCharge' => null,
-                'report' => null,
-                'expenseCategories' => [],
-                'typeOptions' => [],
+                'revenueCategories' => collect(),
+                'revenueTypes' => collect(),
                 'ajaxCalculateRoute' => route('financial-reports.expenses-by-category.calculate'),
             ]);
         }
@@ -1378,31 +1283,20 @@ class FinancialReportController extends Controller implements HasMiddleware
         try {
             $user = $request->user();
 
-            $codes = self::expenseCategorieChargeCodes();
-            $typeCodes = self::expenseTypeChargeCodes();
-
             $validated = $request->validate([
                 'paroisse_id' => ['required', 'integer', 'exists:paroisses,id'],
                 'date_debut' => ['required', 'date'],
                 'date_fin' => ['required', 'date', 'after_or_equal:date_debut'],
-                'categorie_charge' => ['nullable', 'string', 'in:'.implode(',', $codes)],
-                'type_charge' => ['nullable', 'string', 'in:'.implode(',', $typeCodes)],
+                'revenue_category_id' => ['nullable', 'integer', 'exists:revenue_categories,id'],
+                'revenue_type_id' => ['nullable', 'integer', 'exists:revenue_types,id'],
             ]);
 
             if (! $user->hasRole('super_admin') && (int) $validated['paroisse_id'] !== (int) $user->paroisse_id) {
                 return response()->json(['message' => 'Vous ne pouvez consulter que les rapports de votre paroisse.'], 403);
             }
 
-            $categorieCharge = $validated['categorie_charge'] ?? null;
-            $requestedType = $validated['type_charge'] ?? null;
-
-            $typeCharge = $this->resolveExpenseTypeChargeForReport($requestedType, $categorieCharge);
-
-            if (($requestedType !== null && $requestedType !== '') && $typeCharge === null) {
-                return response()->json([
-                    'message' => 'Le type de dépense est invalide pour ce filtre.',
-                ], 422);
-            }
+            $revenueCategoryId = $validated['revenue_category_id'] ?? null;
+            $revenueTypeId = $validated['revenue_type_id'] ?? null;
 
             $dateDebut = Carbon::parse($validated['date_debut'])->startOfDay();
             $dateFin = Carbon::parse($validated['date_fin'])->endOfDay();
@@ -1411,37 +1305,37 @@ class FinancialReportController extends Controller implements HasMiddleware
                 (int) $validated['paroisse_id'],
                 $dateDebut,
                 $dateFin,
-                $categorieCharge,
-                $typeCharge
+                $revenueCategoryId,
+                $revenueTypeId
             );
 
             $html = view('financial-reports.partials.expenses-by-category-report-body', [
                 'report' => $report,
                 'dateDebut' => $validated['date_debut'],
                 'dateFin' => $validated['date_fin'],
-                'selectedCategorieCharge' => $categorieCharge,
-                'selectedTypeCharge' => $typeCharge,
+                'selectedRevenueCategoryId' => $revenueCategoryId,
+                'selectedRevenueTypeId' => $revenueTypeId,
             ])->render();
 
             $pdfUrl = route('financial-reports.expenses-by-category.pdf', array_filter([
                 'paroisse_id' => (int) $validated['paroisse_id'],
                 'date_debut' => $validated['date_debut'],
                 'date_fin' => $validated['date_fin'],
-                'categorie_charge' => $categorieCharge,
-                'type_charge' => $typeCharge,
-            ], fn ($v) => $v !== null && $v !== ''));
+                'revenue_category_id' => $revenueCategoryId,
+                'revenue_type_id' => $revenueTypeId,
+            ]));
 
             return response()->json([
                 'html' => $html,
                 'pdf_url' => $pdfUrl,
-                'period_label' => $dateDebut->format('d/m/Y').' → '.$dateFin->format('d/m/Y'),
+                'period_label' => $dateDebut->format('d/m/Y').' - '.$dateFin->format('d/m/Y'),
             ]);
-        } catch (ValidationException $e) {
-            throw $e;
         } catch (Throwable $e) {
-            $this->logError($e, 'Erreur calcul AJAX rapport dépenses par catégorie', ['data' => $request->all()]);
+            $this->logError($e, 'Erreur calcul rapport par catégories de dépenses', $request->all());
 
-            return response()->json(['message' => 'Une erreur est survenue lors du calcul du rapport.'], 500);
+            return response()->json([
+                'message' => 'Une erreur est survenue lors du calcul du rapport. '.$e->getMessage(),
+            ], 500);
         }
     }
 
@@ -1450,15 +1344,12 @@ class FinancialReportController extends Controller implements HasMiddleware
         try {
             $user = $request->user();
 
-            $codes = self::expenseCategorieChargeCodes();
-            $typeCodes = self::expenseTypeChargeCodes();
-
             $validated = $request->validate([
                 'paroisse_id' => ['required', 'exists:paroisses,id'],
                 'date_debut' => ['required', 'date'],
                 'date_fin' => ['required', 'date', 'after_or_equal:date_debut'],
-                'categorie_charge' => ['nullable', 'string', 'in:'.implode(',', $codes)],
-                'type_charge' => ['nullable', 'string', 'in:'.implode(',', $typeCodes)],
+                'revenue_category_id' => ['nullable', 'integer', 'exists:revenue_categories,id'],
+                'revenue_type_id' => ['nullable', 'integer', 'exists:revenue_types,id'],
             ]);
 
             if (! $user->hasRole('super_admin') && (int) $validated['paroisse_id'] !== (int) $user->paroisse_id) {
@@ -1469,23 +1360,15 @@ class FinancialReportController extends Controller implements HasMiddleware
 
             $dateDebut = Carbon::parse($validated['date_debut'])->startOfDay();
             $dateFin = Carbon::parse($validated['date_fin'])->endOfDay();
-            $categorieCharge = $validated['categorie_charge'] ?? null;
-            $requestedType = $validated['type_charge'] ?? null;
-
-            $typeCharge = $this->resolveExpenseTypeChargeForReport($requestedType, $categorieCharge);
-
-            if ($requestedType !== null && $requestedType !== '' && $typeCharge === null) {
-                FlashAlert::error('Le type de dépense est invalide pour ce filtre.');
-
-                return redirect()->back();
-            }
+            $revenueCategoryId = $validated['revenue_category_id'] ?? null;
+            $revenueTypeId = $validated['revenue_type_id'] ?? null;
 
             $report = $this->calculateExpensesByCategoryReport(
                 (int) $validated['paroisse_id'],
                 $dateDebut,
                 $dateFin,
-                $categorieCharge,
-                $typeCharge
+                $revenueCategoryId,
+                $revenueTypeId
             );
 
             $paroisse = Paroisse::find($validated['paroisse_id']);
@@ -1497,8 +1380,8 @@ class FinancialReportController extends Controller implements HasMiddleware
                 'headerConfig' => $headerConfig,
                 'dateDebut' => $dateDebut,
                 'dateFin' => $dateFin,
-                'selectedCategorieCharge' => $categorieCharge,
-                'selectedTypeCharge' => $typeCharge,
+                'selectedRevenueCategoryId' => $revenueCategoryId,
+                'selectedRevenueTypeId' => $revenueTypeId,
                 'signataires' => FinancialReportSignatories::defaultPdfBlocks(),
             ])->setPaper('a4', 'portrait');
 
@@ -1511,19 +1394,6 @@ class FinancialReportController extends Controller implements HasMiddleware
 
             return redirect()->back();
         }
-    }
-
-    private function resolveExpenseTypeChargeForReport(?string $typeCharge, ?string $categorieCharge): ?string
-    {
-        if ($typeCharge === null || $typeCharge === '') {
-            return null;
-        }
-
-        if (! in_array($typeCharge, self::expenseTypeChargeCodes(), true)) {
-            return null;
-        }
-
-        return $typeCharge;
     }
 
     /**
@@ -1540,48 +1410,52 @@ class FinancialReportController extends Controller implements HasMiddleware
         int $paroisseId,
         Carbon $dateDebut,
         Carbon $dateFin,
-        ?string $categorieCharge = null,
-        ?string $typeCharge = null
+        ?int $revenueCategoryId = null,
+        ?int $revenueTypeId = null
     ): array {
         $query = Expense::query()
+            ->with(['revenueCategory', 'revenueType'])
             ->where('paroisse_id', $paroisseId)
             ->where('statut', 'valide')
             ->whereDate('date_depense', '>=', $dateDebut)
             ->whereDate('date_depense', '<=', $dateFin);
 
-        if ($categorieCharge) {
-            $query->where('categorie_charge', $categorieCharge);
+        if ($revenueCategoryId) {
+            $query->where('revenue_category_id', $revenueCategoryId);
         }
 
-        if ($typeCharge) {
-            $query->where('type_charge', $typeCharge);
+        if ($revenueTypeId) {
+            $query->where('revenue_type_id', $revenueTypeId);
         }
 
         $expenses = $query->orderBy('date_depense')->orderBy('id')->get();
 
-        $catLabels = self::expenseCategorieChargeLabels();
-        $typeLabels = self::expenseTypeChargeLabels();
-
+        // Grouper par catégorie de recettes (source des fonds)
         $byCategory = [];
-        foreach ($expenses->groupBy('categorie_charge') as $code => $items) {
-            /** @var string $code */
-            $byCategory[$code] = [
-                'code' => $code,
-                'nom' => $catLabels[$code] ?? $code,
-                'montant' => (float) $items->sum('montant'),
-                'count' => $items->count(),
-            ];
+        foreach ($expenses->groupBy('revenue_category_id') as $categoryId => $items) {
+            $category = RevenueCategory::find($categoryId);
+            if ($category) {
+                $byCategory[$categoryId] = [
+                    'id' => $categoryId,
+                    'nom' => $category->nom,
+                    'montant' => (float) $items->sum('montant'),
+                    'count' => $items->count(),
+                ];
+            }
         }
 
+        // Grouper par type de recettes (source précise des fonds)
         $byType = [];
-        foreach ($expenses->groupBy('type_charge') as $tcode => $items) {
-            /** @var string $tcode */
-            $byType[$tcode] = [
-                'code' => $tcode,
-                'nom' => $typeLabels[$tcode] ?? $tcode,
-                'montant' => (float) $items->sum('montant'),
-                'count' => $items->count(),
-            ];
+        foreach ($expenses->groupBy('revenue_type_id') as $typeId => $items) {
+            $type = RevenueType::find($typeId);
+            if ($type) {
+                $byType[$typeId] = [
+                    'id' => $typeId,
+                    'nom' => $type->nom,
+                    'montant' => (float) $items->sum('montant'),
+                    'count' => $items->count(),
+                ];
+            }
         }
 
         return [
@@ -1591,25 +1465,6 @@ class FinancialReportController extends Controller implements HasMiddleware
             'total_general' => (float) $expenses->sum('montant'),
             'date_debut' => $dateDebut,
             'date_fin' => $dateFin,
-        ];
-    }
-
-    private function calculateChargesFixesReport(int $paroisseId, Carbon $dateDebut, Carbon $dateFin): array
-    {
-        $expenses = Expense::query()
-            ->where('paroisse_id', $paroisseId)
-            ->where('categorie_charge', 'charge_fixe')
-            ->whereDate('date_depense', '>=', $dateDebut)
-            ->whereDate('date_depense', '<=', $dateFin)
-            ->orderBy('date_depense')
-            ->get();
-
-        return [
-            'expenses' => $expenses,
-            'total' => $expenses->sum('montant'),
-            'date_debut' => $dateDebut,
-            'date_fin' => $dateFin,
-            'type_labels' => self::expenseTypeChargeLabels(),
         ];
     }
 }

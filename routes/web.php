@@ -2,7 +2,6 @@
 
 use App\Http\Controllers\Api\SyncController;
 use App\Http\Controllers\ApplicationConfigurationController;
-use App\Http\Controllers\ChargesFixesReportController;
 use App\Http\Controllers\ConfigurationController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\EventController;
@@ -59,9 +58,6 @@ Route::middleware('auth')->group(function (): void {
     Route::get('reports/quete-ordinaire', [QueteOrdinaireReportController::class, 'legacyRedirectIndex'])->name('reports.quete.index');
     Route::get('reports/quete-ordinaire/print', [QueteOrdinaireReportController::class, 'legacyRedirectPrint'])->name('reports.quete.print');
     Route::get('reports/quete-ordinaire/pdf', [QueteOrdinaireReportController::class, 'legacyRedirectPdf'])->name('reports.quete.pdf');
-    Route::resource('charges-fixes-reports', ChargesFixesReportController::class)->parameters(['charges-fixes-reports' => 'chargesFixesReport']);
-    Route::get('charges-fixes-reports/{chargesFixesReport}/print', [ChargesFixesReportController::class, 'print'])->name('charges-fixes-reports.print');
-    Route::get('charges-fixes-reports/{chargesFixesReport}/pdf', [ChargesFixesReportController::class, 'exportPdf'])->name('charges-fixes-reports.pdf');
     Route::resource('popote-reports', PopoteSubventionReportController::class)->parameters(['popote-reports' => 'popoteReport']);
     Route::get('popote-reports/{popoteReport}/print', [PopoteSubventionReportController::class, 'print'])->name('popote-reports.print');
     Route::get('popote-reports/{popoteReport}/pdf', [PopoteSubventionReportController::class, 'exportPdf'])->name('popote-reports.pdf');
@@ -78,7 +74,6 @@ Route::middleware('auth')->group(function (): void {
     Route::get('financial-reports/revenues-weekly', [FinancialReportController::class, 'revenuesWeekly'])->name('financial-reports.revenues-weekly');
     Route::get('financial-reports/revenues-weekly/print', [FinancialReportController::class, 'revenuesWeeklyPrint'])->name('financial-reports.revenues-weekly-print');
     Route::match(['get', 'post'], 'financial-reports/revenues-weekly/pdf', [FinancialReportController::class, 'downloadRevenuesWeeklyPdf'])->name('financial-reports.revenues-weekly-pdf');
-    Route::get('financial-reports/charges-fixes', [FinancialReportController::class, 'chargesFixesReport'])->name('financial-reports.charges-fixes');
     Route::post('financial-reports/expenses-by-category/calculate', [FinancialReportController::class, 'expensesByCategoryCalculate'])->name('financial-reports.expenses-by-category.calculate');
     Route::get('financial-reports/expenses-by-category/pdf', [FinancialReportController::class, 'downloadExpensesByCategoryPdf'])->name('financial-reports.expenses-by-category.pdf');
     Route::get('financial-reports/expenses-by-category', [FinancialReportController::class, 'expensesByCategory'])->name('financial-reports.expenses-by-category');

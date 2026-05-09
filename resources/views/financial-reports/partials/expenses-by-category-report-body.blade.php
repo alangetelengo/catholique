@@ -1,26 +1,24 @@
 @php
     $fmt = static fn ($n) => \App\Helpers\ParoisseConfig::formatMontant($n);
-    $labelsCat = trans('expenses.categories');
-    $labelsType = trans('expenses.types');
-    if (! is_array($labelsCat)) {
-        $labelsCat = [];
+    $selectedCategory = null;
+    if (!empty($selectedRevenueCategoryId)) {
+        $selectedCategory = \App\Models\RevenueCategory::find($selectedRevenueCategoryId);
     }
-    if (! is_array($labelsType)) {
-        $labelsType = [];
+    $selectedType = null;
+    if (!empty($selectedRevenueTypeId)) {
+        $selectedType = \App\Models\RevenueType::find($selectedRevenueTypeId);
     }
-    $labelCat = static fn (?string $c) => is_string($c) && isset($labelsCat[$c]) ? $labelsCat[$c] : ($c ?? '—');
-    $labelType = static fn (?string $t) => is_string($t) && isset($labelsType[$t]) ? $labelsType[$t] : ($t ?? '—');
 @endphp
 
 <div class="rounded-xl border border-sky-200/80 dark:border-sky-800/60 bg-sky-50/90 dark:bg-sky-950/30 px-4 py-3 mb-6 text-sm text-sky-900 dark:text-sky-100">
     <strong class="font-semibold">Période :</strong>
     {{ \Illuminate\Support\Carbon::parse($dateDebut)->format('d/m/Y') }} au {{ \Illuminate\Support\Carbon::parse($dateFin)->format('d/m/Y') }}
-    @if ($selectedCategorieCharge)
+    @if ($selectedCategory)
         <span class="block mt-1 text-slate-600 dark:text-slate-300">
             Filtre catégorie :
-            <strong class="font-medium text-slate-800 dark:text-slate-100">{{ $labelCat($selectedCategorieCharge) }}</strong>
-            @if ($selectedTypeCharge)
-                — type : <strong class="font-medium text-slate-800 dark:text-slate-100">{{ $labelType($selectedTypeCharge) }}</strong>
+            <strong class="font-medium text-slate-800 dark:text-slate-100">{{ $selectedCategory->nom }}</strong>
+            @if ($selectedType)
+                — type : <strong class="font-medium text-slate-800 dark:text-slate-100">{{ $selectedType->nom }}</strong>
             @endif
         </span>
     @endif
@@ -32,10 +30,10 @@
     <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">Dépenses au statut « validé » sur la période</p>
 </div>
 
-@if (! $selectedCategorieCharge && count($report['by_category']) > 0)
+@if (! $selectedRevenueCategoryId && count($report['by_category']) > 0)
     <div class="adventiste-card-pro-static overflow-hidden mb-6">
         <div class="px-4 py-3 border-b border-slate-200/80 dark:border-slate-600/80 bg-slate-50/80 dark:bg-slate-800/50">
-            <h3 class="text-sm font-semibold text-slate-900 dark:text-white m-0">Répartition par catégorie de charge</h3>
+            <h3 class="text-sm font-semibold text-slate-900 dark:text-white m-0">Répartition par catégorie (source des fonds)</h3>
         </div>
         <div class="overflow-x-auto p-2">
             <table class="min-w-full text-sm">
@@ -65,10 +63,10 @@
     </div>
 @endif
 
-@if ($selectedCategorieCharge && count($report['by_type']) > 0)
+@if ($selectedRevenueCategoryId && count($report['by_type']) > 0)
     <div class="adventiste-card-pro-static overflow-hidden mb-6">
         <div class="px-4 py-3 border-b border-slate-200/80 dark:border-slate-600/80 bg-slate-50/80 dark:bg-slate-800/50">
-            <h3 class="text-sm font-semibold text-slate-900 dark:text-white m-0">Répartition par type de charge</h3>
+            <h3 class="text-sm font-semibold text-slate-900 dark:text-white m-0">Répartition par type (précision de la source)</h3>
         </div>
         <div class="overflow-x-auto p-2">
             <table class="min-w-full text-sm">
@@ -116,8 +114,8 @@
                         @foreach ($report['expenses'] as $ex)
                             <tr class="text-slate-700 dark:text-slate-200">
                                 <td class="px-4 py-3 whitespace-nowrap">{{ $ex->date_depense?->format('d/m/Y') }}</td>
-                                <td class="px-4 py-3">{{ $labelCat($ex->categorie_charge) }}</td>
-                                <td class="px-4 py-3">{{ $labelType($ex->type_charge) }}</td>
+                                <td class="px-4 py-3">{{ $ex->revenueCategory?->nom ?? '—' }}</td>
+                                <td class="px-4 py-3">{{ $ex->revenueType?->nom ?? '—' }}</td>
                                 <td class="px-4 py-3">{{ $ex->libelle ?: '—' }}</td>
                                 <td class="px-4 py-3">{{ $ex->fournisseur ?? '—' }}</td>
                                 <td class="px-4 py-3 text-right font-semibold text-rose-700 dark:text-rose-400 tabular-nums">{{ $fmt($ex->montant) }}</td>

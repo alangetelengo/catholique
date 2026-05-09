@@ -3,11 +3,10 @@
     $isInventoryRoute = request()->routeIs('inventories.*', 'inventaire-magasin.*', 'inventaire-patrimoine.*');
     // Recettes : saisie uniquement ; les rapports recettes (resource) ouvrent le menu « Rapports ».
     $isRevenueRoute = request()->routeIs('revenues.*');
-    $isExpenseRoute = request()->routeIs('expenses.*', 'charges-fixes-reports.*');
-    $isReportsRoute = request()->routeIs('financial-reports.*', 'revenue-reports.*', 'popote-reports.*', 'charges-fixes-reports.*');
+    $isExpenseRoute = request()->routeIs('expenses.*');
+    $isReportsRoute = request()->routeIs('financial-reports.*', 'revenue-reports.*', 'popote-reports.*');
     $isFinancialHub = request()->routeIs(
         'financial-reports.index',
-        'financial-reports.charges-fixes',
         'financial-reports.revenues-by-category',
         'financial-reports.revenues-by-category.store',
         'financial-reports.revenues-by-category.pdf',

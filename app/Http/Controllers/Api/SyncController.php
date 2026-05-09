@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Expense;
 use App\Models\Revenue;
 use App\Models\RevenueCategory;
+use App\Models\RevenueType;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -43,8 +44,8 @@ class SyncController extends Controller
             'expenses.*.action' => ['required', 'in:create'],
             'expenses.*.data' => ['required', 'array'],
             'expenses.*.data.paroisse_id' => ['nullable', 'exists:paroisses,id'],
-            'expenses.*.data.categorie_charge' => ['required', 'in:charge_fixe,charge_variable,charge_exceptionnelle,alimentation_popote'],
-            'expenses.*.data.type_charge' => ['nullable', 'in:'.implode(',', config('expenses.type_charge_codes', []))],
+            'expenses.*.data.revenue_category_id' => ['required', 'exists:revenue_categories,id'],
+            'expenses.*.data.revenue_type_id' => ['required', 'exists:revenue_types,id'],
             'expenses.*.data.date_depense' => ['required', 'date'],
             'expenses.*.data.montant' => ['required', 'numeric', 'min:0'],
             'expenses.*.data.jour_semaine' => ['nullable', 'in:lundi,mardi,mercredi,jeudi,vendredi,samedi,dimanche'],
@@ -135,22 +136,20 @@ class SyncController extends Controller
         $data['piece_facture_path'] = null;
         $data['piece_recu_path'] = null;
 
-        if ($data['categorie_charge'] === 'alimentation_popote') {
-            $data['type_charge'] = 'alimentation';
+        // Vérifier si c'est une dépense popote (type "subvention_popote")
+        $revenueType = RevenueType::find($data['revenue_type_id']);
+        $isPopote = $revenueType && $revenueType->code === 'subvention_popote';
+
+        if ($isPopote) {
+            // Pour les dépenses popote, remplir automatiquement le jour de la semaine si absent
             if (empty($data['jour_semaine']) && ! empty($data['date_depense'])) {
                 $d = Carbon::parse($data['date_depense']);
                 $jours = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'];
                 $data['jour_semaine'] = $jours[$d->dayOfWeek] ?? null;
             }
         } else {
-            $data['libelle'] = null;
-            $data['jour_semaine'] = null;
-            $type = $data['type_charge'] ?? '';
-            if ($type === '' || $type === 'alimentation') {
-                throw ValidationException::withMessages([
-                    'type_charge' => 'Type de charge invalide.',
-                ]);
-            }
+            // Pour les autres dépenses, libellé et jour_semaine ne sont pas obligatoires
+            $data['jour_semaine'] = $data['jour_semaine'] ?? null;
         }
 
         return array_intersect_key($data, array_flip((new Expense)->getFillable()));

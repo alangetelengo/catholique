@@ -79,18 +79,21 @@
                 <input type="date" id="ebc_date_fin" name="date_fin" class="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2.5 text-sm" value="{{ $dateFin ?? $finMois }}" required>
             </div>
             <div class="lg:col-span-2">
-                <label for="ebc_category" class="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-300">Catégorie de charge</label>
-                <select id="ebc_category" name="categorie_charge" class="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2.5 text-sm" @if (auth()->user()->hasRole('super_admin') && ! $selectedParoisseId) disabled @endif>
+                <label for="ebc_category" class="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-300">Catégorie (source fonds)</label>
+                <select id="ebc_category" name="revenue_category_id" class="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2.5 text-sm" @if (auth()->user()->hasRole('super_admin') && ! $selectedParoisseId) disabled @endif>
                     <option value="">Toutes les catégories</option>
-                    @foreach ($expenseCategories as $cat)
-                        <option value="{{ $cat['code'] }}">{{ $cat['nom'] }}</option>
+                    @foreach ($revenueCategories as $cat)
+                        <option value="{{ $cat->id }}">{{ $cat->nom }}</option>
                     @endforeach
                 </select>
             </div>
             <div class="lg:col-span-3">
-                <label for="ebc_type" class="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-300">Type de charge</label>
-                <select id="ebc_type" name="type_charge" class="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2.5 text-sm" aria-describedby="ebc-filter-hint">
+                <label for="ebc_type" class="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-300">Type (précision)</label>
+                <select id="ebc_type" name="revenue_type_id" class="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2.5 text-sm" aria-describedby="ebc-filter-hint">
                     <option value="">Tous les types</option>
+                    @foreach ($revenueTypes as $type)
+                        <option value="{{ $type->id }}" data-category-id="{{ $type->revenue_category_id }}">{{ $type->nom }}</option>
+                    @endforeach
                 </select>
             </div>
             <div id="ebc-filter-hint" class="lg:col-span-12 rounded-lg border border-slate-200/90 bg-slate-50/80 px-3 py-2 text-xs leading-relaxed text-slate-600 dark:border-slate-600/60 dark:bg-slate-800/40 dark:text-slate-400">
@@ -98,7 +101,7 @@
                     <span class="block sm:inline">Choisissez d’abord une <strong class="font-medium text-slate-700 dark:text-slate-300">paroisse</strong> pour activer les filtres.</span>
                     <span class="hidden sm:inline text-slate-400 dark:text-slate-500" aria-hidden="true"> · </span>
                 @endif
-                <span class="block sm:inline">Le filtre <strong class="font-medium text-slate-700 dark:text-slate-300">Type</strong> est indépendant de la catégorie : vous choisissez librement la combinaison.</span>
+                <span class="block sm:inline">Les filtres vous permettent de voir les dépenses selon leur <strong class="font-medium text-slate-700 dark:text-slate-300">source de fonds</strong> (catégorie et type de recette).</span>
             </div>
             <div class="lg:col-span-12 flex flex-wrap gap-2 justify-end border-t border-slate-200/80 pt-3 dark:border-slate-600/60 lg:pt-4">
                 <button type="button" id="ebc-btn-calculate" class="adventiste-btn-primary">
@@ -129,7 +132,6 @@
         <script>
             (function () {
                 var calculateUrl = @json($ajaxCalculateRoute);
-                var typeOptions = @json($typeOptions ?? []);
                 var token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
                 var isSuperAdmin = @json(auth()->user()->hasRole('super_admin'));
 
@@ -142,25 +144,41 @@
                     return h && h.value ? parseInt(h.value, 10) : null;
                 }
 
-                function fillTypes() {
-                    var t = document.getElementById('ebc_type');
-                    if (!t) return;
-                    var prev = t.value;
-                    t.innerHTML = '';
-                    var o0 = document.createElement('option');
-                    o0.value = '';
-                    o0.textContent = 'Tous les types';
-                    t.appendChild(o0);
-                    var rows = Array.isArray(typeOptions) ? typeOptions : [];
-                    rows.forEach(function (row) {
-                        var o = document.createElement('option');
-                        o.value = row.code;
-                        o.textContent = row.nom;
-                        t.appendChild(o);
+                // Gestion du filtrage dynamique des types par catégorie
+                var catEl = document.getElementById('ebc_category');
+                var typeEl = document.getElementById('ebc_type');
+
+                function filterTypesByCategory() {
+                    if (!catEl || !typeEl) return;
+                    
+                    var selectedCatId = catEl.value;
+                    var options = typeEl.querySelectorAll('option');
+                    
+                    options.forEach(function(option) {
+                        if (option.value === '') {
+                            option.style.display = '';
+                            return;
+                        }
+                        
+                        var optCatId = option.getAttribute('data-category-id');
+                        if (!selectedCatId || optCatId === selectedCatId) {
+                            option.style.display = '';
+                        } else {
+                            option.style.display = 'none';
+                        }
                     });
-                    if (prev && rows.some(function (row) { return row.code === prev; })) {
-                        t.value = prev;
+                    
+                    // Réinitialiser le type si la catégorie change et que le type n'est plus applicable
+                    if (typeEl.value !== '') {
+                        var currentOption = typeEl.querySelector('option[value="' + typeEl.value + '"]');
+                        if (currentOption && currentOption.style.display === 'none') {
+                            typeEl.value = '';
+                        }
                     }
+                }
+
+                if (catEl) {
+                    catEl.addEventListener('change', filterTypesByCategory);
                 }
 
                 document.querySelectorAll('.ebc-shortcut').forEach(function (btn) {
@@ -213,8 +231,8 @@
                         date_debut: d0,
                         date_fin: d1
                     };
-                    if (cid) payload.categorie_charge = cid;
-                    if (tid) payload.type_charge = tid;
+                    if (cid) payload.revenue_category_id = parseInt(cid, 10);
+                    if (tid) payload.revenue_type_id = parseInt(tid, 10);
 
                     fetch(calculateUrl, {
                         method: 'POST',
@@ -256,13 +274,8 @@
                     });
                 });
 
-                if (!isSuperAdmin) {
-                    var cat0 = document.getElementById('ebc_category');
-                    if (cat0 && paroisseId()) {
-                        /* catégorie déjà utilisable */
-                    }
-                }
-                fillTypes();
+                // Initialiser le filtre des types au chargement
+                filterTypesByCategory();
             })();
         </script>
     @endpush
