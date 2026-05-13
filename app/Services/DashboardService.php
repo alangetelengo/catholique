@@ -113,6 +113,7 @@ class DashboardService
     private function recentRevenues(?int $paroisseId): Collection
     {
         return Revenue::query()
+            ->where('statut', 'valide')
             ->with(['category', 'type'])
             ->when($paroisseId !== null, fn (Builder $q) => $q->where('paroisse_id', $paroisseId))
             ->orderByDesc('date_recette')
@@ -127,6 +128,7 @@ class DashboardService
     private function recentExpenses(?int $paroisseId): Collection
     {
         return Expense::query()
+            ->where('statut', 'valide')
             ->when($paroisseId !== null, fn (Builder $q) => $q->where('paroisse_id', $paroisseId))
             ->orderByDesc('date_depense')
             ->orderByDesc('id')

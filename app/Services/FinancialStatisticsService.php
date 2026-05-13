@@ -147,7 +147,9 @@ class FinancialStatisticsService
 
     private function scopedRevenues(string $from, string $to, ?int $paroisseId): Builder
     {
-        $q = Revenue::query()->whereBetween('date_recette', [$from, $to]);
+        $q = Revenue::query()
+            ->where('statut', 'valide')
+            ->whereBetween('date_recette', [$from, $to]);
         if ($paroisseId !== null) {
             $q->where('paroisse_id', $paroisseId);
         }
@@ -157,7 +159,9 @@ class FinancialStatisticsService
 
     private function scopedExpenses(string $from, string $to, ?int $paroisseId): Builder
     {
-        $q = Expense::query()->whereBetween('date_depense', [$from, $to]);
+        $q = Expense::query()
+            ->where('statut', 'valide')
+            ->whereBetween('date_depense', [$from, $to]);
         if ($paroisseId !== null) {
             $q->where('paroisse_id', $paroisseId);
         }
@@ -222,11 +226,11 @@ class FinancialStatisticsService
     {
         $expr = $this->monthSqlExpression($dateColumn);
         $model = $table === 'revenues' ? Revenue::query() : Expense::query();
-
         $rows = $model
+            ->where('statut', 'valide')
             ->whereBetween($dateColumn, [$from, $to])
             ->when($paroisseId !== null, fn (Builder $q) => $q->where('paroisse_id', $paroisseId))
-            ->selectRaw("{$expr} as ym, SUM(efs.montant_alloue) as total")
+            ->selectRaw("{$expr} as ym, SUM(montant) as total")
             ->groupByRaw($expr)
             ->orderBy('ym')
             ->get();
@@ -247,6 +251,7 @@ class FinancialStatisticsService
         $expr = $this->monthSqlExpression('date_depense');
         $rows = DB::table('expense_funding_sources as efs')
             ->join('expenses as e', 'e.id', '=', 'efs.expense_id')
+            ->where('e.statut', 'valide')
             ->whereBetween('e.date_depense', [$from, $to])
             ->whereNull('e.deleted_at')
             ->where('efs.revenue_type_id', $popoteTypeId)
@@ -268,11 +273,12 @@ class FinancialStatisticsService
         $expr = $this->monthSqlExpression('date_depense');
         $rows = DB::table('expense_funding_sources as efs')
             ->join('expenses as e', 'e.id', '=', 'efs.expense_id')
+            ->where('e.statut', 'valide')
             ->whereBetween('e.date_depense', [$from, $to])
             ->whereNull('e.deleted_at')
             ->when($popoteTypeId !== null, fn ($q) => $q->where('efs.revenue_type_id', '!=', $popoteTypeId))
             ->when($paroisseId !== null, fn ($q) => $q->where('e.paroisse_id', $paroisseId))
-            ->selectRaw("{$expr} as ym, SUM(montant) as total")
+            ->selectRaw("{$expr} as ym, SUM(efs.montant_alloue) as total")
             ->groupByRaw($expr)
             ->orderBy('ym')
             ->get();
@@ -419,6 +425,7 @@ class FinancialStatisticsService
         $dayExprExp = $this->daySqlExpression('date_depense');
 
         $revRows = Revenue::query()
+            ->where('statut', 'valide')
             ->whereBetween('date_recette', [$fromStr, $toStr])
             ->when($paroisseId !== null, fn (Builder $q) => $q->where('paroisse_id', $paroisseId))
             ->selectRaw("{$dayExprRev} as d, SUM(montant) as total")
@@ -428,6 +435,7 @@ class FinancialStatisticsService
         $popoteTypeId = $this->popoteTypeId($paroisseId);
         $popRows = DB::table('expense_funding_sources as efs')
             ->join('expenses as e', 'e.id', '=', 'efs.expense_id')
+            ->where('e.statut', 'valide')
             ->whereBetween('e.date_depense', [$fromStr, $toStr])
             ->whereNull('e.deleted_at')
             ->when($popoteTypeId !== null, fn ($q) => $q->where('efs.revenue_type_id', $popoteTypeId))
@@ -468,6 +476,7 @@ class FinancialStatisticsService
     {
         return (float) DB::table('expense_funding_sources as efs')
             ->join('expenses as e', 'e.id', '=', 'efs.expense_id')
+            ->where('e.statut', 'valide')
             ->whereBetween('e.date_depense', [$from, $to])
             ->whereNull('e.deleted_at')
             ->where('efs.revenue_type_id', $revenueTypeId)
