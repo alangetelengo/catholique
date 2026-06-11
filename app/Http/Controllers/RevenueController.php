@@ -2,11 +2,13 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Expense;
 use App\Models\Paroisse;
 use App\Models\Revenue;
 use App\Models\RevenueCategory;
 use App\Models\RevenueType;
 use App\Support\PaginationPerPage;
+use App\Support\SubventionMensuelle;
 use App\Traits\LogsErrors;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
@@ -32,11 +34,8 @@ class RevenueController extends Controller
                 ->withQueryString();
 
             $totalMontantRecettes = (float) $this->revenuesIndexFilteredQuery($request)->sum('montant');
-            $montantDerniereRecette = $this->revenuesIndexFilteredQuery($request)
-                ->orderByDesc('date_recette')
-                ->orderByDesc('id')
-                ->value('montant');
-            $montantDerniereRecette = $montantDerniereRecette !== null ? (float) $montantDerniereRecette : null;
+            $totalMontantDepenses = (float) $this->expensesSummaryQuery($request)->sum('montant');
+            $soldeRestant = $totalMontantRecettes - $totalMontantDepenses;
 
             $paroisseId = $this->resolveParoisseIdForContext($request);
             $categories = $paroisseId !== null
@@ -47,7 +46,8 @@ class RevenueController extends Controller
                 'revenues',
                 'categories',
                 'totalMontantRecettes',
-                'montantDerniereRecette',
+                'totalMontantDepenses',
+                'soldeRestant',
             ));
         } catch (Throwable $e) {
             $this->logError($e, 'Erreur lors du chargement des recettes');
@@ -168,6 +168,21 @@ class RevenueController extends Controller
         return $query;
     }
 
+    private function expensesSummaryQuery(Request $request): Builder
+    {
+        $query = Expense::query();
+
+        if ($request->filled('date_from')) {
+            $query->whereDate('date_depense', '>=', $request->date('date_from'));
+        }
+
+        if ($request->filled('date_to')) {
+            $query->whereDate('date_depense', '<=', $request->date('date_to'));
+        }
+
+        return $query;
+    }
+
     /**
      * Catégories et types alignés sur le rapport « par catégories » (paroisse, actifs, tri).
      * En édition, inclut le type courant même s'il est inactif pour conserver l'affichage cohérent.
@@ -224,6 +239,7 @@ class RevenueController extends Controller
             'donateur_nom' => ['nullable', 'string', 'max:255'],
             'donateur_telephone' => ['nullable', 'string', 'max:50'],
             'mois_location' => ['nullable', 'in:01,02,03,04,05,06,07,08,09,10,11,12'],
+            'mois_subvention' => ['nullable', 'regex:/^\d{4}-\d{2}$/'],
         ]);
 
         $paroisseIdForRules = $existingRevenue !== null && ! empty($existingRevenue->paroisse_id)
@@ -261,16 +277,46 @@ class RevenueController extends Controller
         $validated['jour_semaine'] = $jourDepuisDate;
         $validated['periode_messe'] = $jourDepuisDate === 'dimanche' ? 'dimanche' : 'semaine';
 
-        if ($category && $category->code === 'quete_ordinaire') {
+        if (SubventionMensuelle::requiresMoisSubvention($category)) {
+            if (empty($validated['mois_subvention']) || ! SubventionMensuelle::isValidMoisSubvention($validated['mois_subvention'])) {
+                throw ValidationException::withMessages([
+                    'mois_subvention' => 'Le mois concerné est obligatoire pour toute subvention (format AAAA-MM).',
+                ]);
+            }
+
+            $duplicateQuery = Revenue::query()
+                ->where('paroisse_id', $paroisseIdForRules)
+                ->where('revenue_type_id', $revenueType->id)
+                ->where('mois_subvention', $validated['mois_subvention']);
+
+            if ($existingRevenue !== null) {
+                $duplicateQuery->where('id', '!=', $existingRevenue->id);
+            }
+
+            if ($duplicateQuery->exists()) {
+                throw ValidationException::withMessages([
+                    'mois_subvention' => sprintf(
+                        'Une subvention %s existe déjà pour %s.',
+                        $revenueType->nom,
+                        SubventionMensuelle::formatMoisLabel($validated['mois_subvention'])
+                    ),
+                ]);
+            }
+
             $validated['mois_location'] = null;
+        } elseif ($category && $category->code === 'quete_ordinaire') {
+            $validated['mois_location'] = null;
+            $validated['mois_subvention'] = null;
         } elseif ($category && $category->code === 'location' && $revenueType && in_array($revenueType->code, ['loyer-boutique', 'loyer_boutique'], true)) {
             if (empty($validated['mois_location'])) {
                 throw ValidationException::withMessages([
                     'mois_location' => 'Le mois de location est obligatoire pour un loyer boutique.',
                 ]);
             }
+            $validated['mois_subvention'] = null;
         } else {
             $validated['mois_location'] = null;
+            $validated['mois_subvention'] = null;
         }
 
         if (! $category || $category->code !== 'procure') {

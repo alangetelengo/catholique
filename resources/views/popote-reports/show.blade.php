@@ -28,14 +28,48 @@
         <div class="adventiste-card-pro-static p-4"><p class="text-xs uppercase text-slate-500">Solde popote</p><p class="mt-1 text-xl font-bold">{{ $fcfa((float) $report->solde) }}</p></div>
     </div>
 
+    @php $monthlySummary = collect($detailsRecettes['monthly_summary'] ?? []); @endphp
+    @if($monthlySummary->isNotEmpty())
+        <div class="adventiste-card-pro-static p-4 sm:p-5 mb-5">
+            <h2 class="text-sm font-semibold text-slate-900 dark:text-white mb-3">Synthèse par mois</h2>
+            <div class="adventiste-table-shell">
+                <table class="min-w-full text-sm">
+                    <thead>
+                        <tr>
+                            <th class="px-4 py-3 font-semibold text-left">Mois concerné</th>
+                            <th class="px-4 py-3 font-semibold text-left">Subvention reçue</th>
+                            <th class="px-4 py-3 font-semibold text-left">Dépenses</th>
+                            <th class="px-4 py-3 font-semibold text-left">Solde restant</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-200/70 dark:divide-slate-700/70">
+                        @foreach($monthlySummary as $row)
+                            <tr>
+                                <td class="px-4 py-3 font-medium">{{ $row['mois_label'] ?? '—' }}</td>
+                                <td class="px-4 py-3 text-emerald-700 font-semibold">{{ $fcfa((float) ($row['subvention_recue'] ?? 0)) }}</td>
+                                <td class="px-4 py-3 text-rose-700 font-semibold">{{ $fcfa((float) ($row['depenses'] ?? 0)) }}</td>
+                                <td class="px-4 py-3 font-semibold">{{ $fcfa((float) ($row['solde'] ?? 0)) }}</td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    @endif
+
     <div class="adventiste-table-shell mb-5">
         <table class="min-w-full text-sm">
-            <thead><tr><th class="px-4 py-3 font-semibold">Date recette</th><th class="px-4 py-3 font-semibold">Référence</th><th class="px-4 py-3 font-semibold">Montant subvention</th></tr></thead>
+            <thead><tr><th class="px-4 py-3 font-semibold">Mois concerné</th><th class="px-4 py-3 font-semibold">Date recette</th><th class="px-4 py-3 font-semibold">Référence</th><th class="px-4 py-3 font-semibold">Montant subvention</th></tr></thead>
             <tbody class="divide-y divide-slate-200/70 dark:divide-slate-700/70">
                 @forelse($rowsRecettes as $row)
-                    <tr><td class="px-4 py-3">{{ \Illuminate\Support\Carbon::parse($row['date'])->format('d/m/Y') }}</td><td class="px-4 py-3">{{ $row['reference'] ?? '-' }}</td><td class="px-4 py-3 font-semibold">{{ $fcfa((float) ($row['montant'] ?? 0)) }}</td></tr>
+                    <tr>
+                        <td class="px-4 py-3 font-medium">{{ $row['mois_label'] ?? '—' }}</td>
+                        <td class="px-4 py-3">{{ \Illuminate\Support\Carbon::parse($row['date'])->format('d/m/Y') }}</td>
+                        <td class="px-4 py-3">{{ $row['reference'] ?? '-' }}</td>
+                        <td class="px-4 py-3 font-semibold">{{ $fcfa((float) ($row['montant'] ?? 0)) }}</td>
+                    </tr>
                 @empty
-                    <tr><td colspan="3" class="px-4 py-8 text-center text-slate-500">Aucune subvention reçue.</td></tr>
+                    <tr><td colspan="4" class="px-4 py-8 text-center text-slate-500">Aucune subvention reçue.</td></tr>
                 @endforelse
             </tbody>
         </table>

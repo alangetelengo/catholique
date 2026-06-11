@@ -4,7 +4,7 @@
 @section('page-title', 'Rapport par catégories de dépenses')
 
 @section('page-title-info')
-    Filtrez par paroisse, période, <strong class="font-semibold">catégorie de charge</strong> (fixes, variables, exceptionnelles, alimentation popote), puis éventuellement un <strong class="font-semibold">type</strong> de charge. La répartition par catégorie s’affiche sans filtre catégorie ; avec une catégorie, le détail par type et la liste des lignes s’actualisent.
+    Filtrez par paroisse, période, <strong class="font-semibold">catégorie de source</strong> (quête, location, subvention…), puis éventuellement un <strong class="font-semibold">type</strong>. Pour les <strong class="font-semibold">subventions</strong>, le rapport distingue chaque enveloppe mensuelle (type + mois concerné) et affiche subvention reçue, dépenses et solde.
     <span id="ebc-period-display" class="hidden block mt-1 text-slate-500 dark:text-slate-400"></span>
 @endsection
 
@@ -35,7 +35,7 @@
     <div class="rounded-xl border border-sky-200/90 dark:border-sky-800/50 bg-sky-50/90 dark:bg-sky-950/25 px-4 py-3 mb-6 text-sm text-sky-950 dark:text-sky-100 leading-relaxed">
         <p class="m-0 flex gap-2">
             <i class="fas fa-info-circle mt-0.5 shrink-0 text-sky-600 dark:text-sky-400" aria-hidden="true"></i>
-            <span>Les montants regroupent les <strong class="font-semibold">dépenses validées</strong> de la paroisse sur l’intervalle choisi (y compris l’alimentation popote dans les dépenses générales). Calcul <strong class="font-semibold">sans recharger la page</strong>. Le filtre « type » nécessite une catégorie précise.</span>
+            <span>Les montants regroupent les <strong class="font-semibold">dépenses validées</strong> sur l’intervalle choisi. Les subventions sont ventilées par <strong class="font-semibold">mois concerné</strong> (enveloppe mensuelle), et non par cumul global. Calcul <strong class="font-semibold">sans recharger la page</strong>.</span>
         </p>
     </div>
 

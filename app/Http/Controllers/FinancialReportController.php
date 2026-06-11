@@ -12,6 +12,7 @@ use App\Models\RevenueCategory;
 use App\Models\RevenueType;
 use App\Support\FinancialReportSignatories;
 use App\Support\PaginationPerPage;
+use App\Support\SubventionMensuelle;
 use App\Traits\LogsErrors;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
@@ -417,9 +418,14 @@ class FinancialReportController extends Controller implements HasMiddleware
                 $typeId = isset($details['revenue_type_id']) ? (int) $details['revenue_type_id'] : null;
                 $report = $this->calculateRevenuesByCategoryReport($financialReport->paroisse_id, $dateDebut, $dateFin, $categoryId, $typeId);
 
+                $layout = $this->revenuesByCategoryReportLayout($typeId, $categoryId);
+
                 return view('financial-reports.show-revenues-by-category', [
                     'financialReport' => $financialReport,
                     'report' => $report,
+                    'selectedCategoryId' => $categoryId,
+                    'selectedTypeId' => $typeId,
+                    ...$layout,
                 ]);
             }
 
@@ -462,7 +468,7 @@ class FinancialReportController extends Controller implements HasMiddleware
 
                 $pdfCategoryNom = $categoryId ? RevenueCategory::query()->whereKey($categoryId)->value('nom') : null;
                 $pdfTypeNom = $typeId ? RevenueType::query()->whereKey($typeId)->value('nom') : null;
-                $layout = $this->revenuesByCategoryReportLayout($typeId);
+                $layout = $this->revenuesByCategoryReportLayout($typeId, $categoryId);
 
                 $pdf = Pdf::loadView('financial-reports.revenues-by-category-pdf', [
                     'report' => $report,
@@ -475,7 +481,7 @@ class FinancialReportController extends Controller implements HasMiddleware
                     'pdfCategoryNom' => $pdfCategoryNom,
                     'pdfTypeNom' => $pdfTypeNom,
                     ...$layout,
-                ])->setPaper('a4', 'landscape');
+                ])->setPaper('a4', 'portrait');
 
                 $filename = 'rapport-recettes-par-categorie-'.Str::slug($paroisse->nom).'-'.$dateDebut->format('Y-m-d').'-'.$dateFin->format('Y-m-d').'.pdf';
 
@@ -936,7 +942,7 @@ class FinancialReportController extends Controller implements HasMiddleware
                 $typeId
             );
 
-            $layout = $this->revenuesByCategoryReportLayout($typeId);
+            $layout = $this->revenuesByCategoryReportLayout($typeId, $categoryId);
 
             $html = view('financial-reports.partials.revenues-by-category-report-body', [
                 'report' => $report,
@@ -1086,7 +1092,7 @@ class FinancialReportController extends Controller implements HasMiddleware
             $pdfTypeNom = $selectedTypeId
                 ? RevenueType::query()->whereKey($selectedTypeId)->value('nom')
                 : null;
-            $layout = $this->revenuesByCategoryReportLayout($selectedTypeId);
+            $layout = $this->revenuesByCategoryReportLayout($selectedTypeId, $selectedCategoryId);
 
             $pdf = Pdf::loadView('financial-reports.revenues-by-category-pdf', [
                 'report' => $report,
@@ -1141,21 +1147,24 @@ class FinancialReportController extends Controller implements HasMiddleware
     /**
      * Affichage semaine / dimanche du rapport selon le code du type de recette filtré.
      *
-     * @return array{showRptSemaine: bool, showRptDimanche: bool, rptTotalSubtitle: string}
+     * @return array{showRptSemaine: bool, showRptDimanche: bool, rptTotalSubtitle: string, showWeeklyBreakdown: bool}
      */
-    private function revenuesByCategoryReportLayout(?int $typeId): array
+    private function revenuesByCategoryReportLayout(?int $typeId, ?int $categoryId = null): array
     {
+        $showWeeklyBreakdown = $this->shouldShowWeeklyRevenueBreakdown($categoryId, $typeId);
+
         if ($typeId === null) {
             return [
                 'showRptSemaine' => true,
                 'showRptDimanche' => true,
                 'rptTotalSubtitle' => 'Semaine + dimanche',
+                'showWeeklyBreakdown' => $showWeeklyBreakdown,
             ];
         }
 
         $code = RevenueType::query()->whereKey($typeId)->value('code');
 
-        return match ($code) {
+        return array_merge(match ($code) {
             'messe_dimanche' => [
                 'showRptSemaine' => false,
                 'showRptDimanche' => true,
@@ -1171,9 +1180,36 @@ class FinancialReportController extends Controller implements HasMiddleware
                 'showRptDimanche' => true,
                 'rptTotalSubtitle' => 'Semaine + dimanche',
             ],
-        };
+        }, ['showWeeklyBreakdown' => $showWeeklyBreakdown]);
     }
 
+    private function shouldShowWeeklyRevenueBreakdown(?int $categoryId, ?int $typeId): bool
+    {
+        if ($typeId !== null) {
+            $code = RevenueType::query()->whereKey($typeId)->value('code');
+
+            return in_array($code, ['messe_dimanche', 'messe_semaine'], true);
+        }
+
+        if ($categoryId !== null) {
+            return RevenueCategory::query()->whereKey($categoryId)->value('code') === 'quete_ordinaire';
+        }
+
+        return false;
+    }
+
+    /**
+     * @return array{
+     *     revenues: Collection<int, Revenue>,
+     *     by_category: array<int|string, array{nom: string, code: string, montant: float, count: int, revenues: Collection<int, Revenue>}>,
+     *     by_type: array<string, array{id: int, nom: string, mois_subvention: string|null, mois_label: string|null, montant: float, count: int}>,
+     *     subvention_envelopes: list<array{key: string, type_id: int, type_nom: string, mois_subvention: string, mois_label: string, label: string, montant: float, count: int}>,
+     *     total_general: float,
+     *     date_debut: Carbon,
+     *     date_fin: Carbon,
+     *     weekly: array<string, mixed>
+     * }
+     */
     private function calculateRevenuesByCategoryReport(int $paroisseId, Carbon $dateDebut, Carbon $dateFin, ?int $categoryId = null, ?int $typeId = null): array
     {
         $query = Revenue::query()
@@ -1205,13 +1241,78 @@ class FinancialReportController extends Controller implements HasMiddleware
             ];
         }
 
-        $totalGeneral = $revenues->sum('montant');
+        $byType = [];
+        $subventionEnvelopeBuckets = [];
+
+        foreach ($revenues as $revenue) {
+            $type = $revenue->type;
+            if (! $type) {
+                continue;
+            }
+
+            if ($typeId && (int) $type->id !== (int) $typeId) {
+                continue;
+            }
+
+            $moisSubvention = $revenue->mois_subvention;
+            $isSubvention = SubventionMensuelle::isSubventionType($type);
+            $groupKey = $isSubvention && $moisSubvention
+                ? $type->id.'-'.$moisSubvention
+                : (string) $type->id;
+            $groupLabel = $isSubvention && $moisSubvention
+                ? SubventionMensuelle::envelopeLabel($type, $moisSubvention)
+                : $type->nom;
+
+            if (! isset($byType[$groupKey])) {
+                $byType[$groupKey] = [
+                    'id' => (int) $type->id,
+                    'nom' => $groupLabel,
+                    'mois_subvention' => $moisSubvention,
+                    'mois_label' => $moisSubvention ? SubventionMensuelle::formatMoisLabel($moisSubvention) : null,
+                    'montant' => 0.0,
+                    'count' => 0,
+                ];
+            }
+
+            $montant = (float) $revenue->montant;
+            $byType[$groupKey]['montant'] += $montant;
+            $byType[$groupKey]['count']++;
+
+            if ($isSubvention && $moisSubvention) {
+                if (! isset($subventionEnvelopeBuckets[$groupKey])) {
+                    $subventionEnvelopeBuckets[$groupKey] = [
+                        'key' => $groupKey,
+                        'type_id' => (int) $type->id,
+                        'type_nom' => $type->nom,
+                        'mois_subvention' => $moisSubvention,
+                        'mois_label' => SubventionMensuelle::formatMoisLabel($moisSubvention),
+                        'label' => $groupLabel,
+                        'montant' => 0.0,
+                        'count' => 0,
+                    ];
+                }
+
+                $subventionEnvelopeBuckets[$groupKey]['montant'] += $montant;
+                $subventionEnvelopeBuckets[$groupKey]['count']++;
+            }
+        }
+
+        $subventionEnvelopes = array_values($subventionEnvelopeBuckets);
+        usort($subventionEnvelopes, function (array $a, array $b): int {
+            $cmp = strcmp($a['mois_subvention'], $b['mois_subvention']);
+
+            return $cmp !== 0 ? $cmp : strcmp($a['type_nom'], $b['type_nom']);
+        });
+
+        $totalGeneral = (float) $revenues->sum('montant');
         $weekly = $this->splitRevenuesSemaineDimanche($revenues);
         $weekly['revenues_all'] = $revenues;
 
         return [
             'revenues' => $revenues,
             'by_category' => $byCategory,
+            'by_type' => $byType,
+            'subvention_envelopes' => $subventionEnvelopes,
             'total_general' => $totalGeneral,
             'date_debut' => $dateDebut,
             'date_fin' => $dateFin,
@@ -1400,8 +1501,9 @@ class FinancialReportController extends Controller implements HasMiddleware
     /**
      * @return array{
      *     expenses: Collection<int, Expense>,
-     *     by_category: array<string, array{code: string, nom: string, montant: float, count: int}>,
-     *     by_type: array<string, array{code: string, nom: string, montant: float, count: int}>,
+     *     by_category: array<string, array{id: int, nom: string, montant: float, count: int}>,
+     *     by_type: array<string, array{id: int, nom: string, montant: float, count: int, mois_subvention: string|null, mois_label: string|null}>,
+     *     subvention_envelopes: list<array{key: string, type_id: int, type_nom: string, mois_subvention: string|null, mois_label: string|null, label: string, subvention_recue: float|null, depenses: float, solde: float|null, count: int}>,
      *     total_general: float,
      *     date_debut: Carbon,
      *     date_fin: Carbon
@@ -1415,7 +1517,7 @@ class FinancialReportController extends Controller implements HasMiddleware
         ?int $revenueTypeId = null
     ): array {
         $query = Expense::query()
-            ->with(['revenueCategory', 'fundingSources.revenueType'])
+            ->with(['revenueCategory', 'fundingSources.revenueType', 'fundingSources.revenue'])
             ->where('paroisse_id', $paroisseId)
             ->where('statut', 'valide')
             ->whereDate('date_depense', '>=', $dateDebut)
@@ -1433,7 +1535,6 @@ class FinancialReportController extends Controller implements HasMiddleware
 
         $expenses = $query->orderBy('date_depense')->orderBy('id')->get();
 
-        // Grouper par catégorie de recettes (source des fonds)
         $byCategory = [];
         foreach ($expenses->groupBy('revenue_category_id') as $categoryId => $items) {
             $category = RevenueCategory::find($categoryId);
@@ -1447,8 +1548,9 @@ class FinancialReportController extends Controller implements HasMiddleware
             }
         }
 
-        // Grouper par type de recettes (source précise des fonds) via allocations multi-sources
         $byType = [];
+        $subventionEnvelopeBuckets = [];
+
         foreach ($expenses as $expense) {
             foreach ($expense->fundingSources as $fundingSource) {
                 $type = $fundingSource->revenueType;
@@ -1460,28 +1562,95 @@ class FinancialReportController extends Controller implements HasMiddleware
                     continue;
                 }
 
-                $typeId = (int) $type->id;
-                if (! isset($byType[$typeId])) {
-                    $byType[$typeId] = [
-                        'id' => $typeId,
-                        'nom' => $type->nom,
+                $moisSubvention = $fundingSource->revenue?->mois_subvention;
+                $isSubvention = SubventionMensuelle::isSubventionType($type);
+                $groupKey = $isSubvention && $moisSubvention
+                    ? $type->id.'-'.$moisSubvention
+                    : (string) $type->id;
+                $groupLabel = $isSubvention && $moisSubvention
+                    ? SubventionMensuelle::envelopeLabel($type, $moisSubvention)
+                    : $type->nom;
+
+                if (! isset($byType[$groupKey])) {
+                    $byType[$groupKey] = [
+                        'id' => (int) $type->id,
+                        'nom' => $groupLabel,
+                        'mois_subvention' => $moisSubvention,
+                        'mois_label' => $moisSubvention ? SubventionMensuelle::formatMoisLabel($moisSubvention) : null,
                         'montant' => 0.0,
                         'count' => 0,
                     ];
                 }
 
-                $byType[$typeId]['montant'] += (float) $fundingSource->montant_alloue;
-                $byType[$typeId]['count']++;
+                $allocated = (float) $fundingSource->montant_alloue;
+                $byType[$groupKey]['montant'] += $allocated;
+                $byType[$groupKey]['count']++;
+
+                if ($isSubvention && $moisSubvention) {
+                    if (! isset($subventionEnvelopeBuckets[$groupKey])) {
+                        $subventionEnvelopeBuckets[$groupKey] = [
+                            'key' => $groupKey,
+                            'type_id' => (int) $type->id,
+                            'type_nom' => $type->nom,
+                            'mois_subvention' => $moisSubvention,
+                            'mois_label' => SubventionMensuelle::formatMoisLabel($moisSubvention),
+                            'label' => $groupLabel,
+                            'depenses' => 0.0,
+                            'count' => 0,
+                        ];
+                    }
+
+                    $subventionEnvelopeBuckets[$groupKey]['depenses'] += $allocated;
+                    $subventionEnvelopeBuckets[$groupKey]['count']++;
+                }
             }
         }
+
+        $subventionEnvelopes = $this->finalizeSubventionEnvelopeSummary($paroisseId, $subventionEnvelopeBuckets);
 
         return [
             'expenses' => $expenses,
             'by_category' => $byCategory,
             'by_type' => $byType,
+            'subvention_envelopes' => $subventionEnvelopes,
             'total_general' => (float) $expenses->sum('montant'),
             'date_debut' => $dateDebut,
             'date_fin' => $dateFin,
         ];
+    }
+
+    /**
+     * @param  array<string, array{key: string, type_id: int, type_nom: string, mois_subvention: string, mois_label: string, label: string, depenses: float, count: int}>  $buckets
+     * @return list<array{key: string, type_id: int, type_nom: string, mois_subvention: string, mois_label: string, label: string, subvention_recue: float, depenses: float, solde: float, count: int}>
+     */
+    private function finalizeSubventionEnvelopeSummary(int $paroisseId, array $buckets): array
+    {
+        $summary = [];
+
+        foreach ($buckets as $bucket) {
+            $revenue = Revenue::query()
+                ->where('paroisse_id', $paroisseId)
+                ->where('revenue_type_id', $bucket['type_id'])
+                ->where('mois_subvention', $bucket['mois_subvention'])
+                ->where('statut', 'valide')
+                ->first();
+
+            $subventionRecue = $revenue ? (float) $revenue->montant : 0.0;
+            $depenses = (float) $bucket['depenses'];
+
+            $summary[] = [
+                ...$bucket,
+                'subvention_recue' => $subventionRecue,
+                'solde' => $subventionRecue - $depenses,
+            ];
+        }
+
+        usort($summary, function (array $a, array $b): int {
+            $cmp = strcmp($a['mois_subvention'], $b['mois_subvention']);
+
+            return $cmp !== 0 ? $cmp : strcmp($a['type_nom'], $b['type_nom']);
+        });
+
+        return $summary;
     }
 }

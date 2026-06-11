@@ -18,6 +18,7 @@ class Revenue extends Model
         'periode_messe',
         'jour_semaine',
         'mois_location',
+        'mois_subvention',
         'event_id',
         'montant',
         'date_recette',

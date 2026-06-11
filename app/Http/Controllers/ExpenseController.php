@@ -28,7 +28,7 @@ class ExpenseController extends Controller
     {
         try {
             $expenses = $this->expensesIndexFilteredQuery($request)
-                ->with(['createdBy', 'revenueCategory', 'fundingSources.revenueType'])
+                ->with(['createdBy', 'revenueCategory', 'fundingSources.revenueType', 'fundingSources.revenue'])
                 ->orderByDesc('date_depense')
                 ->orderByDesc('id')
                 ->paginate(PaginationPerPage::resolve($request))
@@ -65,13 +65,14 @@ class ExpenseController extends Controller
 
         // Récupérer les types de recettes avec solde disponible > 0
         $revenueTypes = $this->budgetService->getSourcesAvecSolde($userParoisseId);
+        $subventionEnvelopes = $this->budgetService->getSubventionEnvelopesForExpenseForm((int) $userParoisseId);
 
         $expense = new Expense([
             'date_depense' => now()->toDateString(),
             'methode_paiement' => 'especes',
         ]);
 
-        return view('expenses.create', compact('expense', 'revenueCategories', 'revenueTypes'));
+        return view('expenses.create', compact('expense', 'revenueCategories', 'revenueTypes', 'subventionEnvelopes'));
     }
 
     public function store(Request $request): RedirectResponse
@@ -92,6 +93,7 @@ class ExpenseController extends Controller
                         if (! empty($source['revenue_type_id']) && ! empty($source['montant_alloue'])) {
                             $expense->fundingSources()->create([
                                 'revenue_type_id' => $source['revenue_type_id'],
+                                'revenue_id' => ! empty($source['revenue_id']) ? (int) $source['revenue_id'] : null,
                                 'montant_alloue' => $source['montant_alloue'],
                                 'ordre' => $index + 1,
                             ]);
@@ -130,11 +132,12 @@ class ExpenseController extends Controller
 
         // Récupérer les types de recettes avec solde disponible > 0 (en excluant la dépense actuelle)
         $revenueTypes = $this->budgetService->getSourcesAvecSolde($userParoisseId, $expense);
+        $subventionEnvelopes = $this->budgetService->getSubventionEnvelopesForExpenseForm((int) $userParoisseId, $expense);
 
         // Charger les sources de financement existantes
-        $expense->load('fundingSources.revenueType');
+        $expense->load('fundingSources.revenueType', 'fundingSources.revenue');
 
-        return view('expenses.edit', compact('expense', 'revenueCategories', 'revenueTypes'));
+        return view('expenses.edit', compact('expense', 'revenueCategories', 'revenueTypes', 'subventionEnvelopes'));
     }
 
     public function update(Request $request, Expense $expense): RedirectResponse
@@ -160,6 +163,7 @@ class ExpenseController extends Controller
                         if (! empty($source['revenue_type_id']) && ! empty($source['montant_alloue'])) {
                             $expense->fundingSources()->create([
                                 'revenue_type_id' => $source['revenue_type_id'],
+                                'revenue_id' => ! empty($source['revenue_id']) ? (int) $source['revenue_id'] : null,
                                 'montant_alloue' => $source['montant_alloue'],
                                 'ordre' => $index + 1,
                             ]);
@@ -242,6 +246,7 @@ class ExpenseController extends Controller
             'piece_autre' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:5120'],
             'funding_sources' => ['required', 'array', 'min:1'],
             'funding_sources.*.revenue_type_id' => ['required', 'integer', 'exists:revenue_types,id'],
+            'funding_sources.*.revenue_id' => ['nullable', 'integer', 'exists:revenues,id'],
             'funding_sources.*.montant_alloue' => ['required', 'numeric', 'min:0'],
         ]);
 

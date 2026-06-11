@@ -14,6 +14,7 @@
     if ($selectedMoisLocation === null) {
         $selectedMoisLocation = now()->format('m');
     }
+    $selectedMoisSubvention = old('mois_subvention', $revenue->mois_subvention ?? now()->format('Y-m'));
     $moisOptions = [
         '01' => 'Janvier',
         '02' => 'Fevrier',
@@ -134,6 +135,19 @@
         @error('methode_paiement')<p class="mt-1.5 text-sm text-red-600 dark:text-red-400">{{ $message }}</p>@enderror
     </div>
 
+    <div id="moisSubventionWrapper">
+        <label class="block text-sm font-semibold text-slate-800 dark:text-slate-200 mb-1.5">Mois concerné (subvention) <span class="text-red-600">*</span></label>
+        <input
+            type="month"
+            name="mois_subvention"
+            id="mois_subvention"
+            value="{{ $selectedMoisSubvention }}"
+            class="{{ $field }}"
+        >
+        <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Mois auquel cette subvention s&apos;applique (carburant, eau, popote, etc.), indépendamment de la date de réception.</p>
+        @error('mois_subvention')<p class="mt-1.5 text-sm text-red-600 dark:text-red-400">{{ $message }}</p>@enderror
+    </div>
+
     <div id="moisLocationWrapper">
         <label class="block text-sm font-semibold text-slate-800 dark:text-slate-200 mb-1.5">Mois de location (loyer boutique)</label>
         <select name="mois_location" class="{{ $field }}">
@@ -186,6 +200,8 @@
             const dateInput = document.getElementById('date_recette');
             const dayAutoInput = document.getElementById('jour_semaine_auto');
             const monthWrapper = document.getElementById('moisLocationWrapper');
+            const moisSubventionWrapper = document.getElementById('moisSubventionWrapper');
+            const moisSubventionInput = document.getElementById('mois_subvention');
             const donorNomWrapper = document.getElementById('donateurNomWrapper');
             const donorTelephoneWrapper = document.getElementById('donateurTelephoneWrapper');
 
@@ -244,8 +260,11 @@
 
                 const isLocationBoutique = categoryCode === 'location' && (typeCode === 'loyer-boutique' || typeCode === 'loyer_boutique');
                 const isProcure = categoryCode === 'procure';
+                const isSubvention = categoryCode === 'subvention';
 
-                monthWrapper.style.display = isLocationBoutique ? '' : 'none';
+                if (monthWrapper) monthWrapper.style.display = isLocationBoutique ? '' : 'none';
+                if (moisSubventionWrapper) moisSubventionWrapper.style.display = isSubvention ? '' : 'none';
+                if (moisSubventionInput) moisSubventionInput.required = isSubvention;
                 if (donorNomWrapper) donorNomWrapper.style.display = isProcure ? '' : 'none';
                 if (donorTelephoneWrapper) donorTelephoneWrapper.style.display = isProcure ? '' : 'none';
             }

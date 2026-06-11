@@ -129,6 +129,7 @@
                 <thead>
                     <tr class="text-left text-slate-700 dark:text-slate-200">
                         <th class="px-4 py-3 font-semibold">Date</th>
+                        <th class="px-4 py-3 font-semibold">Libellé</th>
                         <th class="px-4 py-3 font-semibold">Catégorie</th>
                         <th class="px-4 py-3 font-semibold">Sources de financement</th>
                         <th class="px-4 py-3 font-semibold">Montant</th>
@@ -141,34 +142,47 @@
                 <tbody class="divide-y divide-slate-200/70 dark:divide-slate-700/70">
                     @forelse ($expenses as $expense)
                         <tr class="text-slate-700 dark:text-slate-200">
-                            <td class="px-4 py-3">{{ optional($expense->date_depense)->format('d/m/Y') }}</td>
-                            <td class="px-4 py-3">
-                                {{ $expense->revenueCategory?->nom ?? '-' }}
+                            <td class="px-4 py-3 whitespace-nowrap">{{ optional($expense->date_depense)->format('d/m/Y') }}</td>
+                            <td class="px-4 py-3 max-w-[14rem]">
+                                <span class="line-clamp-2" title="{{ $expense->libelle }}">{{ $expense->libelle ?: '—' }}</span>
                             </td>
-                            <td class="px-4 py-3 text-xs">
+                            <td class="px-4 py-3 whitespace-nowrap">
+                                {{ $expense->revenueCategory?->nom ?? '—' }}
+                            </td>
+                            <td class="px-4 py-3 text-xs min-w-[12rem]">
                                 @if($expense->fundingSources->isNotEmpty())
-                                    <div class="space-y-1">
+                                    <div class="flex flex-col gap-1">
                                         @foreach($expense->fundingSources as $source)
-                                            <div class="inline-flex items-center gap-1 bg-emerald-50 dark:bg-emerald-900/20 px-2 py-0.5 rounded">
-                                                <span class="text-emerald-700 dark:text-emerald-300">{{ $source->revenueType?->nom ?? '-' }}</span>
-                                                <span class="text-emerald-600 dark:text-emerald-400 font-semibold">({{ number_format($source->montant_alloue, 0, ',', ' ') }})</span>
+                                            @php
+                                                $sourceLabel = $source->revenueType?->nom ?? '—';
+                                                if ($source->revenue?->mois_subvention) {
+                                                    $sourceLabel = \App\Support\SubventionMensuelle::envelopeLabel(
+                                                        $source->revenueType,
+                                                        $source->revenue->mois_subvention
+                                                    );
+                                                }
+                                            @endphp
+                                            <div class="inline-flex flex-wrap items-center gap-1 bg-emerald-50 dark:bg-emerald-900/20 px-2 py-0.5 rounded w-fit">
+                                                <span class="text-emerald-700 dark:text-emerald-300">{{ $sourceLabel }}</span>
+                                                <span class="text-emerald-600 dark:text-emerald-400 font-semibold">({{ number_format((float) $source->montant_alloue, 0, ',', ' ') }} fcfa)</span>
                                             </div>
                                         @endforeach
                                     </div>
                                 @elseif($expense->revenueType)
-                                    {{-- Ancien système --}}
                                     <span class="text-slate-500 dark:text-slate-400 italic">{{ $expense->revenueType->nom }}</span>
                                 @else
-                                    <span class="text-slate-400">-</span>
+                                    <span class="text-slate-400">—</span>
                                 @endif
                             </td>
-                            <td class="px-4 py-3 font-semibold">{{ $formatFcfa((float) $expense->montant) }}</td>
-                            <td class="px-4 py-3">
+                            <td class="px-4 py-3 font-semibold whitespace-nowrap">{{ $formatFcfa((float) $expense->montant) }}</td>
+                            <td class="px-4 py-3 whitespace-nowrap">
                                 <span class="inline-flex items-center rounded-full bg-slate-100 dark:bg-slate-700 px-2.5 py-1 text-xs font-semibold text-slate-700 dark:text-slate-200">
                                     {{ str_replace('_', ' ', ucfirst($expense->methode_paiement)) }}
                                 </span>
                             </td>
-                            <td class="px-4 py-3">{{ $expense->fournisseur ?: ($expense->libelle ?: '-') }}</td>
+                            <td class="px-4 py-3 max-w-[10rem]">
+                                {{ $expense->fournisseur ?: '—' }}
+                            </td>
                             <td class="px-4 py-3">
                                 <div class="flex items-center gap-1.5 text-xs">
                                     @if($expense->piece_facture_path)
@@ -225,7 +239,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="7" class="px-4 py-8 text-center text-slate-500">Aucune dépense trouvée.</td>
+                            <td colspan="9" class="px-4 py-8 text-center text-slate-500">Aucune dépense trouvée.</td>
                         </tr>
                     @endforelse
                 </tbody>

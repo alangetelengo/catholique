@@ -2,383 +2,315 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
+    <title>Rapport recettes — {{ $paroisse?->nom ?? 'Paroisse' }}</title>
     @php
-        $pdfTitle = 'Rapport recettes par catégorie';
-        $categoryLabel = $pdfCategoryNom ?? null;
-        if ($categoryLabel === null && ($selectedCategoryId ?? null)) {
-            $fid = (int) $selectedCategoryId;
-            foreach ($report['by_category'] ?? [] as $cid => $row) {
-                if ((int) $cid === $fid) {
-                    $categoryLabel = $row['nom'] ?? null;
-                    break;
-                }
-            }
-        }
-        if ($categoryLabel) {
-            $pdfTitle .= ' — '.$categoryLabel;
-        }
-        $typeLabel = $pdfTypeNom ?? null;
-        if ($typeLabel === null && ($selectedTypeId ?? null)) {
-            $typeLabel = \App\Models\RevenueType::query()->whereKey((int) $selectedTypeId)->value('nom');
-        }
-        if ($typeLabel) {
-            $pdfTitle .= ' — '.$typeLabel;
-        }
-        if ($paroisse) {
-            $pdfTitle .= ' — '.$paroisse->nom;
-        }
-        $pdfTitle .= ' — '.$dateDebut->format('d/m/Y').' au '.$dateFin->format('d/m/Y');
+        $fmt = static fn (?float $n): string => \App\Helpers\ParoisseConfig::formatMontant($n, $paroisse?->id);
+        $selectedCategory = ! empty($selectedCategoryId)
+            ? \App\Models\RevenueCategory::find($selectedCategoryId)
+            : null;
+        $selectedType = ! empty($selectedTypeId)
+            ? \App\Models\RevenueType::find($selectedTypeId)
+            : null;
+        $isSubventionCategory = $selectedCategory && $selectedCategory->code === \App\Support\SubventionMensuelle::CATEGORY_CODE;
+        $envelopes = collect($report['subvention_envelopes'] ?? []);
+        $w = $report['weekly'] ?? null;
+        $showWeeklyBreakdown = ($showWeeklyBreakdown ?? false) && $w;
+        $showRptSemaine = $showRptSemaine ?? true;
+        $showRptDimanche = $showRptDimanche ?? true;
+        $joursLabels = [
+            'lundi' => 'Lundi', 'mardi' => 'Mardi', 'mercredi' => 'Mercredi', 'jeudi' => 'Jeudi',
+            'vendredi' => 'Vendredi', 'samedi' => 'Samedi', 'dimanche' => 'Dimanche',
+        ];
+        $brandColor = $headerConfig['header_bg_color'] ?? '#003366';
     @endphp
-    <title>{{ $pdfTitle }}</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: 'DejaVu Sans', Arial, sans-serif;
-            font-size: 8px;
-            color: #333;
-            line-height: 1.25;
+            font-size: 12px;
+            color: #1e293b;
+            line-height: 1.5;
         }
         .header {
-            background-color: {{ $headerConfig['header_bg_color'] ?? '#003366' }};
-            color: {{ $headerConfig['header_text_color'] ?? '#FFFFFF' }};
-            padding: 8px 12px;
-            margin-bottom: 8px;
-            border-radius: 2px;
+            background-color: {{ $brandColor }};
+            color: #fff;
+            padding: 14px 16px;
+            margin-bottom: 16px;
         }
-        .header-content { display: table; width: 100%; }
-        .header-left { display: table-cell; vertical-align: middle; width: {{ ($headerConfig['show_logo'] ?? false) ? '15%' : '0%' }}; }
-        .header-center { display: table-cell; vertical-align: middle; text-align: center; width: {{ ($headerConfig['show_logo'] ?? false) ? '85%' : '100%' }}; }
-        .header img { max-width: {{ $headerConfig['logo_width'] ?? '50' }}px; max-height: 40px; }
-        .header h1 { font-size: 12px; font-weight: bold; margin-bottom: 2px; }
-        .header h2 { font-size: 10px; font-weight: normal; margin-bottom: 0; }
-        .header p { font-size: 7px; margin: 0; }
-        .report-title {
-            text-align: center;
-            margin: 6px 0;
-            padding: 6px 10px;
-            background-color: #f5f5f5;
-            border-left: 3px solid {{ $headerConfig['header_bg_color'] ?? '#003366' }};
-        }
-        .report-title h3 { font-size: 11px; color: {{ $headerConfig['header_bg_color'] ?? '#003366' }}; margin-bottom: 2px; }
-        .report-title p { font-size: 8px; color: #666; }
-        .summary { margin: 6px 0; }
-        .summary-row { display: table; width: 100%; }
-        .summary-box {
-            display: table-cell;
-            padding: 6px 8px;
-            text-align: center;
-            vertical-align: top;
-            border: 1px solid #ddd;
-            border-radius: 2px;
-        }
-        .summary-box.primary { background-color: #cfe2ff; border-color: #b6d4fe; }
-        .summary-box.success { background-color: #d1e7dd; border-color: #badbcc; }
-        .summary-box.info { background-color: #d1ecf1; border-color: #bee5eb; }
-        .summary-box h4 { font-size: 8px; margin-bottom: 2px; font-weight: bold; }
-        .summary-box .amount { font-size: 11px; font-weight: bold; }
-        .summary-box .label { font-size: 7px; color: #666; }
-        .details-grid { display: table; width: 100%; margin-bottom: 8px; }
-        .details-col { display: table-cell; padding: 0 6px; vertical-align: top; }
-        .section { margin: 6px 0; page-break-inside: avoid; }
-        .section-title {
-            font-size: 9px;
+        .header h1 {
+            font-size: 16px;
             font-weight: bold;
             margin-bottom: 4px;
-            padding-bottom: 2px;
-            border-bottom: 1px solid {{ $headerConfig['header_bg_color'] ?? '#003366' }};
-            color: {{ $headerConfig['header_bg_color'] ?? '#003366' }};
         }
-        table { width: 100%; border-collapse: collapse; margin-bottom: 6px; font-size: 7px; }
-        table th {
-            background-color: {{ $headerConfig['header_bg_color'] ?? '#003366' }};
-            color: {{ $headerConfig['header_text_color'] ?? '#FFFFFF' }};
-            padding: 3px 4px;
+        .header .meta {
+            font-size: 11px;
+            opacity: 0.95;
+        }
+        .header .meta p { margin: 2px 0; }
+        .kpi-row {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 8px 0;
+            margin-bottom: 18px;
+        }
+        .kpi-row td {
+            vertical-align: top;
+            text-align: center;
+            padding: 12px 8px;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            background: #f8fafc;
+        }
+        .kpi-row .kpi-label {
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            color: #64748b;
+            margin-bottom: 6px;
+        }
+        .kpi-row .kpi-value {
+            font-size: 18px;
+            font-weight: bold;
+            line-height: 1.2;
+        }
+        .kpi-row .kpi-sub {
+            font-size: 10px;
+            color: #64748b;
+            margin-top: 4px;
+        }
+        .kpi-received .kpi-value { color: #047857; }
+        .kpi-week .kpi-value { color: #0369a1; }
+        .kpi-sunday .kpi-value { color: #047857; }
+        .kpi-total-only td {
+            width: 100%;
+            background: #ecfdf5;
+            border-color: #a7f3d0;
+        }
+        .kpi-total-only .kpi-value { color: #047857; font-size: 22px; }
+        .section-title {
+            font-size: 12px;
+            font-weight: bold;
+            color: {{ $brandColor }};
+            margin: 16px 0 8px;
+            padding-bottom: 4px;
+            border-bottom: 2px solid {{ $brandColor }};
+        }
+        .simple-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 14px;
+            font-size: 11px;
+        }
+        .simple-table th {
+            background: {{ $brandColor }};
+            color: #fff;
+            padding: 8px;
             text-align: left;
             font-weight: bold;
-            border: 1px solid #ddd;
         }
-        table td { padding: 2px 4px; border: 1px solid #ddd; }
-        table tr:nth-child(even) { background-color: #f9f9f9; }
-        table .text-right { text-align: right; }
-        table .text-center { text-align: center; }
-        .total-row { font-weight: bold; background-color: #f0f0f0 !important; }
+        .simple-table td {
+            padding: 8px;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        .simple-table .text-right { text-align: right; }
+        .simple-table .total-row td {
+            font-weight: bold;
+            background: #f1f5f9;
+            border-top: 2px solid #cbd5e1;
+        }
         .footer {
-            margin-top: 8px;
-            padding-top: 4px;
-            border-top: 1px solid #ddd;
-            font-size: 7px;
-            color: #666;
+            margin-top: 20px;
+            padding-top: 10px;
+            border-top: 1px solid #e2e8f0;
+            font-size: 9px;
+            color: #94a3b8;
             text-align: center;
         }
-        @page { margin: 12mm; size: A4 portrait; }
+        @page { margin: 14mm; }
     </style>
 </head>
 <body>
     <div class="header">
-        <div class="header-content">
-            @if(($headerConfig['show_logo'] ?? false) && ($headerConfig['logo_path'] ?? null))
-                <div class="header-left">
-                    @php
-                        $logoPath = $headerConfig['logo_path'];
-                        $logoBase64 = null;
-                        if (! str_starts_with($logoPath, 'http') && ! str_starts_with($logoPath, 'data:')) {
-                            $fullPath = str_starts_with($logoPath, '/') ? public_path($logoPath) : public_path('/'.ltrim($logoPath, '/'));
-                            if (file_exists($fullPath) && is_file($fullPath)) {
-                                try {
-                                    $imageData = base64_encode(file_get_contents($fullPath));
-                                    $imageInfo = @getimagesize($fullPath);
-                                    if ($imageInfo !== false) {
-                                        $logoBase64 = 'data:'.$imageInfo['mime'].';base64,'.$imageData;
-                                    }
-                                } catch (\Exception $e) {
-                                }
-                            }
-                        } elseif (str_starts_with($logoPath, 'data:')) {
-                            $logoBase64 = $logoPath;
-                        }
-                    @endphp
-                    @if ($logoBase64)
-                        <img src="{{ $logoBase64 }}" alt="Logo" style="max-width: {{ $headerConfig['logo_width'] ?? '50' }}px;">
+        <h1>{{ $headerConfig['title'] ?? $paroisse?->nom ?? 'Paroisse' }}</h1>
+        <div class="meta">
+            <p><strong>Rapport des recettes</strong>
+                @if ($selectedCategory)
+                    — {{ $selectedCategory->nom }}
+                    @if ($selectedType)
+                        · {{ $selectedType->nom }}
                     @endif
-                </div>
-            @endif
-            <div class="header-center">
-                @if ($headerConfig['title'] ?? null)
-                    <h1>{{ $headerConfig['title'] }}</h1>
-                @elseif ($paroisse)
-                    <h1>{{ $paroisse->nom }}</h1>
+                @elseif ($pdfCategoryNom ?? null)
+                    — {{ $pdfCategoryNom }}
+                    @if ($pdfTypeNom ?? null)
+                        · {{ $pdfTypeNom }}
+                    @endif
                 @endif
-                @if ($headerConfig['subtitle'] ?? null)
-                    <h2>{{ $headerConfig['subtitle'] }}</h2>
-                @endif
-                @if ($headerConfig['address'] ?? null)
-                    <p>{{ $headerConfig['address'] }}</p>
-                @elseif ($paroisse && ($paroisse->adresse ?? null))
-                    <p>{{ $paroisse->adresse }}, {{ $paroisse->ville ?? '' }}</p>
-                @endif
-            </div>
-        </div>
-    </div>
-
-    <div class="report-title">
-        <h3>Rapport par catégories de recettes</h3>
-        <p>Période : {{ $dateDebut->format('d/m/Y') }} au {{ $dateFin->format('d/m/Y') }} — Généré le {{ now()->format('d/m/Y H:i') }}</p>
-        @php
-            $pdfCat = $pdfCategoryNom ?? null;
-            $pdfTyp = $pdfTypeNom ?? null;
-        @endphp
-        @if ($pdfCat || $pdfTyp)
-            <p style="margin-top:4px;">
-                @if ($pdfCat)<span>Filtre catégorie : <strong>{{ $pdfCat }}</strong></span>@endif
-                @if ($pdfCat && $pdfTyp) — @endif
-                @if ($pdfTyp)<span>Filtre type : <strong>{{ $pdfTyp }}</strong></span>@endif
             </p>
-        @endif
+            <p>Période : {{ $dateDebut->format('d/m/Y') }} → {{ $dateFin->format('d/m/Y') }}</p>
+            <p>Édité le {{ now()->format('d/m/Y à H:i') }}</p>
+        </div>
     </div>
 
-    @php
-        $w = $report['weekly'] ?? null;
-        $showRptSemaine = $showRptSemaine ?? true;
-        $showRptDimanche = $showRptDimanche ?? true;
-        $rptTotalSubtitle = $rptTotalSubtitle ?? 'Semaine + dimanche';
-        $rptSummaryCols = 1 + (int) $showRptSemaine + (int) $showRptDimanche;
-        $pdfSummaryBoxWidth = $rptSummaryCols === 3 ? '33.33%' : '50%';
-        $pdfDetailsColWidth = ($showRptSemaine && $showRptDimanche) ? '50%' : '100%';
-    @endphp
+    @if ($isSubventionCategory && $envelopes->isNotEmpty())
+        <div class="section-title">Synthèse subvention</div>
+        <table class="kpi-row">
+            <tr>
+                <td class="kpi-received" style="width:33.33%;">
+                    <div class="kpi-label">Subvention reçue</div>
+                    <div class="kpi-value">{{ $fmt((float) $envelopes->sum('montant')) }}</div>
+                    <div class="kpi-sub">{{ $envelopes->count() }} enveloppe(s)</div>
+                </td>
+                <td class="kpi-week" style="width:33.33%;">
+                    <div class="kpi-label">Recettes (période)</div>
+                    <div class="kpi-value">{{ $fmt($report['total_general']) }}</div>
+                    <div class="kpi-sub">{{ $report['revenues']->count() }} ligne(s)</div>
+                </td>
+                <td style="width:33.33%;">
+                    <div class="kpi-label">Types distincts</div>
+                    <div class="kpi-value">{{ $envelopes->pluck('type_id')->unique()->count() }}</div>
+                    <div class="kpi-sub">ventilation mensuelle</div>
+                </td>
+            </tr>
+        </table>
 
-    @if ($w)
-        <div class="summary">
-            <div class="summary-row">
-                @if ($showRptSemaine)
-                    <div class="summary-box primary" style="width: {{ $pdfSummaryBoxWidth }};">
-                        <h4>Total Semaine</h4>
-                        <div class="amount">{{ \App\Helpers\ParoisseConfig::formatMontant($w['total_semaine']) }}</div>
-                        <div class="label">Lundi - Samedi</div>
-                    </div>
-                @endif
-                @if ($showRptDimanche)
-                    <div class="summary-box success" style="width: {{ $pdfSummaryBoxWidth }};">
-                        <h4>Total Dimanche</h4>
-                        <div class="amount">{{ \App\Helpers\ParoisseConfig::formatMontant($w['total_dimanche']) }}</div>
-                        <div class="label">Dimanche</div>
-                    </div>
-                @endif
-                <div class="summary-box info" style="width: {{ $pdfSummaryBoxWidth }};">
-                    <h4>Total Général</h4>
-                    <div class="amount">{{ \App\Helpers\ParoisseConfig::formatMontant($w['total_general']) }}</div>
-                    <div class="label">{{ $rptTotalSubtitle }}</div>
-                </div>
-            </div>
-        </div>
-
-        <div class="details-grid">
-            @if ($showRptSemaine)
-                <div class="details-col" style="width: {{ $pdfDetailsColWidth }};">
-                    <div class="section">
-                        <div class="section-title">Semaine (Lundi - Samedi)</div>
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>Jour</th>
-                                    <th class="text-right">Montant</th>
-                                    <th class="text-center">Nb</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @php
-                                    $joursLabels = ['lundi' => 'Lun', 'mardi' => 'Mar', 'mercredi' => 'Mer', 'jeudi' => 'Jeu', 'vendredi' => 'Ven', 'samedi' => 'Sam'];
-                                @endphp
-                                @foreach (['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'] as $jour)
-                                    <tr>
-                                        <td>{{ $joursLabels[$jour] }}</td>
-                                        <td class="text-right">{{ \App\Helpers\ParoisseConfig::formatMontant($w['details_semaine'][$jour]['montant'] ?? 0) }}</td>
-                                        <td class="text-center">{{ $w['details_semaine'][$jour]['count'] ?? 0 }}</td>
-                                    </tr>
-                                @endforeach
-                                <tr class="total-row">
-                                    <td>TOTAL</td>
-                                    <td class="text-right">{{ \App\Helpers\ParoisseConfig::formatMontant($w['total_semaine']) }}</td>
-                                    <td class="text-center">{{ $w['revenues_semaine']->count() }}</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            @endif
-            @if ($showRptDimanche)
-                <div class="details-col" style="width: {{ $pdfDetailsColWidth }};">
-                    <div class="section">
-                        <div class="section-title">Dimanche</div>
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>Jour</th>
-                                    <th class="text-right">Montant</th>
-                                    <th class="text-center">Nb</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr>
-                                    <td>Dimanche</td>
-                                    <td class="text-right">{{ \App\Helpers\ParoisseConfig::formatMontant($w['total_dimanche']) }}</td>
-                                    <td class="text-center">{{ $w['details_dimanche']['count'] }}</td>
-                                </tr>
-                                <tr class="total-row">
-                                    <td>TOTAL</td>
-                                    <td class="text-right">{{ \App\Helpers\ParoisseConfig::formatMontant($w['total_dimanche']) }}</td>
-                                    <td class="text-center">{{ $w['details_dimanche']['count'] }}</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            @endif
-        </div>
-    @else
-        <div class="summary">
-            <div class="summary-row">
-                <div class="summary-box info" style="width: 100%; display: table-cell;">
-                    <h4>Total recettes</h4>
-                    <div class="amount">{{ \App\Helpers\ParoisseConfig::formatMontant($report['total_general']) }}</div>
-                    <div class="label">{{ $report['revenues']->count() }} recette(s)</div>
-                </div>
-            </div>
-        </div>
-    @endif
-
-    @if (! ($selectedCategoryId ?? null) && count($report['by_category']) > 0)
-        <div class="section">
-            <div class="section-title">Répartition par catégorie</div>
-            <table>
+        @if ($envelopes->count() > 1)
+            <div class="section-title">Détail par mois concerné</div>
+            <table class="simple-table">
                 <thead>
                     <tr>
-                        <th>Catégorie</th>
-                        <th class="text-center">Nb</th>
+                        <th>Type</th>
+                        <th>Mois</th>
                         <th class="text-right">Montant</th>
                     </tr>
                 </thead>
                 <tbody>
-                    @foreach ($report['by_category'] as $cat)
+                    @foreach ($envelopes as $row)
                         <tr>
-                            <td>{{ $cat['nom'] }}</td>
-                            <td class="text-center">{{ $cat['count'] }}</td>
-                            <td class="text-right">{{ \App\Helpers\ParoisseConfig::formatMontant($cat['montant']) }}</td>
+                            <td>{{ $row['type_nom'] }}</td>
+                            <td>{{ $row['mois_label'] }}</td>
+                            <td class="text-right">{{ $fmt($row['montant']) }}</td>
                         </tr>
                     @endforeach
                 </tbody>
-                <tfoot>
-                    <tr class="total-row">
-                        <td>TOTAL</td>
-                        <td class="text-center">{{ $report['revenues']->count() }}</td>
-                        <td class="text-right">{{ \App\Helpers\ParoisseConfig::formatMontant($report['total_general']) }}</td>
-                    </tr>
-                </tfoot>
             </table>
-        </div>
-    @endif
+        @elseif ($envelopes->count() === 1)
+            @php $env = $envelopes->first(); @endphp
+            <p style="font-size:11px;color:#64748b;margin-bottom:12px;">
+                Enveloppe : <strong>{{ $env['label'] }}</strong>
+            </p>
+        @endif
+    @elseif ($showWeeklyBreakdown)
+        @php
+            $colCount = 1 + (int) $showRptSemaine + (int) $showRptDimanche;
+            $colWidth = $colCount === 3 ? '33.33%' : '50%';
+        @endphp
+        <table class="kpi-row">
+            <tr>
+                @if ($showRptSemaine)
+                    <td class="kpi-week" style="width:{{ $colWidth }};">
+                        <div class="kpi-label">Total semaine</div>
+                        <div class="kpi-value">{{ $fmt($w['total_semaine']) }}</div>
+                        <div class="kpi-sub">Lundi – samedi</div>
+                    </td>
+                @endif
+                @if ($showRptDimanche)
+                    <td class="kpi-sunday" style="width:{{ $colWidth }};">
+                        <div class="kpi-label">Total dimanche</div>
+                        <div class="kpi-value">{{ $fmt($w['total_dimanche']) }}</div>
+                        <div class="kpi-sub">Messe du dimanche</div>
+                    </td>
+                @endif
+                <td style="width:{{ $colWidth }};">
+                    <div class="kpi-label">Total recettes</div>
+                    <div class="kpi-value">{{ $fmt($report['total_general']) }}</div>
+                    <div class="kpi-sub">{{ $rptTotalSubtitle ?? 'Période' }}</div>
+                </td>
+            </tr>
+        </table>
 
-    @php
-        $revenuesAll = data_get($w, 'revenues_all', $report['revenues']);
-        $revenuesForPdf = $revenuesAll;
-        $totalRevenues = $revenuesAll->count();
-        $pdfJoursComplet = [
-            'lundi' => 'Lundi', 'mardi' => 'Mardi', 'mercredi' => 'Mercredi', 'jeudi' => 'Jeudi',
-            'vendredi' => 'Vendredi', 'samedi' => 'Samedi', 'dimanche' => 'Dimanche',
-        ];
-    @endphp
-    @if ($totalRevenues > 0)
-        <div class="section">
-            <div class="section-title">Liste des recettes ({{ $totalRevenues }})</div>
-            <table>
+        @if ($showRptSemaine)
+            <div class="section-title">Semaine (lundi – samedi)</div>
+            <table class="simple-table">
                 <thead>
                     <tr>
-                        <th>Date</th>
                         <th>Jour</th>
                         <th class="text-right">Montant</th>
                     </tr>
                 </thead>
                 <tbody>
-                    @foreach ($revenuesForPdf as $revenue)
+                    @foreach (['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'] as $jour)
                         <tr>
-                            <td>{{ $revenue->date_recette?->format('d/m/Y') }}</td>
-                            <td>{{ $pdfJoursComplet[$revenue->jour_semaine] ?? '—' }}</td>
-                            <td class="text-right">{{ \App\Helpers\ParoisseConfig::formatMontant($revenue->montant) }}</td>
+                            <td>{{ $joursLabels[$jour] }}</td>
+                            <td class="text-right">{{ $fmt($w['details_semaine'][$jour]['montant'] ?? 0) }}</td>
                         </tr>
                     @endforeach
                 </tbody>
-                <tfoot>
-                    <tr class="total-row">
-                        <td colspan="2">TOTAL GÉNÉRAL</td>
-                        <td class="text-right">{{ \App\Helpers\ParoisseConfig::formatMontant($report['total_general']) }}</td>
-                    </tr>
-                </tfoot>
             </table>
-        </div>
-    @endif
-
-    <div class="signatures" style="margin-top: 20px; page-break-inside: avoid;">
-        <div class="section-title">Signatures</div>
-        <table style="width: 100%; border: none; margin-top: 12px;">
+        @endif
+    @else
+        <table class="kpi-row kpi-total-only">
             <tr>
-                <td style="width: 33%; text-align: center; border: none; padding: 8px;">
-                    <div style="border-bottom: 1px solid #333; margin-bottom: 6px; height: 35px;"></div>
-                    <strong style="font-size: 8px;">Le Curé</strong>
-                    <p style="font-size: 6px; color: #666; margin-top: 2px;">Nom et signature</p>
-                </td>
-                <td style="width: 33%; text-align: center; border: none; padding: 8px;">
-                    <div style="border-bottom: 1px solid #333; margin-bottom: 6px; height: 35px;"></div>
-                    <strong style="font-size: 8px;">Le Gestionnaire</strong>
-                    <p style="font-size: 6px; color: #666; margin-top: 2px;">Nom et signature</p>
-                </td>
-                <td style="width: 33%; text-align: center; border: none; padding: 8px;">
-                    <div style="border-bottom: 1px solid #333; margin-bottom: 6px; height: 35px;"></div>
-                    <strong style="font-size: 8px;">Le Vicaire Économe</strong>
-                    <p style="font-size: 6px; color: #666; margin-top: 2px;">Nom et signature</p>
+                <td>
+                    <div class="kpi-label">Total des recettes</div>
+                    <div class="kpi-value">{{ $fmt($report['total_general']) }}</div>
+                    <div class="kpi-sub">{{ $report['revenues']->count() }} ligne(s) validée(s)</div>
                 </td>
             </tr>
         </table>
-    </div>
 
-    
+        @if (! $selectedCategoryId && count($report['by_category']) > 0)
+            <div class="section-title">Par catégorie</div>
+            <table class="simple-table">
+                <thead>
+                    <tr>
+                        <th>Catégorie</th>
+                        <th class="text-right">Montant</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach ($report['by_category'] as $row)
+                        <tr>
+                            <td>{{ $row['nom'] }}</td>
+                            <td class="text-right">{{ $fmt($row['montant']) }}</td>
+                        </tr>
+                    @endforeach
+                    <tr class="total-row">
+                        <td>Total</td>
+                        <td class="text-right">{{ $fmt($report['total_general']) }}</td>
+                    </tr>
+                </tbody>
+            </table>
+        @endif
+
+        @if ($selectedCategoryId && count($report['by_type']) > 0)
+            <div class="section-title">Par type</div>
+            <table class="simple-table">
+                <thead>
+                    <tr>
+                        <th>Type</th>
+                        <th class="text-right">Montant</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach ($report['by_type'] as $row)
+                        <tr>
+                            <td>{{ $row['nom'] }}</td>
+                            <td class="text-right">{{ $fmt($row['montant']) }}</td>
+                        </tr>
+                    @endforeach
+                </tbody>
+            </table>
+        @endif
+    @endif
+
+    @if ($report['revenues']->count() === 0)
+        <p style="text-align:center;color:#64748b;padding:24px 0;">Aucune recette validée pour cette période.</p>
+    @endif
+
+    @include('financial-reports.partials.pdf-signataires-table')
+
+    <div class="footer">
+        Recettes au statut « validé » uniquement — {{ $paroisse?->nom ?? '' }}
+    </div>
 </body>
 </html>

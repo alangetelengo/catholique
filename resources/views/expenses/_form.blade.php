@@ -2,6 +2,30 @@
     $gridColumns = (int) ($formColumns ?? 2);
     $gridClass = $gridColumns === 3 ? 'revenue-form-grid revenue-form-grid--three' : 'revenue-form-grid';
     $field = 'w-full rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900/90 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 shadow-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/35 focus:border-emerald-500/80 transition-shadow';
+    $subventionEnvelopes = $subventionEnvelopes ?? collect();
+    $fundingOptionKey = static function (mixed $source): string {
+        if (is_array($source)) {
+            return ! empty($source['revenue_id'])
+                ? 'env-'.$source['revenue_id']
+                : 'type-'.($source['revenue_type_id'] ?? '');
+        }
+        if ($source instanceof \App\Models\ExpenseFundingSource) {
+            return $source->revenue_id
+                ? 'env-'.$source->revenue_id
+                : 'type-'.$source->revenue_type_id;
+        }
+
+        return '';
+    };
+    $subventionEnvelopesJson = $subventionEnvelopes->map(function ($envelope) {
+        return [
+            'id' => $envelope->id,
+            'revenue_type_id' => $envelope->revenue_type_id,
+            'revenue_category_id' => $envelope->revenue_category_id,
+            'envelope_label' => $envelope->envelope_label ?? (($envelope->type?->nom ?? 'Subvention').' — '.($envelope->mois_label ?? '')),
+            'solde_disponible' => $envelope->solde_disponible,
+        ];
+    })->values();
 @endphp
 
 <div class="{{ $gridClass }}">
@@ -49,7 +73,7 @@
                 Sources de financement <span class="text-red-600">*</span>
             </h3>
             <p class="text-xs text-slate-600 dark:text-slate-400 mb-4">
-                Indiquez d'où proviennent les fonds pour cette dépense. Vous pouvez utiliser plusieurs sources si nécessaire.
+                Indiquez d&apos;où proviennent les fonds pour cette dépense. Pour les <strong>subventions</strong>, choisissez le type et le <strong>mois concerné</strong> (enveloppe mensuelle).
             </p>
 
             @error('funding_sources')
@@ -73,20 +97,45 @@
                 @endphp
 
                 @forelse($existingSources as $index => $source)
+                    @php $selectedFundingKey = $fundingOptionKey($source); @endphp
                     <div class="funding-source-row grid grid-cols-1 md:grid-cols-3 gap-4 mb-3 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg" data-index="{{ $index }}">
                         <div>
-                            <label class="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Type de recette (source précise)</label>
-                            <select name="funding_sources[{{ $index }}][revenue_type_id]" class="funding-source-type w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-2 text-sm" required>
+                            <label class="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Source de financement</label>
+                            <select class="funding-source-select w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-2 text-sm" required>
                                 <option value="">-- Choisir une source --</option>
-                                @foreach ($revenueTypes as $type)
-                                    <option value="{{ $type->id }}" 
-                                        data-solde="{{ $type->solde_disponible ?? 0 }}"
-                                        data-category-id="{{ $type->revenue_category_id }}"
-                                        {{ (is_array($source) ? ($source['revenue_type_id'] ?? '') : ($source->revenue_type_id ?? '')) == $type->id ? 'selected' : '' }}>
-                                        {{ $type->nom }} ({{ number_format($type->solde_disponible ?? 0, 0, ',', ' ') }} FCFA disponible)
-                                    </option>
-                                @endforeach
+                                @if($revenueTypes->isNotEmpty())
+                                    <optgroup label="Autres sources">
+                                        @foreach ($revenueTypes as $type)
+                                            <option value="type-{{ $type->id }}"
+                                                data-kind="type"
+                                                data-revenue-type-id="{{ $type->id }}"
+                                                data-revenue-id=""
+                                                data-solde="{{ $type->solde_disponible ?? 0 }}"
+                                                data-category-id="{{ $type->revenue_category_id }}"
+                                                {{ $selectedFundingKey === 'type-'.$type->id ? 'selected' : '' }}>
+                                                {{ $type->nom }} ({{ number_format($type->solde_disponible ?? 0, 0, ',', ' ') }} FCFA disponible)
+                                            </option>
+                                        @endforeach
+                                    </optgroup>
+                                @endif
+                                @if($subventionEnvelopes->isNotEmpty())
+                                    <optgroup label="Subventions mensuelles (par type et mois)">
+                                        @foreach ($subventionEnvelopes as $envelope)
+                                            <option value="env-{{ $envelope->id }}"
+                                                data-kind="envelope"
+                                                data-revenue-type-id="{{ $envelope->revenue_type_id }}"
+                                                data-revenue-id="{{ $envelope->id }}"
+                                                data-solde="{{ $envelope->solde_disponible ?? 0 }}"
+                                                data-category-id="{{ $envelope->revenue_category_id }}"
+                                                {{ $selectedFundingKey === 'env-'.$envelope->id ? 'selected' : '' }}>
+                                                {{ $envelope->envelope_label ?? ($envelope->type?->nom.' — '.$envelope->mois_label) }} ({{ number_format($envelope->solde_disponible ?? 0, 0, ',', ' ') }} FCFA disponible)
+                                            </option>
+                                        @endforeach
+                                    </optgroup>
+                                @endif
                             </select>
+                            <input type="hidden" class="funding-revenue-type-id" name="funding_sources[{{ $index }}][revenue_type_id]" value="{{ is_array($source) ? ($source['revenue_type_id'] ?? '') : ($source->revenue_type_id ?? '') }}">
+                            <input type="hidden" class="funding-revenue-id" name="funding_sources[{{ $index }}][revenue_id]" value="{{ is_array($source) ? ($source['revenue_id'] ?? '') : ($source->revenue_id ?? '') }}">
                         </div>
                         <div>
                             <label class="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Montant alloué (FCFA)</label>
@@ -110,17 +159,40 @@
                     {{-- Première source par défaut --}}
                     <div class="funding-source-row grid grid-cols-1 md:grid-cols-3 gap-4 mb-3 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg" data-index="0">
                         <div>
-                            <label class="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Type de recette (source précise)</label>
-                            <select name="funding_sources[0][revenue_type_id]" class="funding-source-type w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-2 text-sm" required>
+                            <label class="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Source de financement</label>
+                            <select class="funding-source-select w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-2 text-sm" required>
                                 <option value="">-- Choisir une source --</option>
-                                @foreach ($revenueTypes as $type)
-                                    <option value="{{ $type->id }}" 
-                                        data-solde="{{ $type->solde_disponible ?? 0 }}"
-                                        data-category-id="{{ $type->revenue_category_id }}">
-                                        {{ $type->nom }} ({{ number_format($type->solde_disponible ?? 0, 0, ',', ' ') }} FCFA disponible)
-                                    </option>
-                                @endforeach
+                                @if($revenueTypes->isNotEmpty())
+                                    <optgroup label="Autres sources">
+                                        @foreach ($revenueTypes as $type)
+                                            <option value="type-{{ $type->id }}"
+                                                data-kind="type"
+                                                data-revenue-type-id="{{ $type->id }}"
+                                                data-revenue-id=""
+                                                data-solde="{{ $type->solde_disponible ?? 0 }}"
+                                                data-category-id="{{ $type->revenue_category_id }}">
+                                                {{ $type->nom }} ({{ number_format($type->solde_disponible ?? 0, 0, ',', ' ') }} FCFA disponible)
+                                            </option>
+                                        @endforeach
+                                    </optgroup>
+                                @endif
+                                @if($subventionEnvelopes->isNotEmpty())
+                                    <optgroup label="Subventions mensuelles (par type et mois)">
+                                        @foreach ($subventionEnvelopes as $envelope)
+                                            <option value="env-{{ $envelope->id }}"
+                                                data-kind="envelope"
+                                                data-revenue-type-id="{{ $envelope->revenue_type_id }}"
+                                                data-revenue-id="{{ $envelope->id }}"
+                                                data-solde="{{ $envelope->solde_disponible ?? 0 }}"
+                                                data-category-id="{{ $envelope->revenue_category_id }}">
+                                                {{ $envelope->envelope_label ?? ($envelope->type?->nom.' — '.$envelope->mois_label) }} ({{ number_format($envelope->solde_disponible ?? 0, 0, ',', ' ') }} FCFA disponible)
+                                            </option>
+                                        @endforeach
+                                    </optgroup>
+                                @endif
                             </select>
+                            <input type="hidden" class="funding-revenue-type-id" name="funding_sources[0][revenue_type_id]" value="">
+                            <input type="hidden" class="funding-revenue-id" name="funding_sources[0][revenue_id]" value="">
                         </div>
                         <div>
                             <label class="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Montant alloué (FCFA)</label>
@@ -256,36 +328,76 @@
         const totalAlloueSpan = document.getElementById('total-alloue');
         const montantTotalInput = document.getElementById('montant_total');
         const revenueTypesData = @json($revenueTypes->values());
+        const subventionEnvelopesData = @json($subventionEnvelopesJson);
         const categorySelect = document.getElementById('revenue_category');
         let selectedCategoryId = categorySelect ? categorySelect.value : null;
+
+        function buildFundingOptionsHtml() {
+            let optionsHTML = '<option value="">-- Choisir une source --</option>';
+            const types = revenueTypesData.filter(type => !selectedCategoryId || String(type.revenue_category_id) === String(selectedCategoryId));
+            const envelopes = subventionEnvelopesData.filter(env => !selectedCategoryId || String(env.revenue_category_id) === String(selectedCategoryId));
+
+            if (types.length > 0) {
+                optionsHTML += '<optgroup label="Autres sources">';
+                types.forEach(type => {
+                    const formatted = new Intl.NumberFormat('fr-FR').format(type.solde_disponible);
+                    optionsHTML += `<option value="type-${type.id}" data-kind="type" data-revenue-type-id="${type.id}" data-revenue-id="" data-solde="${type.solde_disponible}" data-category-id="${type.revenue_category_id}">${type.nom} (${formatted} FCFA disponible)</option>`;
+                });
+                optionsHTML += '</optgroup>';
+            }
+
+            if (envelopes.length > 0) {
+                optionsHTML += '<optgroup label="Subventions mensuelles (par type et mois)">';
+                envelopes.forEach(env => {
+                    const formatted = new Intl.NumberFormat('fr-FR').format(env.solde_disponible);
+                    optionsHTML += `<option value="env-${env.id}" data-kind="envelope" data-revenue-type-id="${env.revenue_type_id}" data-revenue-id="${env.id}" data-solde="${env.solde_disponible}" data-category-id="${env.revenue_category_id}">${env.envelope_label} (${formatted} FCFA disponible)</option>`;
+                });
+                optionsHTML += '</optgroup>';
+            }
+
+            return optionsHTML;
+        }
+
+        function syncFundingHiddenFields(select) {
+            const row = select.closest('.funding-source-row');
+            if (!row) return;
+
+            const option = select.options[select.selectedIndex];
+            const typeInput = row.querySelector('.funding-revenue-type-id');
+            const revenueInput = row.querySelector('.funding-revenue-id');
+
+            if (!option || !option.value) {
+                if (typeInput) typeInput.value = '';
+                if (revenueInput) revenueInput.value = '';
+                return;
+            }
+
+            if (typeInput) typeInput.value = option.getAttribute('data-revenue-type-id') || '';
+            if (revenueInput) revenueInput.value = option.getAttribute('data-revenue-id') || '';
+        }
+
+        function initFundingSelect(select) {
+            syncFundingHiddenFields(select);
+        }
 
         function createFundingSourceRow(index) {
             const row = document.createElement('div');
             row.className = 'funding-source-row grid grid-cols-1 md:grid-cols-3 gap-4 mb-3 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg';
             row.dataset.index = index;
 
-            let optionsHTML = '<option value="">-- Choisir une source --</option>';
-            revenueTypesData.forEach(type => {
-                // Filtrer par catégorie si une catégorie est sélectionnée
-                if (selectedCategoryId && type.revenue_category_id != selectedCategoryId) {
-                    return;
-                }
-                
-                const formatted = new Intl.NumberFormat('fr-FR').format(type.solde_disponible);
-                optionsHTML += `<option value="${type.id}" data-solde="${type.solde_disponible}" data-category-id="${type.revenue_category_id}">${type.nom} (${formatted} FCFA disponible)</option>`;
-            });
-
             row.innerHTML = `
                 <div>
-                    <label class="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Type de recette (source précise)</label>
-                    <select name="funding_sources[${index}][revenue_type_id]" class="funding-source-type w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-2 text-sm" required>
-                        ${optionsHTML}
+                    <label class="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Source de financement</label>
+                    <select class="funding-source-select w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-2 text-sm" required>
+                        ${buildFundingOptionsHtml()}
                     </select>
+                    <input type="hidden" class="funding-revenue-type-id" name="funding_sources[' + index + '][revenue_type_id]" value="">
+                    <input type="hidden" class="funding-revenue-id" name="funding_sources[' + index + '][revenue_id]" value="">
                 </div>
                 <div>
                     <label class="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Montant alloué (FCFA)</label>
                     <input type="number" 
-                        name="funding_sources[${index}][montant_alloue]" 
+                        name="funding_sources[' + index + '][montant_alloue]" 
                         class="funding-source-amount w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-2 text-sm" 
                         step="0.01" 
                         min="0"
@@ -328,17 +440,17 @@
         }
 
         function filterUsedSources() {
-            const usedTypes = new Set();
-            document.querySelectorAll('.funding-source-type').forEach(select => {
+            const usedKeys = new Set();
+            document.querySelectorAll('.funding-source-select').forEach(select => {
                 if (select.value) {
-                    usedTypes.add(select.value);
+                    usedKeys.add(select.value);
                 }
             });
 
-            document.querySelectorAll('.funding-source-type').forEach(select => {
+            document.querySelectorAll('.funding-source-select').forEach(select => {
                 const currentValue = select.value;
                 Array.from(select.options).forEach(option => {
-                    if (option.value && option.value !== currentValue && usedTypes.has(option.value)) {
+                    if (option.value && option.value !== currentValue && usedKeys.has(option.value)) {
                         option.disabled = true;
                     } else {
                         option.disabled = false;
@@ -349,27 +461,16 @@
 
         function filterTypesByCategory() {
             selectedCategoryId = categorySelect ? categorySelect.value : null;
-            
-            // Filtrer toutes les sources de financement existantes
-            document.querySelectorAll('.funding-source-type').forEach(select => {
+
+            document.querySelectorAll('.funding-source-select').forEach(select => {
                 const currentValue = select.value;
-                
-                Array.from(select.options).forEach(option => {
-                    if (!option.value) {
-                        option.hidden = false;
-                        return;
-                    }
-                    
-                    const optCategoryId = option.getAttribute('data-category-id');
-                    if (selectedCategoryId && optCategoryId != selectedCategoryId) {
-                        option.hidden = true;
-                        if (option.value === currentValue) {
-                            select.value = '';
-                        }
-                    } else {
-                        option.hidden = false;
-                    }
-                });
+                select.innerHTML = buildFundingOptionsHtml();
+                if (currentValue && Array.from(select.options).some(opt => opt.value === currentValue)) {
+                    select.value = currentValue;
+                } else {
+                    select.value = '';
+                }
+                syncFundingHiddenFields(select);
             });
 
             updateTotalAlloue();
@@ -416,13 +517,15 @@
                 }
             });
 
-            // Écouter les changements de type
             container.addEventListener('change', (e) => {
-                if (e.target.classList.contains('funding-source-type')) {
+                if (e.target.classList.contains('funding-source-select')) {
+                    syncFundingHiddenFields(e.target);
                     filterUsedSources();
                 }
             });
         }
+
+        document.querySelectorAll('.funding-source-select').forEach(initFundingSelect);
 
         // Écouter les changements du montant total
         if (montantTotalInput) {

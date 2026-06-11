@@ -31,20 +31,18 @@
             || request()->filled('date_to');
     @endphp
 
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-5">
-        <div class="adventiste-card-pro-static p-4">
-            <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Total des recettes</p>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-5">
+        <div class="adventiste-card-pro-static p-4 border-t-4 border-t-emerald-500">
+            <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Total de recette</p>
             <p class="mt-1 text-2xl font-bold text-emerald-700 dark:text-emerald-400">{{ $formatFcfa($totalMontantRecettes) }}</p>
         </div>
-        <div class="adventiste-card-pro-static p-4">
-            <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Dernière recette</p>
-            <p class="mt-1 text-2xl font-bold text-slate-900 dark:text-slate-100">
-                @if ($montantDerniereRecette !== null)
-                    {{ $formatFcfa($montantDerniereRecette) }}
-                @else
-                    <span class="text-slate-400 dark:text-slate-500">—</span>
-                @endif
-            </p>
+        <div class="adventiste-card-pro-static p-4 border-t-4 border-t-rose-500">
+            <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Total de dépensé</p>
+            <p class="mt-1 text-2xl font-bold text-rose-700 dark:text-rose-400">{{ $formatFcfa($totalMontantDepenses) }}</p>
+        </div>
+        <div class="adventiste-card-pro-static p-4 border-t-4 {{ $soldeRestant >= 0 ? 'border-t-sky-500' : 'border-t-amber-500' }}">
+            <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Solde restant</p>
+            <p class="mt-1 text-2xl font-bold {{ $soldeRestant >= 0 ? 'text-sky-800 dark:text-sky-300' : 'text-amber-700 dark:text-amber-400' }}">{{ $formatFcfa($soldeRestant) }}</p>
         </div>
     </div>
 
@@ -224,6 +222,7 @@
                         <th class="px-4 py-3 font-semibold">Date</th>
                         <th class="px-4 py-3 font-semibold">Catégorie</th>
                         <th class="px-4 py-3 font-semibold">Type</th>
+                        <th class="px-4 py-3 font-semibold">Mois concerné</th>
                         <th class="px-4 py-3 font-semibold">Montant</th>
                         <th class="px-4 py-3 font-semibold">Paiement</th>
                         <th class="px-4 py-3 font-semibold text-right">Actions</th>
@@ -235,6 +234,13 @@
                             <td class="px-4 py-3">{{ optional($revenue->date_recette)->format('d/m/Y') }}</td>
                             <td class="px-4 py-3">{{ $revenue->category?->nom ?? '-' }}</td>
                             <td class="px-4 py-3">{{ $revenue->type?->nom ?? '-' }}</td>
+                            <td class="px-4 py-3">
+                                @if ($revenue->mois_subvention)
+                                    {{ \App\Support\SubventionMensuelle::formatMoisLabel($revenue->mois_subvention) }}
+                                @else
+                                    <span class="text-slate-400">—</span>
+                                @endif
+                            </td>
                             <td class="px-4 py-3 font-semibold">{{ $formatFcfa((float) $revenue->montant) }}</td>
                             <td class="px-4 py-3">
                                 <span class="inline-flex items-center rounded-full bg-slate-100 dark:bg-slate-700 px-2.5 py-1 text-xs font-semibold text-slate-700 dark:text-slate-200">
