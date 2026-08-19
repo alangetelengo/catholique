@@ -324,17 +324,17 @@ class PopoteSubventionReportController extends Controller
         foreach ($months as $month) {
             $moisSubvention = SubventionMensuelle::moisSubventionFromParts($year, $month);
 
-            $revenue = Revenue::query()
+            $revenues = Revenue::query()
                 ->where('paroisse_id', $paroisseId)
                 ->where('revenue_type_id', $popoteTypeId)
                 ->where('statut', 'valide')
                 ->where('mois_subvention', $moisSubvention)
-                ->first();
+                ->get();
 
-            $subventionRecue = $revenue ? (float) $revenue->montant : 0.0;
-            $depenses = $revenue
+            $subventionRecue = (float) $revenues->sum('montant');
+            $depenses = $revenues->isNotEmpty()
                 ? (float) ExpenseFundingSource::query()
-                    ->where('revenue_id', $revenue->id)
+                    ->whereIn('revenue_id', $revenues->pluck('id'))
                     ->whereHas('expense', fn ($q) => $q->where('statut', 'valide'))
                     ->sum('montant_alloue')
                 : 0.0;

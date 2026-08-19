@@ -43,6 +43,17 @@ class BudgetService
 
     public function getSoldeDisponibleForRevenue(Revenue $revenue, ?Expense $excludeExpense = null): float
     {
+        $revenue->loadMissing('type');
+
+        if ($revenue->mois_subvention && SubventionMensuelle::isSubventionType($revenue->type)) {
+            return $this->getSoldeDisponibleForMonthlyEnvelope(
+                (int) $revenue->paroisse_id,
+                (int) $revenue->revenue_type_id,
+                $revenue->mois_subvention,
+                $excludeExpense
+            );
+        }
+
         if ($revenue->statut !== 'valide') {
             return 0.0;
         }
@@ -59,7 +70,99 @@ class BudgetService
 
         $totalDepenses = (float) $query->sum('montant_alloue');
 
-        return (float) $revenue->montant - $totalDepenses;
+        return max(0.0, round((float) $revenue->montant - $totalDepenses, 2));
+    }
+
+    public function getSoldeDisponibleForMonthlyEnvelope(
+        int $paroisseId,
+        int $revenueTypeId,
+        string $moisSubvention,
+        ?Expense $excludeExpense = null
+    ): float {
+        $revenues = Revenue::query()
+            ->where('paroisse_id', $paroisseId)
+            ->where('revenue_type_id', $revenueTypeId)
+            ->where('mois_subvention', $moisSubvention)
+            ->where('statut', 'valide')
+            ->get();
+
+        if ($revenues->isEmpty()) {
+            return 0.0;
+        }
+
+        $totalRecettes = (float) $revenues->sum('montant');
+        $revenueIds = $revenues->pluck('id');
+
+        $query = ExpenseFundingSource::query()
+            ->whereIn('revenue_id', $revenueIds)
+            ->whereHas('expense', function ($q) {
+                $q->where('statut', 'valide');
+            });
+
+        if ($excludeExpense) {
+            $query->where('expense_id', '!=', $excludeExpense->id);
+        }
+
+        $totalDepenses = (float) $query->sum('montant_alloue');
+
+        return max(0.0, round($totalRecettes - $totalDepenses, 2));
+    }
+
+    private function hasSoldeDisponible(float $solde): bool
+    {
+        return round($solde, 2) > 0;
+    }
+
+    private function getOrphanAllocationForSubventionType(int $revenueTypeId, ?Expense $excludeExpense = null): float
+    {
+        $query = ExpenseFundingSource::query()
+            ->where('revenue_type_id', $revenueTypeId)
+            ->whereNull('revenue_id')
+            ->whereHas('expense', function ($q) {
+                $q->where('statut', 'valide');
+            });
+
+        if ($excludeExpense) {
+            $query->where('expense_id', '!=', $excludeExpense->id);
+        }
+
+        return (float) $query->sum('montant_alloue');
+    }
+
+    /**
+     * Impute les anciennes allocations sans revenue_id sur les enveloppes les plus anciennes (FIFO).
+     *
+     * @param  Collection<int, Revenue>  $envelopes
+     * @return Collection<int, Revenue>
+     */
+    private function applyOrphanAllocationsFifo(Collection $envelopes, ?Expense $excludeExpense = null): Collection
+    {
+        return $envelopes
+            ->groupBy('revenue_type_id')
+            ->flatMap(function (Collection $typeEnvelopes) use ($excludeExpense) {
+                $orphanPool = $this->getOrphanAllocationForSubventionType(
+                    (int) $typeEnvelopes->first()->revenue_type_id,
+                    $excludeExpense
+                );
+
+                return $typeEnvelopes
+                    ->sortBy('mois_subvention')
+                    ->values()
+                    ->map(function (Revenue $revenue) use (&$orphanPool) {
+                        if ($orphanPool <= 0) {
+                            return $revenue;
+                        }
+
+                        $deduct = min($revenue->solde_disponible, $orphanPool);
+                        $revenue->solde_disponible = round($revenue->solde_disponible - $deduct, 2);
+                        $orphanPool -= $deduct;
+
+                        return $revenue;
+                    });
+            })
+            ->sortByDesc('mois_subvention')
+            ->sortBy('revenue_type_id')
+            ->values();
     }
 
     /**
@@ -80,19 +183,40 @@ class BudgetService
             ->when($revenueTypeId !== null, fn ($q) => $q->where('revenue_type_id', $revenueTypeId))
             ->whereHas('type.category', fn ($q) => $q->where('code', SubventionMensuelle::CATEGORY_CODE))
             ->with(['type'])
-            ->orderByDesc('mois_subvention')
-            ->orderBy('revenue_type_id')
+            ->orderBy('date_recette')
+            ->orderBy('id')
             ->get()
-            ->map(function (Revenue $revenue) use ($excludeExpense) {
-                $revenue->solde_disponible = $this->getSoldeDisponibleForRevenue($revenue, $excludeExpense);
-                $revenue->mois_label = SubventionMensuelle::formatMoisLabel($revenue->mois_subvention);
-                $revenue->envelope_label = SubventionMensuelle::envelopeLabel($revenue->type, $revenue->mois_subvention);
+            ->groupBy(fn (Revenue $revenue) => $revenue->revenue_type_id.'|'.$revenue->mois_subvention)
+            ->map(function (Collection $group) use ($excludeExpense) {
+                $canonical = $group->first();
+                $revenueIds = $group->pluck('id');
+                $totalRecettes = (float) $group->sum('montant');
 
-                return $revenue;
-            });
+                $query = ExpenseFundingSource::query()
+                    ->whereIn('revenue_id', $revenueIds)
+                    ->whereHas('expense', function ($q) {
+                        $q->where('statut', 'valide');
+                    });
+
+                if ($excludeExpense) {
+                    $query->where('expense_id', '!=', $excludeExpense->id);
+                }
+
+                $canonical->solde_disponible = max(0.0, round($totalRecettes - (float) $query->sum('montant_alloue'), 2));
+                $canonical->mois_label = SubventionMensuelle::formatMoisLabel($canonical->mois_subvention);
+                $canonical->envelope_label = SubventionMensuelle::envelopeLabel($canonical->type, $canonical->mois_subvention);
+                $canonical->envelope_key = 'env-'.$canonical->revenue_type_id.'-'.$canonical->mois_subvention;
+                $canonical->envelope_revenue_ids = $revenueIds->all();
+                $canonical->envelope_montant_recu = $totalRecettes;
+
+                return $canonical;
+            })
+            ->values();
+
+        $envelopes = $this->applyOrphanAllocationsFifo($envelopes, $excludeExpense);
 
         if ($onlyWithSolde) {
-            return $envelopes->filter(fn (Revenue $revenue) => $revenue->solde_disponible > 0)->values();
+            return $envelopes->filter(fn (Revenue $revenue) => $this->hasSoldeDisponible($revenue->solde_disponible))->values();
         }
 
         return $envelopes->values();
@@ -103,13 +227,17 @@ class BudgetService
      */
     public function getSubventionEnvelopesForExpenseForm(int $paroisseId, ?Expense $expense = null): Collection
     {
-        $envelopes = $this->getSubventionEnvelopesAvecSolde($paroisseId, $expense, false);
         $usedRevenueIds = $expense
             ? $expense->fundingSources()->whereNotNull('revenue_id')->pluck('revenue_id')
             : collect();
 
-        return $envelopes
-            ->filter(fn (Revenue $revenue) => $revenue->solde_disponible > 0 || $usedRevenueIds->contains($revenue->id))
+        return $this->getSubventionEnvelopesAvecSolde($paroisseId, $expense, false)
+            ->filter(function (Revenue $envelope) use ($usedRevenueIds) {
+                $ids = collect($envelope->envelope_revenue_ids ?? [$envelope->id]);
+
+                return $this->hasSoldeDisponible($envelope->solde_disponible)
+                    || $ids->intersect($usedRevenueIds)->isNotEmpty();
+            })
             ->values();
     }
 
@@ -153,8 +281,8 @@ class BudgetService
 
             return $type;
         })->filter(function ($type) {
-            return $type->solde_disponible > 0;
-        });
+            return $this->hasSoldeDisponible($type->solde_disponible);
+        })->values();
     }
 
     public function validateFundingSources(array $fundingSources, ?Expense $excludeExpense = null): array
@@ -197,7 +325,12 @@ class BudgetService
                     continue;
                 }
 
-                $soldeDisponible = $this->getSoldeDisponibleForRevenue($revenue, $excludeExpense);
+                $soldeDisponible = $this->getSoldeDisponibleForMonthlyEnvelope(
+                    (int) $revenue->paroisse_id,
+                    (int) $revenue->revenue_type_id,
+                    $revenue->mois_subvention,
+                    $excludeExpense
+                );
                 $label = SubventionMensuelle::envelopeLabel($revenue->type, $revenue->mois_subvention);
             } else {
                 if ($revenueId !== null) {

@@ -1628,14 +1628,12 @@ class FinancialReportController extends Controller implements HasMiddleware
         $summary = [];
 
         foreach ($buckets as $bucket) {
-            $revenue = Revenue::query()
+            $subventionRecue = (float) Revenue::query()
                 ->where('paroisse_id', $paroisseId)
                 ->where('revenue_type_id', $bucket['type_id'])
                 ->where('mois_subvention', $bucket['mois_subvention'])
                 ->where('statut', 'valide')
-                ->first();
-
-            $subventionRecue = $revenue ? (float) $revenue->montant : 0.0;
+                ->sum('montant');
             $depenses = (float) $bucket['depenses'];
 
             $summary[] = [

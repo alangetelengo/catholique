@@ -3,27 +3,43 @@
     $gridClass = $gridColumns === 3 ? 'revenue-form-grid revenue-form-grid--three' : 'revenue-form-grid';
     $field = 'w-full rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900/90 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 shadow-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/35 focus:border-emerald-500/80 transition-shadow';
     $subventionEnvelopes = $subventionEnvelopes ?? collect();
-    $fundingOptionKey = static function (mixed $source): string {
+    $fundingOptionKey = static function (mixed $source) use ($subventionEnvelopes): string {
+        $revenueId = null;
+        $typeId = null;
+        $mois = null;
+
         if (is_array($source)) {
-            return ! empty($source['revenue_id'])
-                ? 'env-'.$source['revenue_id']
-                : 'type-'.($source['revenue_type_id'] ?? '');
-        }
-        if ($source instanceof \App\Models\ExpenseFundingSource) {
-            return $source->revenue_id
-                ? 'env-'.$source->revenue_id
-                : 'type-'.$source->revenue_type_id;
+            $revenueId = ! empty($source['revenue_id']) ? (int) $source['revenue_id'] : null;
+            $typeId = $source['revenue_type_id'] ?? null;
+        } elseif ($source instanceof \App\Models\ExpenseFundingSource) {
+            $revenueId = $source->revenue_id ? (int) $source->revenue_id : null;
+            $typeId = $source->revenue_type_id;
+            $mois = $source->revenue?->mois_subvention;
         }
 
-        return '';
+        if ($revenueId) {
+            foreach ($subventionEnvelopes as $envelope) {
+                $ids = collect($envelope->envelope_revenue_ids ?? [$envelope->id])->map(fn ($id) => (int) $id);
+                if ($ids->contains($revenueId)) {
+                    return $envelope->envelope_key ?? 'env-'.$envelope->revenue_type_id.'-'.$envelope->mois_subvention;
+                }
+            }
+
+            if ($typeId && $mois) {
+                return 'env-'.$typeId.'-'.$mois;
+            }
+        }
+
+        return $typeId ? 'type-'.$typeId : '';
     };
     $subventionEnvelopesJson = $subventionEnvelopes->map(function ($envelope) {
         return [
             'id' => $envelope->id,
+            'envelope_key' => $envelope->envelope_key ?? 'env-'.$envelope->revenue_type_id.'-'.$envelope->mois_subvention,
             'revenue_type_id' => $envelope->revenue_type_id,
             'revenue_category_id' => $envelope->revenue_category_id,
             'envelope_label' => $envelope->envelope_label ?? (($envelope->type?->nom ?? 'Subvention').' — '.($envelope->mois_label ?? '')),
-            'solde_disponible' => $envelope->solde_disponible,
+            'solde_disponible' => round((float) ($envelope->solde_disponible ?? 0), 2),
         ];
     })->values();
 @endphp
@@ -121,13 +137,13 @@
                                 @if($subventionEnvelopes->isNotEmpty())
                                     <optgroup label="Subventions mensuelles (par type et mois)">
                                         @foreach ($subventionEnvelopes as $envelope)
-                                            <option value="env-{{ $envelope->id }}"
+                                            <option value="{{ $envelope->envelope_key ?? 'env-'.$envelope->revenue_type_id.'-'.$envelope->mois_subvention }}"
                                                 data-kind="envelope"
                                                 data-revenue-type-id="{{ $envelope->revenue_type_id }}"
                                                 data-revenue-id="{{ $envelope->id }}"
                                                 data-solde="{{ $envelope->solde_disponible ?? 0 }}"
                                                 data-category-id="{{ $envelope->revenue_category_id }}"
-                                                {{ $selectedFundingKey === 'env-'.$envelope->id ? 'selected' : '' }}>
+                                                {{ $selectedFundingKey === ($envelope->envelope_key ?? 'env-'.$envelope->revenue_type_id.'-'.$envelope->mois_subvention) ? 'selected' : '' }}>
                                                 {{ $envelope->envelope_label ?? ($envelope->type?->nom.' — '.$envelope->mois_label) }} ({{ number_format($envelope->solde_disponible ?? 0, 0, ',', ' ') }} FCFA disponible)
                                             </option>
                                         @endforeach
@@ -179,7 +195,7 @@
                                 @if($subventionEnvelopes->isNotEmpty())
                                     <optgroup label="Subventions mensuelles (par type et mois)">
                                         @foreach ($subventionEnvelopes as $envelope)
-                                            <option value="env-{{ $envelope->id }}"
+                                            <option value="{{ $envelope->envelope_key ?? 'env-'.$envelope->revenue_type_id.'-'.$envelope->mois_subvention }}"
                                                 data-kind="envelope"
                                                 data-revenue-type-id="{{ $envelope->revenue_type_id }}"
                                                 data-revenue-id="{{ $envelope->id }}"
@@ -332,10 +348,24 @@
         const categorySelect = document.getElementById('revenue_category');
         let selectedCategoryId = categorySelect ? categorySelect.value : null;
 
-        function buildFundingOptionsHtml() {
+        function hasPositiveSolde(amount) {
+            return Math.round((parseFloat(amount) || 0) * 100) / 100 > 0;
+        }
+
+        function buildFundingOptionsHtml(preserveValue = '') {
             let optionsHTML = '<option value="">-- Choisir une source --</option>';
-            const types = revenueTypesData.filter(type => !selectedCategoryId || String(type.revenue_category_id) === String(selectedCategoryId));
-            const envelopes = subventionEnvelopesData.filter(env => !selectedCategoryId || String(env.revenue_category_id) === String(selectedCategoryId));
+            const types = revenueTypesData.filter(type => {
+                const matchesCategory = !selectedCategoryId || String(type.revenue_category_id) === String(selectedCategoryId);
+                const optionKey = `type-${type.id}`;
+
+                return matchesCategory && (hasPositiveSolde(type.solde_disponible) || optionKey === preserveValue);
+            });
+            const envelopes = subventionEnvelopesData.filter(env => {
+                const matchesCategory = !selectedCategoryId || String(env.revenue_category_id) === String(selectedCategoryId);
+                const optionKey = env.envelope_key || `env-${env.id}`;
+
+                return matchesCategory && (hasPositiveSolde(env.solde_disponible) || optionKey === preserveValue);
+            });
 
             if (types.length > 0) {
                 optionsHTML += '<optgroup label="Autres sources">';
@@ -350,7 +380,8 @@
                 optionsHTML += '<optgroup label="Subventions mensuelles (par type et mois)">';
                 envelopes.forEach(env => {
                     const formatted = new Intl.NumberFormat('fr-FR').format(env.solde_disponible);
-                    optionsHTML += `<option value="env-${env.id}" data-kind="envelope" data-revenue-type-id="${env.revenue_type_id}" data-revenue-id="${env.id}" data-solde="${env.solde_disponible}" data-category-id="${env.revenue_category_id}">${env.envelope_label} (${formatted} FCFA disponible)</option>`;
+                    const optionKey = env.envelope_key || `env-${env.id}`;
+                    optionsHTML += `<option value="${optionKey}" data-kind="envelope" data-revenue-type-id="${env.revenue_type_id}" data-revenue-id="${env.id}" data-solde="${env.solde_disponible}" data-category-id="${env.revenue_category_id}">${env.envelope_label} (${formatted} FCFA disponible)</option>`;
                 });
                 optionsHTML += '</optgroup>';
             }
@@ -464,7 +495,7 @@
 
             document.querySelectorAll('.funding-source-select').forEach(select => {
                 const currentValue = select.value;
-                select.innerHTML = buildFundingOptionsHtml();
+                select.innerHTML = buildFundingOptionsHtml(currentValue);
                 if (currentValue && Array.from(select.options).some(opt => opt.value === currentValue)) {
                     select.value = currentValue;
                 } else {

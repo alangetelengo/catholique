@@ -284,25 +284,6 @@ class RevenueController extends Controller
                 ]);
             }
 
-            $duplicateQuery = Revenue::query()
-                ->where('paroisse_id', $paroisseIdForRules)
-                ->where('revenue_type_id', $revenueType->id)
-                ->where('mois_subvention', $validated['mois_subvention']);
-
-            if ($existingRevenue !== null) {
-                $duplicateQuery->where('id', '!=', $existingRevenue->id);
-            }
-
-            if ($duplicateQuery->exists()) {
-                throw ValidationException::withMessages([
-                    'mois_subvention' => sprintf(
-                        'Une subvention %s existe déjà pour %s.',
-                        $revenueType->nom,
-                        SubventionMensuelle::formatMoisLabel($validated['mois_subvention'])
-                    ),
-                ]);
-            }
-
             $validated['mois_location'] = null;
         } elseif ($category && $category->code === 'quete_ordinaire') {
             $validated['mois_location'] = null;

@@ -169,7 +169,7 @@ class PopoteSubventionTest extends TestCase
         $this->assertStringContainsString('Subvention Popote', $validation['errors'][0]);
     }
 
-    public function test_duplicate_monthly_subvention_revenue_is_rejected(): void
+    public function test_multiple_monthly_subvention_revenues_are_allowed(): void
     {
         ['paroisse' => $paroisse, 'user' => $user, 'category' => $category, 'carburantType' => $carburantType] = $this->createSubventionContext();
 
@@ -196,7 +196,145 @@ class PopoteSubventionTest extends TestCase
             'methode_paiement' => 'virement',
         ]);
 
-        $response->assertSessionHasErrors('mois_subvention');
-        $this->assertSame(1, Revenue::query()->where('revenue_type_id', $carburantType->id)->where('mois_subvention', '2026-06')->count());
+        $response->assertSessionHasNoErrors();
+        $this->assertSame(2, Revenue::query()->where('revenue_type_id', $carburantType->id)->where('mois_subvention', '2026-06')->count());
+    }
+
+    public function test_same_month_popote_receipts_are_grouped_into_one_expense_envelope(): void
+    {
+        ['paroisse' => $paroisse, 'user' => $user, 'category' => $category, 'popoteType' => $popoteType] = $this->createSubventionContext();
+
+        Revenue::query()->create([
+            'paroisse_id' => $paroisse->id,
+            'revenue_category_id' => $category->id,
+            'revenue_type_id' => $popoteType->id,
+            'mois_subvention' => '2026-08',
+            'montant' => 500000,
+            'date_recette' => '2026-08-01',
+            'statut' => 'valide',
+            'created_by' => $user->id,
+        ]);
+
+        Revenue::query()->create([
+            'paroisse_id' => $paroisse->id,
+            'revenue_category_id' => $category->id,
+            'revenue_type_id' => $popoteType->id,
+            'mois_subvention' => '2026-08',
+            'montant' => 500000,
+            'date_recette' => '2026-08-05',
+            'statut' => 'valide',
+            'created_by' => $user->id,
+        ]);
+
+        $service = app(BudgetService::class);
+        $envelopes = $service->getSubventionEnvelopesForExpenseForm($paroisse->id);
+
+        $this->assertCount(1, $envelopes);
+        $this->assertSame('2026-08', $envelopes->first()->mois_subvention);
+        $this->assertSame(1000000.0, $envelopes->first()->solde_disponible);
+        $this->assertSame(1000000.0, $envelopes->first()->envelope_montant_recu);
+    }
+
+    public function test_exhausted_subvention_envelope_is_hidden_from_expense_form(): void
+    {
+        ['paroisse' => $paroisse, 'user' => $user, 'category' => $category, 'popoteType' => $popoteType] = $this->createSubventionContext();
+
+        $fevrier = Revenue::query()->create([
+            'paroisse_id' => $paroisse->id,
+            'revenue_category_id' => $category->id,
+            'revenue_type_id' => $popoteType->id,
+            'mois_subvention' => '2026-02',
+            'montant' => 394450,
+            'date_recette' => '2026-02-05',
+            'statut' => 'valide',
+            'created_by' => $user->id,
+        ]);
+
+        Revenue::query()->create([
+            'paroisse_id' => $paroisse->id,
+            'revenue_category_id' => $category->id,
+            'revenue_type_id' => $popoteType->id,
+            'mois_subvention' => '2026-03',
+            'montant' => 394450,
+            'date_recette' => '2026-03-05',
+            'statut' => 'valide',
+            'created_by' => $user->id,
+        ]);
+
+        $expense = Expense::query()->create([
+            'paroisse_id' => $paroisse->id,
+            'revenue_category_id' => $category->id,
+            'montant' => 394450,
+            'date_depense' => '2026-02-15',
+            'jour_semaine' => 'vendredi',
+            'libelle' => 'Salaires février',
+            'statut' => 'valide',
+            'created_by' => $user->id,
+        ]);
+
+        $expense->fundingSources()->create([
+            'revenue_type_id' => $popoteType->id,
+            'revenue_id' => $fevrier->id,
+            'montant_alloue' => 394450,
+            'ordre' => 1,
+        ]);
+
+        $service = app(BudgetService::class);
+        $envelopes = $service->getSubventionEnvelopesForExpenseForm($paroisse->id);
+
+        $this->assertFalse($envelopes->contains('id', $fevrier->id));
+        $this->assertTrue($envelopes->contains('mois_subvention', '2026-03'));
+        $this->assertSame(394450.0, $envelopes->firstWhere('mois_subvention', '2026-03')->solde_disponible);
+    }
+
+    public function test_orphan_subvention_allocation_reduces_oldest_envelope_balance_fifo(): void
+    {
+        ['paroisse' => $paroisse, 'user' => $user, 'category' => $category, 'popoteType' => $popoteType] = $this->createSubventionContext();
+
+        Revenue::query()->create([
+            'paroisse_id' => $paroisse->id,
+            'revenue_category_id' => $category->id,
+            'revenue_type_id' => $popoteType->id,
+            'mois_subvention' => '2026-02',
+            'montant' => 394450,
+            'date_recette' => '2026-02-05',
+            'statut' => 'valide',
+            'created_by' => $user->id,
+        ]);
+
+        Revenue::query()->create([
+            'paroisse_id' => $paroisse->id,
+            'revenue_category_id' => $category->id,
+            'revenue_type_id' => $popoteType->id,
+            'mois_subvention' => '2026-03',
+            'montant' => 394450,
+            'date_recette' => '2026-03-05',
+            'statut' => 'valide',
+            'created_by' => $user->id,
+        ]);
+
+        $expense = Expense::query()->create([
+            'paroisse_id' => $paroisse->id,
+            'revenue_category_id' => $category->id,
+            'montant' => 394450,
+            'date_depense' => '2026-02-15',
+            'jour_semaine' => 'vendredi',
+            'libelle' => 'Ancienne dépense sans mois',
+            'statut' => 'valide',
+            'created_by' => $user->id,
+        ]);
+
+        $expense->fundingSources()->create([
+            'revenue_type_id' => $popoteType->id,
+            'revenue_id' => null,
+            'montant_alloue' => 394450,
+            'ordre' => 1,
+        ]);
+
+        $service = app(BudgetService::class);
+        $envelopes = $service->getSubventionEnvelopesForExpenseForm($paroisse->id);
+
+        $this->assertFalse($envelopes->contains('mois_subvention', '2026-02'));
+        $this->assertTrue($envelopes->contains('mois_subvention', '2026-03'));
     }
 }
