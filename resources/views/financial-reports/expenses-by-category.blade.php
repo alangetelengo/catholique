@@ -4,7 +4,7 @@
 @section('page-title', 'Rapport par catégories de dépenses')
 
 @section('page-title-info')
-    Filtrez par paroisse, période, <strong class="font-semibold">catégorie de source</strong> (quête, location, subvention…), puis éventuellement un <strong class="font-semibold">type</strong>. Pour les <strong class="font-semibold">subventions</strong>, le rapport distingue chaque enveloppe mensuelle (type + mois concerné) et affiche subvention reçue, dépenses et solde.
+    Filtrez par paroisse, période, <strong class="font-semibold">type de dépense</strong> (nature), et/ou <strong class="font-semibold">source de fonds</strong> (quête, subvention…). Pour les <strong class="font-semibold">subventions</strong>, le rapport distingue chaque enveloppe mensuelle et affiche reçu / dépensé / solde.
     <span id="ebc-period-display" class="hidden block mt-1 text-slate-500 dark:text-slate-400"></span>
 @endsection
 
@@ -79,6 +79,15 @@
                 <input type="date" id="ebc_date_fin" name="date_fin" class="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2.5 text-sm" value="{{ $dateFin ?? $finMois }}" required>
             </div>
             <div class="lg:col-span-2">
+                <label for="ebc_expense_type" class="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-300">Type de dépense</label>
+                <select id="ebc_expense_type" name="expense_type_id" class="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2.5 text-sm">
+                    <option value="">Tous les types</option>
+                    @foreach (($expenseTypes ?? collect()) as $expenseType)
+                        <option value="{{ $expenseType->id }}">{{ $expenseType->nom }}</option>
+                    @endforeach
+                </select>
+            </div>
+            <div class="lg:col-span-2">
                 <label for="ebc_category" class="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-300">Catégorie (source fonds)</label>
                 <select id="ebc_category" name="revenue_category_id" class="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2.5 text-sm" @if (auth()->user()->hasRole('super_admin') && ! $selectedParoisseId) disabled @endif>
                     <option value="">Toutes les catégories</option>
@@ -87,10 +96,10 @@
                     @endforeach
                 </select>
             </div>
-            <div class="lg:col-span-3">
-                <label for="ebc_type" class="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-300">Type (précision)</label>
+            <div class="lg:col-span-2">
+                <label for="ebc_type" class="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-300">Source (précision)</label>
                 <select id="ebc_type" name="revenue_type_id" class="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2.5 text-sm" aria-describedby="ebc-filter-hint">
-                    <option value="">Tous les types</option>
+                    <option value="">Toutes les sources</option>
                     @foreach ($revenueTypes as $type)
                         <option value="{{ $type->id }}" data-category-id="{{ $type->revenue_category_id }}">{{ $type->nom }}</option>
                     @endforeach
@@ -101,7 +110,7 @@
                     <span class="block sm:inline">Choisissez d’abord une <strong class="font-medium text-slate-700 dark:text-slate-300">paroisse</strong> pour activer les filtres.</span>
                     <span class="hidden sm:inline text-slate-400 dark:text-slate-500" aria-hidden="true"> · </span>
                 @endif
-                <span class="block sm:inline">Les filtres vous permettent de voir les dépenses selon leur <strong class="font-medium text-slate-700 dark:text-slate-300">source de fonds</strong> (catégorie et type de recette).</span>
+                <span class="block sm:inline">Filtrez par <strong class="font-medium text-slate-700 dark:text-slate-300">type de dépense</strong> (nature) et/ou par <strong class="font-medium text-slate-700 dark:text-slate-300">source de fonds</strong>.</span>
             </div>
             <div class="lg:col-span-12 flex flex-wrap gap-2 justify-end border-t border-slate-200/80 pt-3 dark:border-slate-600/60 lg:pt-4">
                 <button type="button" id="ebc-btn-calculate" class="adventiste-btn-primary">
@@ -211,6 +220,8 @@
                     var cid = catEl && !catEl.disabled ? catEl.value : '';
                     var tidEl = document.getElementById('ebc_type');
                     var tid = tidEl ? tidEl.value : '';
+                    var etidEl = document.getElementById('ebc_expense_type');
+                    var etid = etidEl ? etidEl.value : '';
 
                     if (!pid) {
                         alert('Veuillez sélectionner une paroisse.');
@@ -233,6 +244,7 @@
                     };
                     if (cid) payload.revenue_category_id = parseInt(cid, 10);
                     if (tid) payload.revenue_type_id = parseInt(tid, 10);
+                    if (etid) payload.expense_type_id = parseInt(etid, 10);
 
                     fetch(calculateUrl, {
                         method: 'POST',

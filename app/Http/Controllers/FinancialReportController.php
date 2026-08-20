@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Helpers\FlashAlert;
 use App\Helpers\ParoisseConfig;
 use App\Models\Expense;
+use App\Models\ExpenseType;
 use App\Models\FinancialReport;
 use App\Models\Paroisse;
 use App\Models\Revenue;
@@ -1355,6 +1356,12 @@ class FinancialReportController extends Controller implements HasMiddleware
                 ->orderBy('nom')
                 ->get();
 
+            $expenseTypes = ExpenseType::query()
+                ->where('actif', true)
+                ->orderBy('ordre')
+                ->orderBy('nom')
+                ->get();
+
             return view('financial-reports.expenses-by-category', [
                 'paroisses' => $paroisses,
                 'selectedParoisseId' => $selectedParoisseId,
@@ -1362,6 +1369,7 @@ class FinancialReportController extends Controller implements HasMiddleware
                 'dateFin' => $dateFin,
                 'revenueCategories' => $revenueCategories,
                 'revenueTypes' => $revenueTypes,
+                'expenseTypes' => $expenseTypes,
                 'ajaxCalculateRoute' => route('financial-reports.expenses-by-category.calculate'),
             ]);
         } catch (Throwable $e) {
@@ -1375,6 +1383,7 @@ class FinancialReportController extends Controller implements HasMiddleware
                 'dateFin' => now()->endOfMonth()->format('Y-m-d'),
                 'revenueCategories' => collect(),
                 'revenueTypes' => collect(),
+                'expenseTypes' => collect(),
                 'ajaxCalculateRoute' => route('financial-reports.expenses-by-category.calculate'),
             ]);
         }
@@ -1391,6 +1400,7 @@ class FinancialReportController extends Controller implements HasMiddleware
                 'date_fin' => ['required', 'date', 'after_or_equal:date_debut'],
                 'revenue_category_id' => ['nullable', 'integer', 'exists:revenue_categories,id'],
                 'revenue_type_id' => ['nullable', 'integer', 'exists:revenue_types,id'],
+                'expense_type_id' => ['nullable', 'integer', 'exists:expense_types,id'],
             ]);
 
             if (! $user->hasRole('super_admin') && (int) $validated['paroisse_id'] !== (int) $user->paroisse_id) {
@@ -1399,6 +1409,7 @@ class FinancialReportController extends Controller implements HasMiddleware
 
             $revenueCategoryId = $validated['revenue_category_id'] ?? null;
             $revenueTypeId = $validated['revenue_type_id'] ?? null;
+            $expenseTypeId = $validated['expense_type_id'] ?? null;
 
             $dateDebut = Carbon::parse($validated['date_debut'])->startOfDay();
             $dateFin = Carbon::parse($validated['date_fin'])->endOfDay();
@@ -1408,7 +1419,8 @@ class FinancialReportController extends Controller implements HasMiddleware
                 $dateDebut,
                 $dateFin,
                 $revenueCategoryId,
-                $revenueTypeId
+                $revenueTypeId,
+                $expenseTypeId
             );
 
             $html = view('financial-reports.partials.expenses-by-category-report-body', [
@@ -1417,6 +1429,7 @@ class FinancialReportController extends Controller implements HasMiddleware
                 'dateFin' => $validated['date_fin'],
                 'selectedRevenueCategoryId' => $revenueCategoryId,
                 'selectedRevenueTypeId' => $revenueTypeId,
+                'selectedExpenseTypeId' => $expenseTypeId,
             ])->render();
 
             $pdfUrl = route('financial-reports.expenses-by-category.pdf', array_filter([
@@ -1425,6 +1438,7 @@ class FinancialReportController extends Controller implements HasMiddleware
                 'date_fin' => $validated['date_fin'],
                 'revenue_category_id' => $revenueCategoryId,
                 'revenue_type_id' => $revenueTypeId,
+                'expense_type_id' => $expenseTypeId,
             ]));
 
             return response()->json([
@@ -1452,6 +1466,7 @@ class FinancialReportController extends Controller implements HasMiddleware
                 'date_fin' => ['required', 'date', 'after_or_equal:date_debut'],
                 'revenue_category_id' => ['nullable', 'integer', 'exists:revenue_categories,id'],
                 'revenue_type_id' => ['nullable', 'integer', 'exists:revenue_types,id'],
+                'expense_type_id' => ['nullable', 'integer', 'exists:expense_types,id'],
             ]);
 
             if (! $user->hasRole('super_admin') && (int) $validated['paroisse_id'] !== (int) $user->paroisse_id) {
@@ -1464,13 +1479,15 @@ class FinancialReportController extends Controller implements HasMiddleware
             $dateFin = Carbon::parse($validated['date_fin'])->endOfDay();
             $revenueCategoryId = $validated['revenue_category_id'] ?? null;
             $revenueTypeId = $validated['revenue_type_id'] ?? null;
+            $expenseTypeId = $validated['expense_type_id'] ?? null;
 
             $report = $this->calculateExpensesByCategoryReport(
                 (int) $validated['paroisse_id'],
                 $dateDebut,
                 $dateFin,
                 $revenueCategoryId,
-                $revenueTypeId
+                $revenueTypeId,
+                $expenseTypeId
             );
 
             $paroisse = Paroisse::find($validated['paroisse_id']);
@@ -1484,6 +1501,7 @@ class FinancialReportController extends Controller implements HasMiddleware
                 'dateFin' => $dateFin,
                 'selectedRevenueCategoryId' => $revenueCategoryId,
                 'selectedRevenueTypeId' => $revenueTypeId,
+                'selectedExpenseTypeId' => $expenseTypeId,
                 'signataires' => FinancialReportSignatories::defaultPdfBlocks(),
             ])->setPaper('a4', 'portrait');
 
@@ -1503,6 +1521,7 @@ class FinancialReportController extends Controller implements HasMiddleware
      *     expenses: Collection<int, Expense>,
      *     by_category: array<string, array{id: int, nom: string, montant: float, count: int}>,
      *     by_type: array<string, array{id: int, nom: string, montant: float, count: int, mois_subvention: string|null, mois_label: string|null}>,
+     *     by_expense_type: array<int|string, array{id: int|null, nom: string, montant: float, count: int}>,
      *     subvention_envelopes: list<array{key: string, type_id: int, type_nom: string, mois_subvention: string|null, mois_label: string|null, label: string, subvention_recue: float|null, depenses: float, solde: float|null, count: int}>,
      *     total_general: float,
      *     date_debut: Carbon,
@@ -1514,10 +1533,11 @@ class FinancialReportController extends Controller implements HasMiddleware
         Carbon $dateDebut,
         Carbon $dateFin,
         ?int $revenueCategoryId = null,
-        ?int $revenueTypeId = null
+        ?int $revenueTypeId = null,
+        ?int $expenseTypeId = null
     ): array {
         $query = Expense::query()
-            ->with(['revenueCategory', 'fundingSources.revenueType', 'fundingSources.revenue'])
+            ->with(['revenueCategory', 'expenseType', 'fundingSources.revenueType', 'fundingSources.revenue'])
             ->where('paroisse_id', $paroisseId)
             ->where('statut', 'valide')
             ->whereDate('date_depense', '>=', $dateDebut)
@@ -1525,6 +1545,10 @@ class FinancialReportController extends Controller implements HasMiddleware
 
         if ($revenueCategoryId) {
             $query->where('revenue_category_id', $revenueCategoryId);
+        }
+
+        if ($expenseTypeId) {
+            $query->where('expense_type_id', $expenseTypeId);
         }
 
         if ($revenueTypeId) {
@@ -1547,6 +1571,20 @@ class FinancialReportController extends Controller implements HasMiddleware
                 ];
             }
         }
+
+        $byExpenseType = [];
+        foreach ($expenses->groupBy('expense_type_id') as $typeId => $items) {
+            $expenseType = $items->first()?->expenseType;
+            $key = $typeId ?: 'sans_type';
+            $byExpenseType[$key] = [
+                'id' => $typeId ? (int) $typeId : null,
+                'nom' => $expenseType?->nom ?? 'Sans type',
+                'montant' => (float) $items->sum('montant'),
+                'count' => $items->count(),
+            ];
+        }
+
+        uasort($byExpenseType, fn (array $a, array $b): int => $b['montant'] <=> $a['montant']);
 
         $byType = [];
         $subventionEnvelopeBuckets = [];
@@ -1612,6 +1650,7 @@ class FinancialReportController extends Controller implements HasMiddleware
             'expenses' => $expenses,
             'by_category' => $byCategory,
             'by_type' => $byType,
+            'by_expense_type' => $byExpenseType,
             'subvention_envelopes' => $subventionEnvelopes,
             'total_general' => (float) $expenses->sum('montant'),
             'date_debut' => $dateDebut,

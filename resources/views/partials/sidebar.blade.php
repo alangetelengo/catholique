@@ -28,7 +28,7 @@
     $isConfigWorkspaceRoute = request()->routeIs('configurations.workspace');
     $isEventsRoute = request()->routeIs('events.*');
     $isGroupsRoute = request()->routeIs('groups.*');
-    $isLegacyAdminRoute = request()->routeIs('paroisses.*', 'users.*', 'roles.*', 'permissions.*', 'revenue-categories.*', 'revenue-types.*', 'configurations.*');
+    $isLegacyAdminRoute = request()->routeIs('paroisses.*', 'users.*', 'roles.*', 'permissions.*', 'revenue-categories.*', 'revenue-types.*', 'expense-types.*', 'configurations.*');
     $isConfigurationNavOpen = $isAppConfigRoute || $isConfigWorkspaceRoute || $isLegacyAdminRoute;
     $isConfigParoissesTab = request()->routeIs('application-configuration.index') && request()->query('tab') === 'paroisses';
     $isConfigOverviewSubActive = $isAppConfigRoute && ! $isConfigParoissesTab;

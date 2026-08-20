@@ -46,6 +46,7 @@ class SyncController extends Controller
             'expenses.*.data.paroisse_id' => ['nullable', 'exists:paroisses,id'],
             'expenses.*.data.revenue_category_id' => ['required', 'exists:revenue_categories,id'],
             'expenses.*.data.revenue_type_id' => ['required', 'exists:revenue_types,id'],
+            'expenses.*.data.expense_type_id' => ['required', 'integer', 'exists:expense_types,id,actif,1'],
             'expenses.*.data.date_depense' => ['required', 'date'],
             'expenses.*.data.montant' => ['required', 'numeric', 'min:0'],
             'expenses.*.data.jour_semaine' => ['nullable', 'in:lundi,mardi,mercredi,jeudi,vendredi,samedi,dimanche'],

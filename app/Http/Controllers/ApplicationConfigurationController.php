@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\ExpenseType;
 use App\Models\Paroisse;
 use App\Models\Permission;
 use App\Models\RevenueCategory;
@@ -41,6 +42,7 @@ class ApplicationConfigurationController extends Controller
 
         $tabs['revenue-categories'] = 'Catégories recettes';
         $tabs['revenue-types'] = 'Types recettes';
+        $tabs['expense-types'] = 'Types dépenses';
 
         if ($user->can('view_configuration')) {
             $tabs['appearance'] = 'Paramètres paroisse';
@@ -82,6 +84,7 @@ class ApplicationConfigurationController extends Controller
             'permissions' => $this->panelPermissions($request),
             'revenue-categories' => $this->panelRevenueCategories($request),
             'revenue-types' => $this->panelRevenueTypes($request),
+            'expense-types' => $this->panelExpenseTypes($request),
             'appearance' => $this->panelAppearance($request),
             default => abort(404),
         };
@@ -97,7 +100,7 @@ class ApplicationConfigurationController extends Controller
             'users' => $user->can('manage_users'),
             'roles' => $user->can('manage_roles'),
             'permissions' => $user->can('manage_permissions'),
-            'revenue-categories', 'revenue-types' => true,
+            'revenue-categories', 'revenue-types', 'expense-types' => true,
             'appearance' => $user->can('view_configuration'),
             default => false,
         };
@@ -226,6 +229,22 @@ class ApplicationConfigurationController extends Controller
         $categories = $categoriesQuery->get();
 
         return view('application-configuration.panels.revenue-types', compact('types', 'categories'));
+    }
+
+    private function panelExpenseTypes(Request $request): View
+    {
+        $this->ensureTabAccess($request, 'expense-types');
+
+        $perPage = PaginationPerPage::resolve($request);
+        $types = ExpenseType::query()
+            ->orderBy('ordre')
+            ->orderBy('nom')
+            ->paginate($perPage)
+            ->withQueryString();
+
+        $canManage = $request->user()?->hasRole('super_admin') ?? false;
+
+        return view('application-configuration.panels.expense-types', compact('types', 'canManage'));
     }
 
     private function panelAppearance(Request $request): View

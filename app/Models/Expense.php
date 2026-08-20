@@ -37,6 +37,7 @@ class Expense extends Model
     protected $fillable = [
         'paroisse_id',
         'revenue_category_id',
+        'expense_type_id',
         'revenue_type_id',
         'montant',
         'date_depense',
@@ -68,6 +69,11 @@ class Expense extends Model
     public function revenueCategory(): BelongsTo
     {
         return $this->belongsTo(RevenueCategory::class, 'revenue_category_id');
+    }
+
+    public function expenseType(): BelongsTo
+    {
+        return $this->belongsTo(ExpenseType::class);
     }
 
     public function revenueType(): BelongsTo

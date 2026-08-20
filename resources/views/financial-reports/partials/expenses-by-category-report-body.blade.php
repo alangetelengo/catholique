@@ -6,6 +6,10 @@
     $selectedType = ! empty($selectedRevenueTypeId)
         ? \App\Models\RevenueType::find($selectedRevenueTypeId)
         : null;
+    $selectedExpenseType = ! empty($selectedExpenseTypeId)
+        ? \App\Models\ExpenseType::find($selectedExpenseTypeId)
+        : null;
+    $byExpenseType = collect($report['by_expense_type'] ?? []);
     $isSubventionCategory = $selectedCategory && $selectedCategory->code === \App\Support\SubventionMensuelle::CATEGORY_CODE;
     $envelopes = collect($report['subvention_envelopes'] ?? []);
     $totalSubventionRecue = (float) $envelopes->sum('subvention_recue');
@@ -27,15 +31,54 @@
 <div class="rounded-xl border border-sky-200/80 dark:border-sky-800/60 bg-sky-50/90 dark:bg-sky-950/30 px-4 py-3 mb-5 text-sm text-sky-900 dark:text-sky-100">
     <strong class="font-semibold">Période :</strong>
     {{ \Illuminate\Support\Carbon::parse($dateDebut)->format('d/m/Y') }} → {{ \Illuminate\Support\Carbon::parse($dateFin)->format('d/m/Y') }}
-    @if ($selectedCategory)
+    @if ($selectedCategory || $selectedExpenseType)
         <span class="block mt-1 text-slate-600 dark:text-slate-300">
-            {{ $selectedCategory->nom }}
-            @if ($selectedType)
-                · <strong class="font-medium text-slate-800 dark:text-slate-100">{{ $selectedType->nom }}</strong>
+            @if ($selectedExpenseType)
+                Type : <strong class="font-medium text-slate-800 dark:text-slate-100">{{ $selectedExpenseType->nom }}</strong>
+            @endif
+            @if ($selectedCategory)
+                @if ($selectedExpenseType) · @endif
+                Source : {{ $selectedCategory->nom }}
+                @if ($selectedType)
+                    · <strong class="font-medium text-slate-800 dark:text-slate-100">{{ $selectedType->nom }}</strong>
+                @endif
             @endif
         </span>
     @endif
 </div>
+
+@if ($byExpenseType->isNotEmpty() && ! $selectedExpenseTypeId)
+    <div class="adventiste-card-pro-static overflow-hidden mb-6">
+        <div class="px-4 py-3 border-b border-slate-200/80 dark:border-slate-600/80 bg-slate-50/80 dark:bg-slate-800/50">
+            <h3 class="text-sm font-semibold text-slate-900 dark:text-white m-0">Répartition par type de dépense</h3>
+        </div>
+        <div class="overflow-x-auto p-2">
+            <table class="min-w-full text-sm">
+                <thead>
+                    <tr class="text-left text-slate-700 dark:text-slate-200 border-b border-slate-200 dark:border-slate-600">
+                        <th class="px-3 py-2 font-semibold">Type de dépense</th>
+                        <th class="px-3 py-2 font-semibold text-center">Nb</th>
+                        <th class="px-3 py-2 font-semibold text-right">Montant</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-200/70 dark:divide-slate-700/70">
+                    @foreach ($byExpenseType as $row)
+                        <tr class="text-slate-700 dark:text-slate-200">
+                            <td class="px-3 py-2">{{ $row['nom'] }}</td>
+                            <td class="px-3 py-2 text-center tabular-nums">{{ $row['count'] }}</td>
+                            <td class="px-3 py-2 text-right font-medium tabular-nums">{{ $fmt($row['montant']) }}</td>
+                        </tr>
+                    @endforeach
+                    <tr class="bg-slate-50/90 dark:bg-slate-800/50 font-semibold">
+                        <td class="px-3 py-2">Total</td>
+                        <td class="px-3 py-2 text-center tabular-nums">{{ $report['expenses']->count() }}</td>
+                        <td class="px-3 py-2 text-right tabular-nums">{{ $fmt($report['total_general']) }}</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+@endif
 
 @if ($isSubventionCategory && $envelopes->isNotEmpty())
     <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
@@ -180,6 +223,9 @@
                         @endforeach
                     @elseif ($ex->revenueType)
                         <p class="text-xs text-emerald-700 dark:text-emerald-400 mb-0.5">{{ $ex->revenueType->nom }}</p>
+                    @endif
+                    @if ($ex->expenseType)
+                        <p class="text-xs text-amber-700 dark:text-amber-400 mb-0.5">{{ $ex->expenseType->nom }}</p>
                     @endif
                     <p class="text-sm text-slate-700 dark:text-slate-200 mt-1">{{ $ex->libelle ?: '—' }}</p>
                     @if ($ex->fournisseur)

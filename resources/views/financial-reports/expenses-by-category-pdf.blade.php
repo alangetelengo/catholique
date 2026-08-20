@@ -11,6 +11,10 @@
         $selectedType = ! empty($selectedRevenueTypeId)
             ? \App\Models\RevenueType::find($selectedRevenueTypeId)
             : null;
+        $selectedExpenseType = ! empty($selectedExpenseTypeId)
+            ? \App\Models\ExpenseType::find($selectedExpenseTypeId)
+            : null;
+        $byExpenseType = collect($report['by_expense_type'] ?? []);
         $isSubventionCategory = $selectedCategory && $selectedCategory->code === \App\Support\SubventionMensuelle::CATEGORY_CODE;
         $envelopes = collect($report['subvention_envelopes'] ?? []);
         $totalSubventionRecue = (float) $envelopes->sum('subvention_recue');
@@ -194,8 +198,11 @@
         <h1>{{ $headerConfig['title'] ?? $paroisse?->nom ?? 'Paroisse' }}</h1>
         <div class="meta">
             <p><strong>Rapport des dépenses</strong>
+                @if ($selectedExpenseType)
+                    — Type : {{ $selectedExpenseType->nom }}
+                @endif
                 @if ($selectedCategory)
-                    — {{ $selectedCategory->nom }}
+                    — Source : {{ $selectedCategory->nom }}
                     @if ($selectedType)
                         · {{ $selectedType->nom }}
                     @endif
@@ -205,6 +212,33 @@
             <p>Édité le {{ now()->format('d/m/Y à H:i') }}</p>
         </div>
     </div>
+
+    @if ($byExpenseType->isNotEmpty() && empty($selectedExpenseTypeId))
+        <div class="section-title">Répartition par type de dépense</div>
+        <table class="simple-table">
+            <thead>
+                <tr>
+                    <th>Type de dépense</th>
+                    <th class="text-right">Nb</th>
+                    <th class="text-right">Montant</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach ($byExpenseType as $row)
+                    <tr>
+                        <td>{{ $row['nom'] }}</td>
+                        <td class="text-right">{{ $row['count'] }}</td>
+                        <td class="text-right">{{ $fmt($row['montant']) }}</td>
+                    </tr>
+                @endforeach
+                <tr class="total-row">
+                    <td>Total</td>
+                    <td class="text-right">{{ $report['expenses']->count() }}</td>
+                    <td class="text-right">{{ $fmt($report['total_general']) }}</td>
+                </tr>
+            </tbody>
+        </table>
+    @endif
 
     @if ($isSubventionCategory && $envelopes->isNotEmpty())
         <div class="report-heading">Synthèse subvention</div>

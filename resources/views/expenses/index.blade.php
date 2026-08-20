@@ -58,6 +58,14 @@
                 placeholder="Recherche (notes, fournisseur, facture)"
                 class="md:col-span-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2.5 text-sm"
             >
+            <select name="expense_type_id" class="rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2.5 text-sm">
+                <option value="">Tous types de dépense</option>
+                @foreach (($expenseTypes ?? collect()) as $expenseType)
+                    <option value="{{ $expenseType->id }}" {{ request('expense_type_id') == $expenseType->id ? 'selected' : '' }}>
+                        {{ $expenseType->nom }}
+                    </option>
+                @endforeach
+            </select>
             <select name="revenue_category_id" id="expenses_index_category" class="rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2.5 text-sm">
                 <option value="">Toutes catégories</option>
                 @foreach ($revenueCategories as $category)
@@ -67,7 +75,7 @@
                 @endforeach
             </select>
             <select name="revenue_type_id" id="expenses_index_type" class="rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2.5 text-sm">
-                <option value="">Tous types</option>
+                <option value="">Toutes sources</option>
                 @foreach ($revenueTypes as $type)
                     <option 
                         value="{{ $type->id }}" 
@@ -92,10 +100,18 @@
             </div>
         </form>
 
-        @if (request()->filled('q') || request()->filled('revenue_category_id') || request()->filled('revenue_type_id') || request()->filled('date_from') || request()->filled('date_to'))
+        @if (request()->filled('q') || request()->filled('expense_type_id') || request()->filled('revenue_category_id') || request()->filled('revenue_type_id') || request()->filled('date_from') || request()->filled('date_to'))
             <div class="mt-4 flex flex-wrap gap-2">
                 @if (request('q'))
                     <span class="inline-flex items-center rounded-full bg-slate-100 dark:bg-slate-700 px-3 py-1 text-xs font-medium text-slate-700 dark:text-slate-200">Recherche: {{ request('q') }}</span>
+                @endif
+                @if (request('expense_type_id'))
+                    @php
+                        $selectedExpenseType = ($expenseTypes ?? collect())->firstWhere('id', (int) request('expense_type_id'));
+                    @endphp
+                    @if ($selectedExpenseType)
+                        <span class="inline-flex items-center rounded-full bg-amber-50 dark:bg-amber-900/30 px-3 py-1 text-xs font-medium text-amber-800 dark:text-amber-200">Type dépense: {{ $selectedExpenseType->nom }}</span>
+                    @endif
                 @endif
                 @if (request('revenue_category_id'))
                     @php
@@ -110,7 +126,7 @@
                         $selectedType = $revenueTypes->firstWhere('id', request('revenue_type_id'));
                     @endphp
                     @if ($selectedType)
-                        <span class="inline-flex items-center rounded-full bg-rose-50 dark:bg-rose-900/30 px-3 py-1 text-xs font-medium text-rose-700 dark:text-rose-300">Type: {{ $selectedType->nom }}</span>
+                        <span class="inline-flex items-center rounded-full bg-rose-50 dark:bg-rose-900/30 px-3 py-1 text-xs font-medium text-rose-700 dark:text-rose-300">Source: {{ $selectedType->nom }}</span>
                     @endif
                 @endif
                 @if (request('date_from'))
@@ -130,6 +146,7 @@
                     <tr class="text-left text-slate-700 dark:text-slate-200">
                         <th class="px-4 py-3 font-semibold">Date</th>
                         <th class="px-4 py-3 font-semibold">Libellé</th>
+                        <th class="px-4 py-3 font-semibold">Type de dépense</th>
                         <th class="px-4 py-3 font-semibold">Catégorie</th>
                         <th class="px-4 py-3 font-semibold">Sources de financement</th>
                         <th class="px-4 py-3 font-semibold">Montant</th>
@@ -145,6 +162,9 @@
                             <td class="px-4 py-3 whitespace-nowrap">{{ optional($expense->date_depense)->format('d/m/Y') }}</td>
                             <td class="px-4 py-3 max-w-[14rem]">
                                 <span class="line-clamp-2" title="{{ $expense->libelle }}">{{ $expense->libelle ?: '—' }}</span>
+                            </td>
+                            <td class="px-4 py-3 whitespace-nowrap">
+                                {{ $expense->expenseType?->nom ?? '—' }}
                             </td>
                             <td class="px-4 py-3 whitespace-nowrap">
                                 {{ $expense->revenueCategory?->nom ?? '—' }}

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Expense;
+use App\Models\ExpenseType;
 use App\Models\RevenueCategory;
 use App\Services\BudgetService;
 use App\Support\PaginationPerPage;
@@ -12,6 +13,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 use Throwable;
@@ -28,7 +30,7 @@ class ExpenseController extends Controller
     {
         try {
             $expenses = $this->expensesIndexFilteredQuery($request)
-                ->with(['createdBy', 'revenueCategory', 'fundingSources.revenueType', 'fundingSources.revenue'])
+                ->with(['createdBy', 'revenueCategory', 'expenseType', 'fundingSources.revenueType', 'fundingSources.revenue'])
                 ->orderByDesc('date_depense')
                 ->orderByDesc('id')
                 ->paginate(PaginationPerPage::resolve($request))
@@ -40,11 +42,13 @@ class ExpenseController extends Controller
                 ->orderByDesc('id')
                 ->value('montant');
             $montantDerniereDepense = $montantDerniereDepense !== null ? (float) $montantDerniereDepense : null;
+            $expenseTypes = ExpenseType::query()->where('actif', true)->orderBy('ordre')->orderBy('nom')->get();
 
             return view('expenses.index', compact(
                 'expenses',
                 'totalMontantDepenses',
                 'montantDerniereDepense',
+                'expenseTypes',
             ));
         } catch (Throwable $e) {
             $this->logError($e, 'Erreur lors du chargement des dépenses');
@@ -66,13 +70,14 @@ class ExpenseController extends Controller
         // Récupérer les types de recettes avec solde disponible > 0
         $revenueTypes = $this->budgetService->getSourcesAvecSolde($userParoisseId);
         $subventionEnvelopes = $this->budgetService->getSubventionEnvelopesForExpenseForm((int) $userParoisseId);
+        $expenseTypes = ExpenseType::query()->where('actif', true)->orderBy('ordre')->orderBy('nom')->get();
 
         $expense = new Expense([
             'date_depense' => now()->toDateString(),
             'methode_paiement' => 'especes',
         ]);
 
-        return view('expenses.create', compact('expense', 'revenueCategories', 'revenueTypes', 'subventionEnvelopes'));
+        return view('expenses.create', compact('expense', 'revenueCategories', 'revenueTypes', 'subventionEnvelopes', 'expenseTypes'));
     }
 
     public function store(Request $request): RedirectResponse
@@ -133,11 +138,21 @@ class ExpenseController extends Controller
         // Récupérer les types de recettes avec solde disponible > 0 (en excluant la dépense actuelle)
         $revenueTypes = $this->budgetService->getSourcesAvecSolde($userParoisseId, $expense);
         $subventionEnvelopes = $this->budgetService->getSubventionEnvelopesForExpenseForm((int) $userParoisseId, $expense);
+        $expenseTypes = ExpenseType::query()
+            ->where(function ($query) use ($expense): void {
+                $query->where('actif', true);
+                if ($expense->expense_type_id) {
+                    $query->orWhere('id', $expense->expense_type_id);
+                }
+            })
+            ->orderBy('ordre')
+            ->orderBy('nom')
+            ->get();
 
         // Charger les sources de financement existantes
-        $expense->load('fundingSources.revenueType', 'fundingSources.revenue');
+        $expense->load('fundingSources.revenueType', 'fundingSources.revenue', 'expenseType');
 
-        return view('expenses.edit', compact('expense', 'revenueCategories', 'revenueTypes', 'subventionEnvelopes'));
+        return view('expenses.edit', compact('expense', 'revenueCategories', 'revenueTypes', 'subventionEnvelopes', 'expenseTypes'));
     }
 
     public function update(Request $request, Expense $expense): RedirectResponse
@@ -203,6 +218,10 @@ class ExpenseController extends Controller
             $query->where('revenue_category_id', $request->integer('revenue_category_id'));
         }
 
+        if ($request->filled('expense_type_id')) {
+            $query->where('expense_type_id', $request->integer('expense_type_id'));
+        }
+
         // Filtrer par type de recette (source précise des fonds)
         if ($request->filled('revenue_type_id')) {
             $query->where('revenue_type_id', $request->integer('revenue_type_id'));
@@ -234,6 +253,16 @@ class ExpenseController extends Controller
     {
         $validated = $request->validate([
             'revenue_category_id' => ['required', 'integer', 'exists:revenue_categories,id'],
+            'expense_type_id' => [
+                'required',
+                'integer',
+                Rule::exists('expense_types', 'id')->where(function ($query) use ($expense): void {
+                    $query->where('actif', true);
+                    if ($expense?->expense_type_id) {
+                        $query->orWhere('id', $expense->expense_type_id);
+                    }
+                }),
+            ],
             'date_depense' => ['required', 'date'],
             'montant' => ['required', 'numeric', 'min:0'],
             'libelle' => ['required', 'string', 'max:500'],

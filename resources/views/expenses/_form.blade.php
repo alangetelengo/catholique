@@ -60,10 +60,20 @@
         @error('revenue_category_id')<p class="mt-1.5 text-sm text-red-600 dark:text-red-400">{{ $message }}</p>@enderror
     </div>
 
+
     <div>
-        <label class="block text-sm font-semibold text-slate-800 dark:text-slate-200 mb-1.5">Date de dépense <span class="text-red-600">*</span></label>
-        <input type="date" name="date_depense" id="date_depense" value="{{ old('date_depense', optional($expense->date_depense)->format('Y-m-d') ?? now()->format('Y-m-d')) }}" class="{{ $field }}" required>
-        @error('date_depense')<p class="mt-1.5 text-sm text-red-600 dark:text-red-400">{{ $message }}</p>@enderror
+        <label class="block text-sm font-semibold text-slate-800 dark:text-slate-200 mb-1.5">Type de dépense <span class="text-red-600">*</span></label>
+        <select name="expense_type_id" id="expense_type_id" class="{{ $field }}" required>
+            <option value="">-- Choisir le type --</option>
+            @foreach (($expenseTypes ?? collect()) as $type)
+                <option value="{{ $type->id }}"
+                    {{ (string) old('expense_type_id', $expense->expense_type_id) === (string) $type->id ? 'selected' : '' }}>
+                    {{ $type->nom }}@if (! $type->actif) (inactif)@endif
+                </option>
+            @endforeach
+        </select>
+        <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Nature de la dépense (alimentation, salaires…)</p>
+        @error('expense_type_id')<p class="mt-1.5 text-sm text-red-600 dark:text-red-400">{{ $message }}</p>@enderror
     </div>
 
     <div>
@@ -77,6 +87,16 @@
         <input type="text" name="libelle" id="libelle" value="{{ old('libelle', $expense->libelle) }}" class="{{ $field }}" placeholder="Ex: Achat de riz pour popote" required>
         <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Décrivez précisément l'achat effectué</p>
         @error('libelle')<p class="mt-1.5 text-sm text-red-600 dark:text-red-400">{{ $message }}</p>@enderror
+    </div>
+    <div>
+        <label class="block text-sm font-semibold text-slate-800 dark:text-slate-200 mb-1.5">Date de dépense <span class="text-red-600">*</span></label>
+        <input type="date" name="date_depense" id="date_depense" value="{{ old('date_depense', optional($expense->date_depense)->format('Y-m-d') ?? now()->format('Y-m-d')) }}" class="{{ $field }}" required>
+        @error('date_depense')<p class="mt-1.5 text-sm text-red-600 dark:text-red-400">{{ $message }}</p>@enderror
+    </div>
+    <div>
+        <label class="block text-sm font-semibold text-slate-800 dark:text-slate-200 mb-1.5">Fournisseur</label>
+        <input type="text" name="fournisseur" value="{{ old('fournisseur', $expense->fournisseur) }}" class="{{ $field }}" placeholder="Nom du fournisseur ou du vendeur">
+        @error('fournisseur')<p class="mt-1.5 text-sm text-red-600 dark:text-red-400">{{ $message }}</p>@enderror
     </div>
 
     {{-- Section Sources de financement --}}
@@ -155,13 +175,13 @@
                         </div>
                         <div>
                             <label class="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Montant alloué (FCFA)</label>
-                            <input type="number" 
-                                name="funding_sources[{{ $index }}][montant_alloue]" 
-                                class="funding-source-amount w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-2 text-sm" 
-                                step="0.01" 
+                            <input type="number"
+                                name="funding_sources[{{ $index }}][montant_alloue]"
+                                class="funding-source-amount w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-2 text-sm"
+                                step="0.01"
                                 min="0"
                                 value="{{ is_array($source) ? ($source['montant_alloue'] ?? '') : ($source->montant_alloue ?? '') }}"
-                                placeholder="0" 
+                                placeholder="0"
                                 required>
                         </div>
                         <div>
@@ -212,12 +232,12 @@
                         </div>
                         <div>
                             <label class="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Montant alloué (FCFA)</label>
-                            <input type="number" 
-                                name="funding_sources[0][montant_alloue]" 
-                                class="funding-source-amount w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-2 text-sm" 
-                                step="0.01" 
+                            <input type="number"
+                                name="funding_sources[0][montant_alloue]"
+                                class="funding-source-amount w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-2 text-sm"
+                                step="0.01"
                                 min="0"
-                                placeholder="0" 
+                                placeholder="0"
                                 required>
                         </div>
                         <div>
@@ -262,11 +282,7 @@
         @error('facture_reference')<p class="mt-1.5 text-sm text-red-600 dark:text-red-400">{{ $message }}</p>@enderror
     </div>
 
-    <div>
-        <label class="block text-sm font-semibold text-slate-800 dark:text-slate-200 mb-1.5">Fournisseur</label>
-        <input type="text" name="fournisseur" value="{{ old('fournisseur', $expense->fournisseur) }}" class="{{ $field }}" placeholder="Nom du fournisseur ou du vendeur">
-        @error('fournisseur')<p class="mt-1.5 text-sm text-red-600 dark:text-red-400">{{ $message }}</p>@enderror
-    </div>
+
 
     <div class="revenue-form-grid__full">
         <div class="border-t border-slate-200 dark:border-slate-700 pt-4 mt-2">
@@ -279,9 +295,9 @@
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                     <label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">📄 Facture</label>
-                    <input type="file" 
-                           name="piece_facture" 
-                           accept=".pdf,.jpg,.jpeg,.png" 
+                    <input type="file"
+                           name="piece_facture"
+                           accept=".pdf,.jpg,.jpeg,.png"
                            class="{{ $field }} file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100 dark:file:bg-emerald-900/20 dark:file:text-emerald-400">
                     <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">PDF, JPG, PNG (max 5 Mo)</p>
                     @if($expense->piece_facture_path)
@@ -295,9 +311,9 @@
 
                 <div>
                     <label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">🧾 Reçu de paiement</label>
-                    <input type="file" 
-                           name="piece_recu" 
-                           accept=".pdf,.jpg,.jpeg,.png" 
+                    <input type="file"
+                           name="piece_recu"
+                           accept=".pdf,.jpg,.jpeg,.png"
                            class="{{ $field }} file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100 dark:file:bg-emerald-900/20 dark:file:text-emerald-400">
                     <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">PDF, JPG, PNG (max 5 Mo)</p>
                     @if($expense->piece_recu_path)
@@ -311,9 +327,9 @@
 
                 <div>
                     <label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">📎 Autre document</label>
-                    <input type="file" 
-                           name="piece_autre" 
-                           accept=".pdf,.jpg,.jpeg,.png" 
+                    <input type="file"
+                           name="piece_autre"
+                           accept=".pdf,.jpg,.jpeg,.png"
                            class="{{ $field }} file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100 dark:file:bg-emerald-900/20 dark:file:text-emerald-400">
                     <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Bon de livraison, devis, etc.</p>
                     @if($expense->piece_autre_path)
@@ -427,12 +443,12 @@
                 </div>
                 <div>
                     <label class="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Montant alloué (FCFA)</label>
-                    <input type="number" 
-                        name="funding_sources[' + index + '][montant_alloue]" 
-                        class="funding-source-amount w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-2 text-sm" 
-                        step="0.01" 
+                    <input type="number"
+                        name="funding_sources[' + index + '][montant_alloue]"
+                        class="funding-source-amount w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-2 text-sm"
+                        step="0.01"
                         min="0"
-                        placeholder="0" 
+                        placeholder="0"
                         required>
                 </div>
                 <div>

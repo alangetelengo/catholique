@@ -6,6 +6,7 @@ use App\Http\Controllers\ConfigurationController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\EventController;
 use App\Http\Controllers\ExpenseController;
+use App\Http\Controllers\ExpenseTypeController;
 use App\Http\Controllers\FinancialReportController;
 use App\Http\Controllers\FinancialStatisticsController;
 use App\Http\Controllers\GroupController;
@@ -63,6 +64,7 @@ Route::middleware('auth')->group(function (): void {
     Route::get('popote-reports/{popoteReport}/pdf', [PopoteSubventionReportController::class, 'exportPdf'])->name('popote-reports.pdf');
     Route::resource('revenue-categories', RevenueCategoryController::class)->except(['show']);
     Route::resource('revenue-types', RevenueTypeController::class)->except(['show']);
+    Route::resource('expense-types', ExpenseTypeController::class)->except(['show']);
 
     Route::get('financial-statistics', [FinancialStatisticsController::class, 'index'])->name('financial-statistics.index');
     Route::get('financial-statistics/pdf', [FinancialStatisticsController::class, 'exportPdf'])->name('financial-statistics.pdf');
