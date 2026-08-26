@@ -2,12 +2,15 @@
 
 namespace Tests\Feature;
 
+use App\Models\Caisse;
 use App\Models\Expense;
+use App\Models\ExpenseType;
 use App\Models\Paroisse;
 use App\Models\Revenue;
 use App\Models\RevenueCategory;
 use App\Models\RevenueType;
 use App\Models\User;
+use App\Services\CaisseService;
 use App\Services\FinancialStatisticsService;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -36,28 +39,19 @@ class FinancialStatisticsServiceTest extends TestCase
             'ordre' => 1,
         ]);
 
-        $popoteType = RevenueType::query()->create([
-            'paroisse_id' => $paroisse->id,
-            'revenue_category_id' => $category->id,
-            'code' => FinancialStatisticsService::POPOTE_TYPE_CODE,
-            'nom' => 'Subvention popote',
-            'actif' => true,
-            'ordre' => 1,
-        ]);
-
-        $otherType = RevenueType::query()->create([
+        $queteType = RevenueType::query()->create([
             'paroisse_id' => $paroisse->id,
             'revenue_category_id' => $category->id,
             'code' => 'quete_type_sp001',
             'nom' => 'Quête type',
             'actif' => true,
-            'ordre' => 2,
+            'ordre' => 1,
         ]);
 
         Revenue::query()->create([
             'paroisse_id' => $paroisse->id,
             'revenue_category_id' => $category->id,
-            'revenue_type_id' => $popoteType->id,
+            'revenue_type_id' => $queteType->id,
             'montant' => 10000,
             'date_recette' => '2026-05-10',
             'statut' => 'valide',
@@ -67,7 +61,7 @@ class FinancialStatisticsServiceTest extends TestCase
         Revenue::query()->create([
             'paroisse_id' => $paroisse->id,
             'revenue_category_id' => $category->id,
-            'revenue_type_id' => $otherType->id,
+            'revenue_type_id' => $queteType->id,
             'montant' => 5000,
             'date_recette' => '2026-05-10',
             'statut' => 'valide',
@@ -77,16 +71,25 @@ class FinancialStatisticsServiceTest extends TestCase
         Revenue::query()->create([
             'paroisse_id' => $paroisse->id,
             'revenue_category_id' => $category->id,
-            'revenue_type_id' => $otherType->id,
+            'revenue_type_id' => $queteType->id,
             'montant' => 9000,
             'date_recette' => '2026-05-10',
             'statut' => 'en_attente',
             'created_by' => $user->id,
         ]);
 
+        $popote = Caisse::query()->where('paroisse_id', $paroisse->id)->where('code', 'alimentation_popote')->firstOrFail();
+        $transport = Caisse::query()->where('paroisse_id', $paroisse->id)->where('code', 'transport')->firstOrFail();
+        $serviceCaisse = app(CaisseService::class);
+        $serviceCaisse->creditDirect($popote, 100000, '2026-05-01', 'Crédit popote', null, $user->id);
+        $serviceCaisse->creditDirect($transport, 100000, '2026-05-01', 'Crédit transport', null, $user->id);
+
+        $expenseType = ExpenseType::query()->where('code', 'alimentation_popote')->firstOrFail();
+
         $expenseValidated = Expense::query()->create([
             'paroisse_id' => $paroisse->id,
             'revenue_category_id' => $category->id,
+            'expense_type_id' => $expenseType->id,
             'montant' => 7000,
             'date_depense' => '2026-05-10',
             'jour_semaine' => 'samedi',
@@ -97,12 +100,12 @@ class FinancialStatisticsServiceTest extends TestCase
 
         $expenseValidated->fundingSources()->createMany([
             [
-                'revenue_type_id' => $popoteType->id,
+                'caisse_id' => $popote->id,
                 'montant_alloue' => 4000,
                 'ordre' => 1,
             ],
             [
-                'revenue_type_id' => $otherType->id,
+                'caisse_id' => $transport->id,
                 'montant_alloue' => 3000,
                 'ordre' => 2,
             ],
@@ -111,6 +114,7 @@ class FinancialStatisticsServiceTest extends TestCase
         $expenseOtherValidated = Expense::query()->create([
             'paroisse_id' => $paroisse->id,
             'revenue_category_id' => $category->id,
+            'expense_type_id' => $expenseType->id,
             'montant' => 2000,
             'date_depense' => '2026-05-10',
             'jour_semaine' => 'samedi',
@@ -120,7 +124,7 @@ class FinancialStatisticsServiceTest extends TestCase
         ]);
 
         $expenseOtherValidated->fundingSources()->create([
-            'revenue_type_id' => $otherType->id,
+            'caisse_id' => $transport->id,
             'montant_alloue' => 2000,
             'ordre' => 1,
         ]);
@@ -128,6 +132,7 @@ class FinancialStatisticsServiceTest extends TestCase
         $expensePending = Expense::query()->create([
             'paroisse_id' => $paroisse->id,
             'revenue_category_id' => $category->id,
+            'expense_type_id' => $expenseType->id,
             'montant' => 6000,
             'date_depense' => '2026-05-10',
             'jour_semaine' => 'samedi',
@@ -137,7 +142,7 @@ class FinancialStatisticsServiceTest extends TestCase
         ]);
 
         $expensePending->fundingSources()->create([
-            'revenue_type_id' => $popoteType->id,
+            'caisse_id' => $popote->id,
             'montant_alloue' => 6000,
             'ordre' => 1,
         ]);

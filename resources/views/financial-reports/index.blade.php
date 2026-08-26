@@ -2,7 +2,7 @@
 
 @section('title', 'Génération de rapport mensuel — Catholique')
 @section('page-title', 'Génération de rapport mensuel')
-@section('page-title-info', 'Justification mensuelle : recettes validées hors Procure (quêtes, locations, popote/subvention), dépenses validées toutes catégories, solde = recettes − dépenses. Enregistrement possible selon les droits.')
+@section('page-title-info', 'Justification mensuelle : recettes validées hors Procure (Banque, quêtes, location, fête), dépenses validées toutes catégories, solde = recettes − dépenses. Enregistrement possible selon les droits.')
 
 @section('btn-create')
     <nav class="inline-flex min-w-0 max-w-full flex-wrap items-center justify-end gap-2" aria-label="Navigation rapports financiers">
@@ -83,7 +83,7 @@
             <i class="fas fa-info-circle mt-0.5 shrink-0 text-sky-600 dark:text-sky-400" aria-hidden="true"></i>
             <span>
                 <strong class="font-semibold">Méthode de calcul :</strong>
-                les <strong>recettes</strong> totalisent uniquement les catégories quête ordinaire, quête extraordinaire, location et popote/subvention (la <strong>Procure</strong> est exclue) pour les lignes au statut « validé ».
+                les <strong>recettes</strong> totalisent Banque, quêtes, location et fête (la <strong>Procure</strong> est exclue) pour les lignes au statut « validé ».
                 Les <strong>dépenses</strong> additionnent toutes les catégories de charges sur la même période (statut « validé »).
                 Le <strong>solde</strong> est la différence entre ces deux totaux.
             </span>
@@ -98,7 +98,7 @@
                     Total recettes
                 </p>
                 <p class="mt-1 text-xl font-bold text-emerald-700 dark:text-emerald-400">{{ $fmt($report['total_recettes']) }}</p>
-                <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">Quêtes, locations, popote (hors Procure)</p>
+                <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">Banque, quêtes, location, fête (hors Procure)</p>
             </div>
             <div class="adventiste-card-pro-static p-4 border-t-4 border-t-rose-500">
                 <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400 flex items-center gap-2">
@@ -302,7 +302,7 @@
                                                 @php
                                                     $sourceLabels = $expense->fundingSources
                                                         ? $expense->fundingSources
-                                                            ->map(fn ($source) => $source->revenueType?->nom)
+                                                            ->map(fn ($source) => $source->caisse?->nom ?? $source->revenueType?->nom)
                                                             ->filter()
                                                             ->values()
                                                         : collect();

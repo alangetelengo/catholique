@@ -1,7 +1,7 @@
 @extends('layouts.app')
 
-@section('title', 'Rapports Subvention Popote - Catholique')
-@section('page-title', 'Rapport Subvention Popote')
+@section('title', 'Rapports Caisse Popote - Catholique')
+@section('page-title', 'Rapport Caisse Popote')
 @section('page-title-info', 'Comparaison subvention reçue vs dépenses alimentation.')
 
 @section('btn-create')
@@ -31,7 +31,7 @@
     <div class="adventiste-table-shell">
         <div class="overflow-x-auto">
             <table class="min-w-full text-sm">
-                <thead><tr><th class="px-4 py-3 font-semibold">Période</th><th class="px-4 py-3 font-semibold">Paroisse</th><th class="px-4 py-3 font-semibold">Subvention reçue</th><th class="px-4 py-3 font-semibold">Dépenses alimentation</th><th class="px-4 py-3 font-semibold">Solde</th><th class="px-4 py-3 font-semibold text-right">Actions</th></tr></thead>
+                <thead><tr><th class="px-4 py-3 font-semibold">Période</th><th class="px-4 py-3 font-semibold">Paroisse</th><th class="px-4 py-3 font-semibold">Crédits caisse</th><th class="px-4 py-3 font-semibold">Dépenses alimentation</th><th class="px-4 py-3 font-semibold">Solde</th><th class="px-4 py-3 font-semibold text-right">Actions</th></tr></thead>
                 <tbody class="divide-y divide-slate-200/70 dark:divide-slate-700/70">
                     @forelse($reports as $report)
                         @php
@@ -50,7 +50,7 @@
                                 <div class="flex items-center justify-end gap-2">
                                     <x-action-button variant="view" href="{{ route('popote-reports.show', $report) }}" />
                                     <x-action-button variant="edit" href="{{ route('popote-reports.edit', $report) }}" />
-                                    <x-action-button variant="delete" action="{{ route('popote-reports.destroy', $report) }}" method="DELETE" confirm-message="Supprimer ce rapport Subvention Popote ?" />
+                                    <x-action-button variant="delete" action="{{ route('popote-reports.destroy', $report) }}" method="DELETE" confirm-message="Supprimer ce rapport Caisse Popote ?" />
                                 </div>
                             </td>
                         </tr>

@@ -1,8 +1,8 @@
 @extends('layouts.app')
 
-@section('title', 'Détail rapport Subvention Popote - Catholique')
-@section('page-title', 'Détail rapport Subvention Popote')
-@section('page-title-info', 'Subvention reçue comparée aux dépenses alimentation.')
+@section('title', 'Détail rapport Caisse Popote - Catholique')
+@section('page-title', 'Détail rapport Caisse Popote')
+@section('page-title-info', 'Crédits de la caisse Popote comparés aux dépenses alimentation.')
 
 @section('header-back')
     <x-back-link :href="route('popote-reports.index')" />
@@ -23,7 +23,7 @@
 
     <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-5">
         <div class="adventiste-card-pro-static p-4"><p class="text-xs uppercase text-slate-500">Période</p><p class="mt-1 text-xl font-bold">{{ $period }}</p></div>
-        <div class="adventiste-card-pro-static p-4"><p class="text-xs uppercase text-slate-500">Subvention reçue</p><p class="mt-1 text-xl font-bold text-emerald-700">{{ $fcfa((float) $report->total_recettes) }}</p></div>
+        <div class="adventiste-card-pro-static p-4"><p class="text-xs uppercase text-slate-500">Crédits caisse</p><p class="mt-1 text-xl font-bold text-emerald-700">{{ $fcfa((float) $report->total_recettes) }}</p></div>
         <div class="adventiste-card-pro-static p-4"><p class="text-xs uppercase text-slate-500">Dépenses alimentation</p><p class="mt-1 text-xl font-bold text-rose-700">{{ $fcfa((float) $report->total_depenses) }}</p></div>
         <div class="adventiste-card-pro-static p-4"><p class="text-xs uppercase text-slate-500">Solde popote</p><p class="mt-1 text-xl font-bold">{{ $fcfa((float) $report->solde) }}</p></div>
     </div>
@@ -37,7 +37,7 @@
                     <thead>
                         <tr>
                             <th class="px-4 py-3 font-semibold text-left">Mois concerné</th>
-                            <th class="px-4 py-3 font-semibold text-left">Subvention reçue</th>
+                            <th class="px-4 py-3 font-semibold text-left">Crédits caisse</th>
                             <th class="px-4 py-3 font-semibold text-left">Dépenses</th>
                             <th class="px-4 py-3 font-semibold text-left">Solde restant</th>
                         </tr>

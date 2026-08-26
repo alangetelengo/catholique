@@ -13,7 +13,8 @@
 @section('content')
     <div class="adventiste-card-pro-static w-full p-5 sm:p-6">
         <p class="text-sm text-slate-600 dark:text-slate-400 mb-6 leading-relaxed border-b border-slate-200/80 dark:border-slate-600/60 pb-6">
-            Enregistrez la dépense avec la catégorie et le type exacts. Le jour de la semaine est calculé automatiquement selon la date choisie.
+            Choisissez le type de dépense, puis prélevez sur une ou plusieurs <strong>caisses</strong> déjà alimentées
+            (crédit direct ou virement depuis la trésorerie). La trésorerie générale ne finance pas directement une dépense.
         </p>
         <form method="post" action="{{ route('expenses.store') }}" enctype="multipart/form-data" class="space-y-8">
             @csrf

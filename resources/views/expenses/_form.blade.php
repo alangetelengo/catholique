@@ -2,77 +2,33 @@
     $gridColumns = (int) ($formColumns ?? 2);
     $gridClass = $gridColumns === 3 ? 'revenue-form-grid revenue-form-grid--three' : 'revenue-form-grid';
     $field = 'w-full rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900/90 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 shadow-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/35 focus:border-emerald-500/80 transition-shadow';
-    $subventionEnvelopes = $subventionEnvelopes ?? collect();
-    $fundingOptionKey = static function (mixed $source) use ($subventionEnvelopes): string {
-        $revenueId = null;
-        $typeId = null;
-        $mois = null;
-
-        if (is_array($source)) {
-            $revenueId = ! empty($source['revenue_id']) ? (int) $source['revenue_id'] : null;
-            $typeId = $source['revenue_type_id'] ?? null;
-        } elseif ($source instanceof \App\Models\ExpenseFundingSource) {
-            $revenueId = $source->revenue_id ? (int) $source->revenue_id : null;
-            $typeId = $source->revenue_type_id;
-            $mois = $source->revenue?->mois_subvention;
-        }
-
-        if ($revenueId) {
-            foreach ($subventionEnvelopes as $envelope) {
-                $ids = collect($envelope->envelope_revenue_ids ?? [$envelope->id])->map(fn ($id) => (int) $id);
-                if ($ids->contains($revenueId)) {
-                    return $envelope->envelope_key ?? 'env-'.$envelope->revenue_type_id.'-'.$envelope->mois_subvention;
-                }
-            }
-
-            if ($typeId && $mois) {
-                return 'env-'.$typeId.'-'.$mois;
-            }
-        }
-
-        return $typeId ? 'type-'.$typeId : '';
-    };
-    $subventionEnvelopesJson = $subventionEnvelopes->map(function ($envelope) {
-        return [
-            'id' => $envelope->id,
-            'envelope_key' => $envelope->envelope_key ?? 'env-'.$envelope->revenue_type_id.'-'.$envelope->mois_subvention,
-            'revenue_type_id' => $envelope->revenue_type_id,
-            'revenue_category_id' => $envelope->revenue_category_id,
-            'envelope_label' => $envelope->envelope_label ?? (($envelope->type?->nom ?? 'Subvention').' — '.($envelope->mois_label ?? '')),
-            'solde_disponible' => round((float) ($envelope->solde_disponible ?? 0), 2),
-        ];
-    })->values();
+    $caisses = $caisses ?? collect();
+    $caissesJson = $caisses->map(fn ($caisse) => [
+        'id' => $caisse->id,
+        'code' => $caisse->code,
+        'nom' => $caisse->nom,
+        'solde_disponible' => round((float) ($caisse->solde_disponible ?? 0), 2),
+    ])->values();
+    $expenseTypesJson = collect($expenseTypes ?? [])->map(fn ($type) => [
+        'id' => $type->id,
+        'code' => $type->code,
+    ])->values();
 @endphp
 
 <div class="{{ $gridClass }}">
-    <div>
-        <label class="block text-sm font-semibold text-slate-800 dark:text-slate-200 mb-1.5">Catégorie de recette (source) <span class="text-red-600">*</span></label>
-        <select name="revenue_category_id" id="revenue_category" class="{{ $field }}" required>
-            <option value="">-- Choisir la source --</option>
-            @foreach ($revenueCategories as $category)
-                <option value="{{ $category->id }}"
-                    {{ (string) old('revenue_category_id', $expense->revenue_category_id) === (string) $category->id ? 'selected' : '' }}>
-                    {{ $category->nom }}
-                </option>
-            @endforeach
-        </select>
-        <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Catégorie générale de la dépense</p>
-        @error('revenue_category_id')<p class="mt-1.5 text-sm text-red-600 dark:text-red-400">{{ $message }}</p>@enderror
-    </div>
-
-
     <div>
         <label class="block text-sm font-semibold text-slate-800 dark:text-slate-200 mb-1.5">Type de dépense <span class="text-red-600">*</span></label>
         <select name="expense_type_id" id="expense_type_id" class="{{ $field }}" required>
             <option value="">-- Choisir le type --</option>
             @foreach (($expenseTypes ?? collect()) as $type)
                 <option value="{{ $type->id }}"
+                    data-code="{{ $type->code }}"
                     {{ (string) old('expense_type_id', $expense->expense_type_id) === (string) $type->id ? 'selected' : '' }}>
                     {{ $type->nom }}@if (! $type->actif) (inactif)@endif
                 </option>
             @endforeach
         </select>
-        <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Nature de la dépense (alimentation, salaires…)</p>
+        <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Une suggestion de caisse homonyme sera proposée si elle a un solde.</p>
         @error('expense_type_id')<p class="mt-1.5 text-sm text-red-600 dark:text-red-400">{{ $message }}</p>@enderror
     </div>
 
@@ -84,8 +40,7 @@
 
     <div>
         <label class="block text-sm font-semibold text-slate-800 dark:text-slate-200 mb-1.5">Libellé (description de la dépense) <span class="text-red-600">*</span></label>
-        <input type="text" name="libelle" id="libelle" value="{{ old('libelle', $expense->libelle) }}" class="{{ $field }}" placeholder="Ex: Achat de riz pour popote" required>
-        <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Décrivez précisément l'achat effectué</p>
+        <input type="text" name="libelle" id="libelle" value="{{ old('libelle', $expense->libelle) }}" class="{{ $field }}" placeholder="Ex: Achat hosties" required>
         @error('libelle')<p class="mt-1.5 text-sm text-red-600 dark:text-red-400">{{ $message }}</p>@enderror
     </div>
     <div>
@@ -99,17 +54,13 @@
         @error('fournisseur')<p class="mt-1.5 text-sm text-red-600 dark:text-red-400">{{ $message }}</p>@enderror
     </div>
 
-    {{-- Section Sources de financement --}}
     <div class="revenue-form-grid__full">
         <div class="border-t border-slate-200 dark:border-slate-700 pt-4 mt-2">
-            <h3 class="text-sm font-semibold text-slate-800 dark:text-slate-200 mb-3 flex items-center gap-2">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"></path>
-                </svg>
-                Sources de financement <span class="text-red-600">*</span>
-            </h3>
+            <h3 class="text-sm font-semibold text-slate-800 dark:text-slate-200 mb-3">Caisses de financement <span class="text-red-600">*</span></h3>
             <p class="text-xs text-slate-600 dark:text-slate-400 mb-4">
-                Indiquez d&apos;où proviennent les fonds pour cette dépense. Pour les <strong>subventions</strong>, choisissez le type et le <strong>mois concerné</strong> (enveloppe mensuelle).
+                Prélevez sur une ou plusieurs caisses opérationnelles. Si une caisse est vide,
+                <a href="{{ route('caisses.virement.create') }}" class="underline text-emerald-700 dark:text-emerald-400">alimentez-la d&apos;abord</a>
+                (virement trésorerie ou crédit direct). La trésorerie générale n&apos;apparaît pas ici.
             </p>
 
             @error('funding_sources')
@@ -124,6 +75,8 @@
                 </div>
             @enderror
 
+            <p id="funding-solde-warning" class="mb-3 hidden text-sm text-amber-700 dark:text-amber-300"></p>
+
             <div id="funding-sources-container">
                 @php
                     $existingSources = old('funding_sources', $expense->fundingSources ?? collect());
@@ -133,45 +86,23 @@
                 @endphp
 
                 @forelse($existingSources as $index => $source)
-                    @php $selectedFundingKey = $fundingOptionKey($source); @endphp
+                    @php
+                        $selectedCaisseId = is_array($source) ? ($source['caisse_id'] ?? '') : ($source->caisse_id ?? '');
+                    @endphp
                     <div class="funding-source-row grid grid-cols-1 md:grid-cols-3 gap-4 mb-3 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg" data-index="{{ $index }}">
                         <div>
-                            <label class="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Source de financement</label>
-                            <select class="funding-source-select w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-2 text-sm" required>
-                                <option value="">-- Choisir une source --</option>
-                                @if($revenueTypes->isNotEmpty())
-                                    <optgroup label="Autres sources">
-                                        @foreach ($revenueTypes as $type)
-                                            <option value="type-{{ $type->id }}"
-                                                data-kind="type"
-                                                data-revenue-type-id="{{ $type->id }}"
-                                                data-revenue-id=""
-                                                data-solde="{{ $type->solde_disponible ?? 0 }}"
-                                                data-category-id="{{ $type->revenue_category_id }}"
-                                                {{ $selectedFundingKey === 'type-'.$type->id ? 'selected' : '' }}>
-                                                {{ $type->nom }} ({{ number_format($type->solde_disponible ?? 0, 0, ',', ' ') }} FCFA disponible)
-                                            </option>
-                                        @endforeach
-                                    </optgroup>
-                                @endif
-                                @if($subventionEnvelopes->isNotEmpty())
-                                    <optgroup label="Subventions mensuelles (par type et mois)">
-                                        @foreach ($subventionEnvelopes as $envelope)
-                                            <option value="{{ $envelope->envelope_key ?? 'env-'.$envelope->revenue_type_id.'-'.$envelope->mois_subvention }}"
-                                                data-kind="envelope"
-                                                data-revenue-type-id="{{ $envelope->revenue_type_id }}"
-                                                data-revenue-id="{{ $envelope->id }}"
-                                                data-solde="{{ $envelope->solde_disponible ?? 0 }}"
-                                                data-category-id="{{ $envelope->revenue_category_id }}"
-                                                {{ $selectedFundingKey === ($envelope->envelope_key ?? 'env-'.$envelope->revenue_type_id.'-'.$envelope->mois_subvention) ? 'selected' : '' }}>
-                                                {{ $envelope->envelope_label ?? ($envelope->type?->nom.' — '.$envelope->mois_label) }} ({{ number_format($envelope->solde_disponible ?? 0, 0, ',', ' ') }} FCFA disponible)
-                                            </option>
-                                        @endforeach
-                                    </optgroup>
-                                @endif
+                            <label class="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Caisse</label>
+                            <select name="funding_sources[{{ $index }}][caisse_id]" class="funding-source-select w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-2 text-sm" required>
+                                <option value="">-- Choisir une caisse --</option>
+                                @foreach ($caisses as $caisse)
+                                    <option value="{{ $caisse->id }}"
+                                        data-solde="{{ $caisse->solde_disponible ?? 0 }}"
+                                        data-code="{{ $caisse->code }}"
+                                        {{ (string) $selectedCaisseId === (string) $caisse->id ? 'selected' : '' }}>
+                                        {{ $caisse->nom }} ({{ number_format($caisse->solde_disponible ?? 0, 0, ',', ' ') }} FCFA)
+                                    </option>
+                                @endforeach
                             </select>
-                            <input type="hidden" class="funding-revenue-type-id" name="funding_sources[{{ $index }}][revenue_type_id]" value="{{ is_array($source) ? ($source['revenue_type_id'] ?? '') : ($source->revenue_type_id ?? '') }}">
-                            <input type="hidden" class="funding-revenue-id" name="funding_sources[{{ $index }}][revenue_id]" value="{{ is_array($source) ? ($source['revenue_id'] ?? '') : ($source->revenue_id ?? '') }}">
                         </div>
                         <div>
                             <label class="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Montant alloué (FCFA)</label>
@@ -179,10 +110,10 @@
                                 name="funding_sources[{{ $index }}][montant_alloue]"
                                 class="funding-source-amount w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-2 text-sm"
                                 step="0.01"
-                                min="0"
+                                min="0.01"
                                 value="{{ is_array($source) ? ($source['montant_alloue'] ?? '') : ($source->montant_alloue ?? '') }}"
-                                placeholder="0"
                                 required>
+                            <p class="funding-source-solde-hint mt-1 text-xs text-slate-500 dark:text-slate-400"></p>
                         </div>
                         <div>
                             <label class="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Action</label>
@@ -192,43 +123,17 @@
                         </div>
                     </div>
                 @empty
-                    {{-- Première source par défaut --}}
                     <div class="funding-source-row grid grid-cols-1 md:grid-cols-3 gap-4 mb-3 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg" data-index="0">
                         <div>
-                            <label class="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Source de financement</label>
-                            <select class="funding-source-select w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-2 text-sm" required>
-                                <option value="">-- Choisir une source --</option>
-                                @if($revenueTypes->isNotEmpty())
-                                    <optgroup label="Autres sources">
-                                        @foreach ($revenueTypes as $type)
-                                            <option value="type-{{ $type->id }}"
-                                                data-kind="type"
-                                                data-revenue-type-id="{{ $type->id }}"
-                                                data-revenue-id=""
-                                                data-solde="{{ $type->solde_disponible ?? 0 }}"
-                                                data-category-id="{{ $type->revenue_category_id }}">
-                                                {{ $type->nom }} ({{ number_format($type->solde_disponible ?? 0, 0, ',', ' ') }} FCFA disponible)
-                                            </option>
-                                        @endforeach
-                                    </optgroup>
-                                @endif
-                                @if($subventionEnvelopes->isNotEmpty())
-                                    <optgroup label="Subventions mensuelles (par type et mois)">
-                                        @foreach ($subventionEnvelopes as $envelope)
-                                            <option value="{{ $envelope->envelope_key ?? 'env-'.$envelope->revenue_type_id.'-'.$envelope->mois_subvention }}"
-                                                data-kind="envelope"
-                                                data-revenue-type-id="{{ $envelope->revenue_type_id }}"
-                                                data-revenue-id="{{ $envelope->id }}"
-                                                data-solde="{{ $envelope->solde_disponible ?? 0 }}"
-                                                data-category-id="{{ $envelope->revenue_category_id }}">
-                                                {{ $envelope->envelope_label ?? ($envelope->type?->nom.' — '.$envelope->mois_label) }} ({{ number_format($envelope->solde_disponible ?? 0, 0, ',', ' ') }} FCFA disponible)
-                                            </option>
-                                        @endforeach
-                                    </optgroup>
-                                @endif
+                            <label class="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Caisse</label>
+                            <select name="funding_sources[0][caisse_id]" class="funding-source-select w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-2 text-sm" required>
+                                <option value="">-- Choisir une caisse --</option>
+                                @foreach ($caisses as $caisse)
+                                    <option value="{{ $caisse->id }}" data-solde="{{ $caisse->solde_disponible ?? 0 }}" data-code="{{ $caisse->code }}">
+                                        {{ $caisse->nom }} ({{ number_format($caisse->solde_disponible ?? 0, 0, ',', ' ') }} FCFA)
+                                    </option>
+                                @endforeach
                             </select>
-                            <input type="hidden" class="funding-revenue-type-id" name="funding_sources[0][revenue_type_id]" value="">
-                            <input type="hidden" class="funding-revenue-id" name="funding_sources[0][revenue_id]" value="">
                         </div>
                         <div>
                             <label class="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Montant alloué (FCFA)</label>
@@ -236,9 +141,9 @@
                                 name="funding_sources[0][montant_alloue]"
                                 class="funding-source-amount w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-2 text-sm"
                                 step="0.01"
-                                min="0"
-                                placeholder="0"
+                                min="0.01"
                                 required>
+                            <p class="funding-source-solde-hint mt-1 text-xs text-slate-500 dark:text-slate-400"></p>
                         </div>
                         <div>
                             <label class="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Action</label>
@@ -252,102 +157,62 @@
 
             <div class="flex items-center justify-between mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
                 <button type="button" id="add-funding-source" class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-lg hover:bg-emerald-100 dark:hover:bg-emerald-900/40">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
-                    </svg>
-                    Ajouter une source
+                    Ajouter une caisse
                 </button>
-
-                <div class="text-sm">
-                    <span class="text-slate-600 dark:text-slate-400">Total alloué:</span>
-                    <span id="total-alloue" class="ml-2 font-bold text-lg text-slate-900 dark:text-slate-100">0 FCFA</span>
+                <div class="text-sm text-right">
+                    <div>
+                        <span class="text-slate-600 dark:text-slate-400">Total alloué:</span>
+                        <span id="total-alloue" class="ml-2 font-bold text-lg text-slate-900 dark:text-slate-100">0 FCFA</span>
+                    </div>
+                    <p id="total-alloue-hint" class="mt-1 text-xs text-slate-500 dark:text-slate-400"></p>
                 </div>
             </div>
+            @if ($caisses->isEmpty())
+                <p class="mt-3 text-sm text-amber-700 dark:text-amber-300">Aucune caisse alimentée. Créez un crédit direct ou un virement avant d&apos;enregistrer une dépense.</p>
+            @endif
         </div>
     </div>
 
     <div class="hidden">
-        <label class="block text-sm font-semibold text-slate-800 dark:text-slate-200 mb-1.5">Méthode de paiement <span class="text-red-600">*</span></label>
-        <select name="methode_paiement" class="{{ $field }}" required>
+        <select name="methode_paiement" required>
             @foreach (['especes' => 'Espèces', 'cheque' => 'Chèque', 'virement' => 'Virement', 'carte' => 'Carte', 'mobile_money' => 'Mobile Money'] as $key => $label)
                 <option value="{{ $key }}" {{ old('methode_paiement', $expense->methode_paiement) === $key ? 'selected' : '' }}>{{ $label }}</option>
             @endforeach
         </select>
-        @error('methode_paiement')<p class="mt-1.5 text-sm text-red-600 dark:text-red-400">{{ $message }}</p>@enderror
     </div>
-
-    <div class="hidden">
-        <label class="block text-sm font-semibold text-slate-800 dark:text-slate-200 mb-1.5">Référence facture</label>
-        <input type="text" name="facture_reference" value="{{ old('facture_reference', $expense->facture_reference) }}" class="{{ $field }}">
-        @error('facture_reference')<p class="mt-1.5 text-sm text-red-600 dark:text-red-400">{{ $message }}</p>@enderror
-    </div>
-
-
 
     <div class="revenue-form-grid__full">
         <div class="border-t border-slate-200 dark:border-slate-700 pt-4 mt-2">
-            <h3 class="text-sm font-semibold text-slate-800 dark:text-slate-200 mb-3 flex items-center gap-2">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"></path>
-                </svg>
-                Documents justificatifs
-            </h3>
+            <h3 class="text-sm font-semibold text-slate-800 dark:text-slate-200 mb-3">Documents justificatifs</h3>
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
-                    <label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">📄 Facture</label>
-                    <input type="file"
-                           name="piece_facture"
-                           accept=".pdf,.jpg,.jpeg,.png"
-                           class="{{ $field }} file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100 dark:file:bg-emerald-900/20 dark:file:text-emerald-400">
-                    <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">PDF, JPG, PNG (max 5 Mo)</p>
+                    <label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Facture</label>
+                    <input type="file" name="piece_facture" accept=".pdf,.jpg,.jpeg,.png" class="{{ $field }}">
                     @if($expense->piece_facture_path)
-                        <p class="mt-1.5 text-xs text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
-                            <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>
-                            <a href="{{ Storage::url($expense->piece_facture_path) }}" target="_blank" class="underline hover:text-emerald-700">Voir le fichier</a>
-                        </p>
+                        <p class="mt-1.5 text-xs"><a href="{{ Storage::url($expense->piece_facture_path) }}" target="_blank" class="underline text-emerald-600">Voir le fichier</a></p>
                     @endif
-                    @error('piece_facture')<p class="mt-1.5 text-sm text-red-600 dark:text-red-400">{{ $message }}</p>@enderror
                 </div>
-
                 <div>
-                    <label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">🧾 Reçu de paiement</label>
-                    <input type="file"
-                           name="piece_recu"
-                           accept=".pdf,.jpg,.jpeg,.png"
-                           class="{{ $field }} file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100 dark:file:bg-emerald-900/20 dark:file:text-emerald-400">
-                    <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">PDF, JPG, PNG (max 5 Mo)</p>
+                    <label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Reçu</label>
+                    <input type="file" name="piece_recu" accept=".pdf,.jpg,.jpeg,.png" class="{{ $field }}">
                     @if($expense->piece_recu_path)
-                        <p class="mt-1.5 text-xs text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
-                            <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>
-                            <a href="{{ Storage::url($expense->piece_recu_path) }}" target="_blank" class="underline hover:text-emerald-700">Voir le fichier</a>
-                        </p>
+                        <p class="mt-1.5 text-xs"><a href="{{ Storage::url($expense->piece_recu_path) }}" target="_blank" class="underline text-emerald-600">Voir le fichier</a></p>
                     @endif
-                    @error('piece_recu')<p class="mt-1.5 text-sm text-red-600 dark:text-red-400">{{ $message }}</p>@enderror
                 </div>
-
                 <div>
-                    <label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">📎 Autre document</label>
-                    <input type="file"
-                           name="piece_autre"
-                           accept=".pdf,.jpg,.jpeg,.png"
-                           class="{{ $field }} file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100 dark:file:bg-emerald-900/20 dark:file:text-emerald-400">
-                    <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Bon de livraison, devis, etc.</p>
+                    <label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Autre</label>
+                    <input type="file" name="piece_autre" accept=".pdf,.jpg,.jpeg,.png" class="{{ $field }}">
                     @if($expense->piece_autre_path)
-                        <p class="mt-1.5 text-xs text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
-                            <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>
-                            <a href="{{ Storage::url($expense->piece_autre_path) }}" target="_blank" class="underline hover:text-emerald-700">Voir le fichier</a>
-                        </p>
+                        <p class="mt-1.5 text-xs"><a href="{{ Storage::url($expense->piece_autre_path) }}" target="_blank" class="underline text-emerald-600">Voir le fichier</a></p>
                     @endif
-                    @error('piece_autre')<p class="mt-1.5 text-sm text-red-600 dark:text-red-400">{{ $message }}</p>@enderror
                 </div>
             </div>
         </div>
     </div>
 
     <div class="revenue-form-grid__full">
-        <label class="block text-sm font-semibold text-slate-800 dark:text-slate-200 mb-1.5">Notes complémentaires</label>
-        <textarea name="notes" rows="4" class="{{ $field }}" placeholder="Informations supplémentaires sur cette dépense...">{{ old('notes', $expense->notes) }}</textarea>
-        @error('notes')<p class="mt-1.5 text-sm text-red-600 dark:text-red-400">{{ $message }}</p>@enderror
+        <label class="block text-sm font-semibold text-slate-800 dark:text-slate-200 mb-1.5">Notes</label>
+        <textarea name="notes" rows="4" class="{{ $field }}">{{ old('notes', $expense->notes) }}</textarea>
     </div>
 </div>
 
@@ -358,230 +223,271 @@
         const container = document.getElementById('funding-sources-container');
         const addButton = document.getElementById('add-funding-source');
         const totalAlloueSpan = document.getElementById('total-alloue');
+        const totalAlloueHint = document.getElementById('total-alloue-hint');
+        const soldeWarning = document.getElementById('funding-solde-warning');
         const montantTotalInput = document.getElementById('montant_total');
-        const revenueTypesData = @json($revenueTypes->values());
-        const subventionEnvelopesData = @json($subventionEnvelopesJson);
-        const categorySelect = document.getElementById('revenue_category');
-        let selectedCategoryId = categorySelect ? categorySelect.value : null;
+        const expenseTypeSelect = document.getElementById('expense_type_id');
+        const form = container ? container.closest('form') : null;
+        const caissesData = @json($caissesJson);
+        const expenseTypesData = @json($expenseTypesJson);
+        const typeToCaisseCode = {
+            transport: 'transport',
+            carburant: 'transport',
+            entretien_reparations: 'entretien',
+            liturgie: 'liturgie',
+            factures: 'charges',
+            intendance: 'intendance',
+            accueil_pastorale: 'accueil_pastorale',
+            alimentation_popote: 'alimentation_popote',
+            salaires: 'salaires',
+            autre: 'divers'
+        };
 
-        function hasPositiveSolde(amount) {
-            return Math.round((parseFloat(amount) || 0) * 100) / 100 > 0;
+        function formatFcfa(value) {
+            return new Intl.NumberFormat('fr-FR').format(value) + ' FCFA';
         }
 
-        function buildFundingOptionsHtml(preserveValue = '') {
-            let optionsHTML = '<option value="">-- Choisir une source --</option>';
-            const types = revenueTypesData.filter(type => {
-                const matchesCategory = !selectedCategoryId || String(type.revenue_category_id) === String(selectedCategoryId);
-                const optionKey = `type-${type.id}`;
+        function parseMontantTotal() {
+            const raw = (montantTotalInput && montantTotalInput.value || '').toString()
+                .replace(/\s/g, '')
+                .replace(/fcfa/ig, '')
+                .replace(',', '.');
+            return parseFloat(raw) || 0;
+        }
 
-                return matchesCategory && (hasPositiveSolde(type.solde_disponible) || optionKey === preserveValue);
+        function buildOptionsHtml(preserveValue) {
+            preserveValue = preserveValue || '';
+            let html = '<option value="">-- Choisir une caisse --</option>';
+            caissesData.forEach(function (caisse) {
+                const keep = String(caisse.id) === String(preserveValue);
+                if (caisse.solde_disponible > 0 || keep) {
+                    html += '<option value="' + caisse.id + '" data-solde="' + caisse.solde_disponible + '" data-code="' + caisse.code + '">'
+                        + caisse.nom + ' (' + new Intl.NumberFormat('fr-FR').format(caisse.solde_disponible) + ' FCFA)</option>';
+                }
             });
-            const envelopes = subventionEnvelopesData.filter(env => {
-                const matchesCategory = !selectedCategoryId || String(env.revenue_category_id) === String(selectedCategoryId);
-                const optionKey = env.envelope_key || `env-${env.id}`;
-
-                return matchesCategory && (hasPositiveSolde(env.solde_disponible) || optionKey === preserveValue);
-            });
-
-            if (types.length > 0) {
-                optionsHTML += '<optgroup label="Autres sources">';
-                types.forEach(type => {
-                    const formatted = new Intl.NumberFormat('fr-FR').format(type.solde_disponible);
-                    optionsHTML += `<option value="type-${type.id}" data-kind="type" data-revenue-type-id="${type.id}" data-revenue-id="" data-solde="${type.solde_disponible}" data-category-id="${type.revenue_category_id}">${type.nom} (${formatted} FCFA disponible)</option>`;
-                });
-                optionsHTML += '</optgroup>';
-            }
-
-            if (envelopes.length > 0) {
-                optionsHTML += '<optgroup label="Subventions mensuelles (par type et mois)">';
-                envelopes.forEach(env => {
-                    const formatted = new Intl.NumberFormat('fr-FR').format(env.solde_disponible);
-                    const optionKey = env.envelope_key || `env-${env.id}`;
-                    optionsHTML += `<option value="${optionKey}" data-kind="envelope" data-revenue-type-id="${env.revenue_type_id}" data-revenue-id="${env.id}" data-solde="${env.solde_disponible}" data-category-id="${env.revenue_category_id}">${env.envelope_label} (${formatted} FCFA disponible)</option>`;
-                });
-                optionsHTML += '</optgroup>';
-            }
-
-            return optionsHTML;
-        }
-
-        function syncFundingHiddenFields(select) {
-            const row = select.closest('.funding-source-row');
-            if (!row) return;
-
-            const option = select.options[select.selectedIndex];
-            const typeInput = row.querySelector('.funding-revenue-type-id');
-            const revenueInput = row.querySelector('.funding-revenue-id');
-
-            if (!option || !option.value) {
-                if (typeInput) typeInput.value = '';
-                if (revenueInput) revenueInput.value = '';
-                return;
-            }
-
-            if (typeInput) typeInput.value = option.getAttribute('data-revenue-type-id') || '';
-            if (revenueInput) revenueInput.value = option.getAttribute('data-revenue-id') || '';
-        }
-
-        function initFundingSelect(select) {
-            syncFundingHiddenFields(select);
+            return html;
         }
 
         function createFundingSourceRow(index) {
             const row = document.createElement('div');
             row.className = 'funding-source-row grid grid-cols-1 md:grid-cols-3 gap-4 mb-3 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg';
             row.dataset.index = index;
-
-            row.innerHTML = `
-                <div>
-                    <label class="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Source de financement</label>
-                    <select class="funding-source-select w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-2 text-sm" required>
-                        ${buildFundingOptionsHtml()}
-                    </select>
-                    <input type="hidden" class="funding-revenue-type-id" name="funding_sources[' + index + '][revenue_type_id]" value="">
-                    <input type="hidden" class="funding-revenue-id" name="funding_sources[' + index + '][revenue_id]" value="">
-                </div>
-                <div>
-                    <label class="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Montant alloué (FCFA)</label>
-                    <input type="number"
-                        name="funding_sources[' + index + '][montant_alloue]"
-                        class="funding-source-amount w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-2 text-sm"
-                        step="0.01"
-                        min="0"
-                        placeholder="0"
-                        required>
-                </div>
-                <div>
-                    <label class="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Action</label>
-                    <button type="button" class="remove-funding-source w-full px-3 py-2.5 text-sm font-medium text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/40">
-                        Retirer
-                    </button>
-                </div>
-            `;
-
+            row.innerHTML =
+                '<div>' +
+                    '<label class="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Caisse</label>' +
+                    '<select name="funding_sources[' + index + '][caisse_id]" class="funding-source-select w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-2 text-sm" required>' +
+                        buildOptionsHtml() +
+                    '</select>' +
+                '</div>' +
+                '<div>' +
+                    '<label class="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Montant alloué (FCFA)</label>' +
+                    '<input type="number" name="funding_sources[' + index + '][montant_alloue]" class="funding-source-amount w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-2 text-sm" step="0.01" min="0.01" required>' +
+                    '<p class="funding-source-solde-hint mt-1 text-xs text-slate-500 dark:text-slate-400"></p>' +
+                '</div>' +
+                '<div>' +
+                    '<label class="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Action</label>' +
+                    '<button type="button" class="remove-funding-source w-full px-3 py-2.5 text-sm font-medium text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">Retirer</button>' +
+                '</div>';
             return row;
+        }
+
+        function getCaisseSolde(caisseId) {
+            const found = caissesData.find(function (c) { return String(c.id) === String(caisseId); });
+            return found ? Number(found.solde_disponible) : 0;
+        }
+
+        function updateRowHints() {
+            document.querySelectorAll('.funding-source-row').forEach(function (row) {
+                const select = row.querySelector('.funding-source-select');
+                const amountInput = row.querySelector('.funding-source-amount');
+                const hint = row.querySelector('.funding-source-solde-hint');
+                if (!select || !amountInput || !hint) return;
+
+                const solde = getCaisseSolde(select.value);
+                const amount = parseFloat(amountInput.value) || 0;
+
+                if (!select.value) {
+                    hint.textContent = '';
+                    amountInput.removeAttribute('max');
+                    amountInput.classList.remove('border-red-500', 'text-red-600');
+                    return;
+                }
+
+                amountInput.setAttribute('max', String(solde));
+                hint.textContent = 'Disponible : ' + formatFcfa(solde);
+
+                if (amount > solde + 0.01) {
+                    hint.textContent = 'Dépassement : ' + formatFcfa(amount) + ' demandé pour ' + formatFcfa(solde) + ' disponible';
+                    hint.classList.add('text-red-600');
+                    hint.classList.remove('text-slate-500', 'dark:text-slate-400');
+                    amountInput.classList.add('border-red-500', 'text-red-600');
+                } else {
+                    hint.classList.remove('text-red-600');
+                    hint.classList.add('text-slate-500', 'dark:text-slate-400');
+                    amountInput.classList.remove('border-red-500', 'text-red-600');
+                }
+            });
+        }
+
+        function aggregateByCaisse() {
+            const totals = {};
+            document.querySelectorAll('.funding-source-row').forEach(function (row) {
+                const select = row.querySelector('.funding-source-select');
+                const amountInput = row.querySelector('.funding-source-amount');
+                if (!select || !select.value) return;
+                const id = String(select.value);
+                totals[id] = (totals[id] || 0) + (parseFloat(amountInput && amountInput.value) || 0);
+            });
+            return totals;
+        }
+
+        function validateSoldes() {
+            const totals = aggregateByCaisse();
+            const errors = [];
+            Object.keys(totals).forEach(function (caisseId) {
+                const solde = getCaisseSolde(caisseId);
+                const demande = Math.round(totals[caisseId] * 100) / 100;
+                if (demande > solde + 0.01) {
+                    const caisse = caissesData.find(function (c) { return String(c.id) === String(caisseId); });
+                    errors.push((caisse ? caisse.nom : 'Caisse') + ' : ' + formatFcfa(demande) + ' demandé, ' + formatFcfa(solde) + ' disponible');
+                }
+            });
+
+            if (soldeWarning) {
+                if (errors.length) {
+                    soldeWarning.textContent = errors.join(' — ');
+                    soldeWarning.classList.remove('hidden');
+                } else {
+                    soldeWarning.textContent = '';
+                    soldeWarning.classList.add('hidden');
+                }
+            }
+
+            return errors;
         }
 
         function updateTotalAlloue() {
             let total = 0;
-            document.querySelectorAll('.funding-source-amount').forEach(input => {
-                const value = parseFloat(input.value) || 0;
-                total += value;
+            document.querySelectorAll('.funding-source-amount').forEach(function (input) {
+                total += parseFloat(input.value) || 0;
             });
-
-            const formatted = new Intl.NumberFormat('fr-FR').format(total);
-            totalAlloueSpan.textContent = `${formatted} FCFA`;
-
-            // Vérifier si le total correspond au montant
-            const montantTotal = parseFloat(montantTotalInput.value.replace(/\s/g, '').replace(',', '.')) || 0;
-            if (Math.abs(total - montantTotal) > 0.01 && total > 0) {
-                totalAlloueSpan.classList.add('text-red-600', 'dark:text-red-400');
-                totalAlloueSpan.classList.remove('text-emerald-600', 'dark:text-emerald-400', 'text-slate-900', 'dark:text-slate-100');
-            } else if (Math.abs(total - montantTotal) <= 0.01 && total > 0) {
-                totalAlloueSpan.classList.add('text-emerald-600', 'dark:text-emerald-400');
-                totalAlloueSpan.classList.remove('text-red-600', 'dark:text-red-400', 'text-slate-900', 'dark:text-slate-100');
-            } else {
-                totalAlloueSpan.classList.add('text-slate-900', 'dark:text-slate-100');
-                totalAlloueSpan.classList.remove('text-red-600', 'dark:text-red-400', 'text-emerald-600', 'dark:text-emerald-400');
+            totalAlloueSpan.textContent = formatFcfa(total);
+            const montantTotal = parseMontantTotal();
+            const match = Math.abs(total - montantTotal) <= 0.01 && total > 0;
+            totalAlloueSpan.classList.toggle('text-red-600', !match && total > 0);
+            totalAlloueSpan.classList.toggle('text-emerald-600', match);
+            if (totalAlloueHint) {
+                if (montantTotal <= 0) {
+                    totalAlloueHint.textContent = '';
+                } else if (match) {
+                    totalAlloueHint.textContent = 'Le total correspond au montant de la dépense.';
+                    totalAlloueHint.className = 'mt-1 text-xs text-emerald-600';
+                } else {
+                    totalAlloueHint.textContent = 'Doit égaler ' + formatFcfa(montantTotal) + '.';
+                    totalAlloueHint.className = 'mt-1 text-xs text-red-600';
+                }
             }
+            updateRowHints();
+            validateSoldes();
         }
 
         function filterUsedSources() {
-            const usedKeys = new Set();
-            document.querySelectorAll('.funding-source-select').forEach(select => {
-                if (select.value) {
-                    usedKeys.add(select.value);
-                }
+            const used = {};
+            document.querySelectorAll('.funding-source-select').forEach(function (select) {
+                if (select.value) used[select.value] = true;
             });
-
-            document.querySelectorAll('.funding-source-select').forEach(select => {
-                const currentValue = select.value;
-                Array.from(select.options).forEach(option => {
-                    if (option.value && option.value !== currentValue && usedKeys.has(option.value)) {
-                        option.disabled = true;
-                    } else {
-                        option.disabled = false;
-                    }
+            document.querySelectorAll('.funding-source-select').forEach(function (select) {
+                Array.from(select.options).forEach(function (option) {
+                    option.disabled = !!(option.value && option.value !== select.value && used[option.value]);
                 });
             });
         }
 
-        function filterTypesByCategory() {
-            selectedCategoryId = categorySelect ? categorySelect.value : null;
+        function suggestCaisseFromExpenseType() {
+            if (!expenseTypeSelect || !container) return;
+            const typeId = expenseTypeSelect.value;
+            const type = expenseTypesData.find(function (t) { return String(t.id) === String(typeId); });
+            if (!type) return;
 
-            document.querySelectorAll('.funding-source-select').forEach(select => {
-                const currentValue = select.value;
-                select.innerHTML = buildFundingOptionsHtml(currentValue);
-                if (currentValue && Array.from(select.options).some(opt => opt.value === currentValue)) {
-                    select.value = currentValue;
-                } else {
-                    select.value = '';
-                }
-                syncFundingHiddenFields(select);
+            const caisseCode = typeToCaisseCode[type.code];
+            if (!caisseCode) return;
+
+            const caisse = caissesData.find(function (c) {
+                return c.code === caisseCode && c.solde_disponible > 0;
             });
+            if (!caisse) return;
 
-            updateTotalAlloue();
+            const firstSelect = container.querySelector('.funding-source-row .funding-source-select');
+            if (!firstSelect || firstSelect.value) return;
+
+            firstSelect.value = String(caisse.id);
             filterUsedSources();
+            updateTotalAlloue();
         }
 
-        // Event listener pour le changement de catégorie
-        if (categorySelect) {
-            categorySelect.addEventListener('change', filterTypesByCategory);
-            // Filtrer initialement
-            filterTypesByCategory();
-        }
-
-        // Ajouter une source
         if (addButton) {
-            addButton.addEventListener('click', () => {
-                const newRow = createFundingSourceRow(fundingSourceIndex);
-                container.appendChild(newRow);
-                fundingSourceIndex++;
+            addButton.addEventListener('click', function () {
+                container.appendChild(createFundingSourceRow(fundingSourceIndex++));
                 updateTotalAlloue();
                 filterUsedSources();
             });
         }
 
-        // Délégation d'événements pour retirer une source
         if (container) {
-            container.addEventListener('click', (e) => {
+            container.addEventListener('click', function (e) {
                 if (e.target.classList.contains('remove-funding-source')) {
-                    const row = e.target.closest('.funding-source-row');
-                    if (container.querySelectorAll('.funding-source-row').length > 1) {
-                        row.remove();
+                    const rows = container.querySelectorAll('.funding-source-row');
+                    if (rows.length > 1) {
+                        e.target.closest('.funding-source-row').remove();
                         updateTotalAlloue();
                         filterUsedSources();
                     } else {
-                        alert('Vous devez avoir au moins une source de financement.');
+                        alert('Au moins une caisse est obligatoire.');
                     }
                 }
             });
-
-            // Écouter les changements de montant
-            container.addEventListener('input', (e) => {
-                if (e.target.classList.contains('funding-source-amount')) {
+            container.addEventListener('input', function (e) {
+                if (e.target.classList.contains('funding-source-amount')) updateTotalAlloue();
+            });
+            container.addEventListener('change', function (e) {
+                if (e.target.classList.contains('funding-source-select')) {
+                    filterUsedSources();
                     updateTotalAlloue();
                 }
             });
+        }
 
-            container.addEventListener('change', (e) => {
-                if (e.target.classList.contains('funding-source-select')) {
-                    syncFundingHiddenFields(e.target);
-                    filterUsedSources();
+        if (montantTotalInput) montantTotalInput.addEventListener('input', updateTotalAlloue);
+        if (expenseTypeSelect) expenseTypeSelect.addEventListener('change', suggestCaisseFromExpenseType);
+
+        if (form) {
+            form.addEventListener('submit', function (e) {
+                const montantTotal = parseMontantTotal();
+                let total = 0;
+                document.querySelectorAll('.funding-source-amount').forEach(function (input) {
+                    total += parseFloat(input.value) || 0;
+                });
+                const soldeErrors = validateSoldes();
+
+                if (soldeErrors.length) {
+                    e.preventDefault();
+                    alert('Solde insuffisant sur une ou plusieurs caisses.\n' + soldeErrors.join('\n'));
+                    return;
+                }
+
+                if (Math.abs(total - montantTotal) > 0.01) {
+                    e.preventDefault();
+                    alert('Le total des caisses (' + formatFcfa(total) + ') doit être égal au montant de la dépense (' + formatFcfa(montantTotal) + ').');
                 }
             });
         }
 
-        document.querySelectorAll('.funding-source-select').forEach(initFundingSelect);
-
-        // Écouter les changements du montant total
-        if (montantTotalInput) {
-            montantTotalInput.addEventListener('input', updateTotalAlloue);
-        }
-
-        // Initialiser
         updateTotalAlloue();
         filterUsedSources();
+        const firstFundingSelect = document.querySelector('.funding-source-select');
+        if (!firstFundingSelect || !firstFundingSelect.value) {
+            suggestCaisseFromExpenseType();
+        }
     })();
 </script>
 @endpush

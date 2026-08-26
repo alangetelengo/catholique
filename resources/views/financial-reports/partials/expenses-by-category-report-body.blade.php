@@ -1,47 +1,43 @@
 @php
     $fmt = static fn ($n) => \App\Helpers\ParoisseConfig::formatMontant($n);
-    $selectedCategory = ! empty($selectedRevenueCategoryId)
-        ? \App\Models\RevenueCategory::find($selectedRevenueCategoryId)
-        : null;
-    $selectedType = ! empty($selectedRevenueTypeId)
-        ? \App\Models\RevenueType::find($selectedRevenueTypeId)
+    $selectedCaisse = ! empty($selectedCaisseId)
+        ? \App\Models\Caisse::find($selectedCaisseId)
         : null;
     $selectedExpenseType = ! empty($selectedExpenseTypeId)
         ? \App\Models\ExpenseType::find($selectedExpenseTypeId)
         : null;
     $byExpenseType = collect($report['by_expense_type'] ?? []);
-    $isSubventionCategory = $selectedCategory && $selectedCategory->code === \App\Support\SubventionMensuelle::CATEGORY_CODE;
-    $envelopes = collect($report['subvention_envelopes'] ?? []);
-    $totalSubventionRecue = (float) $envelopes->sum('subvention_recue');
-    $totalSubventionDepenses = (float) $envelopes->sum('depenses');
-    $totalSubventionSolde = (float) $envelopes->sum('solde');
+    $caisseSummary = collect($report['caisse_summary'] ?? []);
+    $totalCaisseCredits = (float) $caisseSummary->sum('credits');
+    $totalCaisseDepenses = (float) $caisseSummary->sum('depenses');
+    $totalCaisseSolde = (float) $caisseSummary->sum('solde');
     $fundingSourceLabel = static function ($source): string {
+        if ($source->caisse) {
+            return $source->caisse->nom;
+        }
         $type = $source->revenueType;
         if (! $type) {
             return '—';
         }
-        if ($source->revenue?->mois_subvention) {
-            return \App\Support\SubventionMensuelle::envelopeLabel($type, $source->revenue->mois_subvention);
+        if ($source->revenue?->mois_capital) {
+            return $type->nom.' — '.\App\Support\SubventionMensuelle::formatMoisCapital($source->revenue->mois_capital).' (historique)';
         }
 
-        return $type->nom;
+        return $type->nom.' (historique)';
     };
 @endphp
 
 <div class="rounded-xl border border-sky-200/80 dark:border-sky-800/60 bg-sky-50/90 dark:bg-sky-950/30 px-4 py-3 mb-5 text-sm text-sky-900 dark:text-sky-100">
     <strong class="font-semibold">Période :</strong>
     {{ \Illuminate\Support\Carbon::parse($dateDebut)->format('d/m/Y') }} → {{ \Illuminate\Support\Carbon::parse($dateFin)->format('d/m/Y') }}
-    @if ($selectedCategory || $selectedExpenseType)
+    @if ($selectedCaisse || $selectedExpenseType)
         <span class="block mt-1 text-slate-600 dark:text-slate-300">
             @if ($selectedExpenseType)
                 Type : <strong class="font-medium text-slate-800 dark:text-slate-100">{{ $selectedExpenseType->nom }}</strong>
             @endif
-            @if ($selectedCategory)
+            @if ($selectedCaisse)
                 @if ($selectedExpenseType) · @endif
-                Source : {{ $selectedCategory->nom }}
-                @if ($selectedType)
-                    · <strong class="font-medium text-slate-800 dark:text-slate-100">{{ $selectedType->nom }}</strong>
-                @endif
+                Caisse : <strong class="font-medium text-slate-800 dark:text-slate-100">{{ $selectedCaisse->nom }}</strong>
             @endif
         </span>
     @endif
@@ -80,61 +76,52 @@
     </div>
 @endif
 
-@if ($isSubventionCategory && $envelopes->isNotEmpty())
+@if ($caisseSummary->isNotEmpty())
     <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
         <div class="adventiste-card-pro-static p-4 border-t-4 border-t-emerald-500">
-            <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Subvention reçue</p>
-            <p class="mt-1 text-2xl font-bold text-emerald-700 dark:text-emerald-400 tabular-nums">{{ $fmt($totalSubventionRecue) }}</p>
-            <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">{{ $envelopes->count() }} enveloppe(s)</p>
+            <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Crédits caisses (période)</p>
+            <p class="mt-1 text-2xl font-bold text-emerald-700 dark:text-emerald-400 tabular-nums">{{ $fmt($totalCaisseCredits) }}</p>
+            <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">{{ $caisseSummary->count() }} caisse(s)</p>
         </div>
         <div class="adventiste-card-pro-static p-4 border-t-4 border-t-rose-500">
             <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Dépensé (période)</p>
-            <p class="mt-1 text-2xl font-bold text-rose-700 dark:text-rose-400 tabular-nums">{{ $fmt($totalSubventionDepenses) }}</p>
+            <p class="mt-1 text-2xl font-bold text-rose-700 dark:text-rose-400 tabular-nums">{{ $fmt($totalCaisseDepenses) }}</p>
             <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">{{ $report['expenses']->count() }} opération(s)</p>
         </div>
         <div class="adventiste-card-pro-static p-4 border-t-4 border-t-sky-500">
-            <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Solde restant</p>
-            <p class="mt-1 text-2xl font-bold text-sky-800 dark:text-sky-300 tabular-nums">{{ $fmt($totalSubventionSolde) }}</p>
-            <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">recettes − dépenses</p>
+            <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Solde période</p>
+            <p class="mt-1 text-2xl font-bold text-sky-800 dark:text-sky-300 tabular-nums">{{ $fmt($totalCaisseSolde) }}</p>
+            <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">crédits − dépenses</p>
         </div>
     </div>
 
-    @if ($envelopes->count() > 1)
-        <div class="adventiste-card-pro-static overflow-hidden mb-6">
-            <div class="px-4 py-3 border-b border-slate-200/80 dark:border-slate-600/80 bg-slate-50/80 dark:bg-slate-800/50">
-                <h3 class="text-sm font-semibold text-slate-900 dark:text-white m-0">Détail par mois concerné</h3>
-            </div>
-            <div class="overflow-x-auto p-2">
-                <table class="min-w-full text-sm">
-                    <thead>
-                        <tr class="text-left text-slate-700 dark:text-slate-200 border-b border-slate-200 dark:border-slate-600">
-                            <th class="px-3 py-2 font-semibold">Type</th>
-                            <th class="px-3 py-2 font-semibold">Mois</th>
-                            <th class="px-3 py-2 font-semibold text-right">Reçu</th>
-                            <th class="px-3 py-2 font-semibold text-right">Dépensé</th>
-                            <th class="px-3 py-2 font-semibold text-right">Solde</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-slate-200/70 dark:divide-slate-700/70">
-                        @foreach ($envelopes as $row)
-                            <tr class="text-slate-700 dark:text-slate-200">
-                                <td class="px-3 py-2">{{ $row['type_nom'] }}</td>
-                                <td class="px-3 py-2 font-medium">{{ $row['mois_label'] }}</td>
-                                <td class="px-3 py-2 text-right text-emerald-700 dark:text-emerald-400 tabular-nums">{{ $fmt($row['subvention_recue']) }}</td>
-                                <td class="px-3 py-2 text-right text-rose-700 dark:text-rose-400 tabular-nums">{{ $fmt($row['depenses']) }}</td>
-                                <td class="px-3 py-2 text-right font-semibold tabular-nums">{{ $fmt($row['solde']) }}</td>
-                            </tr>
-                        @endforeach
-                    </tbody>
-                </table>
-            </div>
+    <div class="adventiste-card-pro-static overflow-hidden mb-6">
+        <div class="px-4 py-3 border-b border-slate-200/80 dark:border-slate-600/80 bg-slate-50/80 dark:bg-slate-800/50">
+            <h3 class="text-sm font-semibold text-slate-900 dark:text-white m-0">Répartition par caisse</h3>
         </div>
-    @elseif ($envelopes->count() === 1)
-        @php $env = $envelopes->first(); @endphp
-        <p class="text-sm text-slate-600 dark:text-slate-400 mb-6">
-            Enveloppe : <strong class="text-slate-800 dark:text-slate-200">{{ $env['label'] }}</strong>
-        </p>
-    @endif
+        <div class="overflow-x-auto p-2">
+            <table class="min-w-full text-sm">
+                <thead>
+                    <tr class="text-left text-slate-700 dark:text-slate-200 border-b border-slate-200 dark:border-slate-600">
+                        <th class="px-3 py-2 font-semibold">Caisse</th>
+                        <th class="px-3 py-2 font-semibold text-right">Crédits</th>
+                        <th class="px-3 py-2 font-semibold text-right">Dépensé</th>
+                        <th class="px-3 py-2 font-semibold text-right">Solde période</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-200/70 dark:divide-slate-700/70">
+                    @foreach ($caisseSummary as $row)
+                        <tr class="text-slate-700 dark:text-slate-200">
+                            <td class="px-3 py-2">{{ $row['nom'] }}</td>
+                            <td class="px-3 py-2 text-right text-emerald-700 dark:text-emerald-400 tabular-nums">{{ $fmt($row['credits']) }}</td>
+                            <td class="px-3 py-2 text-right text-rose-700 dark:text-rose-400 tabular-nums">{{ $fmt($row['depenses']) }}</td>
+                            <td class="px-3 py-2 text-right font-semibold tabular-nums">{{ $fmt($row['solde']) }}</td>
+                        </tr>
+                    @endforeach
+                </tbody>
+            </table>
+        </div>
+    </div>
 @else
     <div class="adventiste-card-pro-static p-4 border-t-4 border-t-rose-500 mb-6">
         <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Total des dépenses</p>
@@ -142,16 +129,16 @@
         <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">{{ $report['expenses']->count() }} ligne(s) validée(s)</p>
     </div>
 
-    @if (! $selectedRevenueCategoryId && count($report['by_category']) > 0)
+    @if (! $selectedCaisseId && count($report['by_category']) > 0)
         <div class="adventiste-card-pro-static overflow-hidden mb-6">
             <div class="px-4 py-3 border-b border-slate-200/80 dark:border-slate-600/80 bg-slate-50/80 dark:bg-slate-800/50">
-                <h3 class="text-sm font-semibold text-slate-900 dark:text-white m-0">Par catégorie</h3>
+                <h3 class="text-sm font-semibold text-slate-900 dark:text-white m-0">Par caisse</h3>
             </div>
             <div class="overflow-x-auto p-2">
                 <table class="min-w-full text-sm">
                     <thead>
                         <tr class="text-left text-slate-700 dark:text-slate-200 border-b border-slate-200 dark:border-slate-600">
-                            <th class="px-3 py-2 font-semibold">Catégorie</th>
+                            <th class="px-3 py-2 font-semibold">Caisse</th>
                             <th class="px-3 py-2 font-semibold text-right">Montant</th>
                         </tr>
                     </thead>
@@ -172,16 +159,16 @@
         </div>
     @endif
 
-    @if ($selectedRevenueCategoryId && count($report['by_type']) > 0)
+    @if (count($report['by_type']) > 0)
         <div class="adventiste-card-pro-static overflow-hidden mb-6">
             <div class="px-4 py-3 border-b border-slate-200/80 dark:border-slate-600/80 bg-slate-50/80 dark:bg-slate-800/50">
-                <h3 class="text-sm font-semibold text-slate-900 dark:text-white m-0">Par type de source</h3>
+                <h3 class="text-sm font-semibold text-slate-900 dark:text-white m-0">Par caisse / source</h3>
             </div>
             <div class="overflow-x-auto p-2">
                 <table class="min-w-full text-sm">
                     <thead>
                         <tr class="text-left text-slate-700 dark:text-slate-200 border-b border-slate-200 dark:border-slate-600">
-                            <th class="px-3 py-2 font-semibold">Type</th>
+                            <th class="px-3 py-2 font-semibold">Source</th>
                             <th class="px-3 py-2 font-semibold text-right">Montant</th>
                         </tr>
                     </thead>

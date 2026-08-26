@@ -18,6 +18,7 @@ class DatabaseSeeder extends Seeder
             // Référentiel FINANCES (prioritaire)
             RevenueCategorySeeder::class,
             RevenueTypeSeeder::class,
+            CaisseSeeder::class,
 
             // Sécurité / accès
             RolePermissionSeeder::class,

@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>Rapport Subvention Popote</title>
+    <title>Rapport Caisse Popote</title>
     <style>
         body { font-family: Arial, sans-serif; margin: 0; color: #1f2937; }
         .header { background: #0b3d6e; color: #fff; text-align: center; padding: 14px 12px; }
@@ -38,11 +38,11 @@
     </div>
     <div class="wrap">
         <div class="title">
-            <h2>Rapport Subvention Popote</h2>
+            <h2>Rapport Caisse Popote</h2>
             <p>Période : {{ $period }} — Généré le {{ now()->format('d/m/Y H:i') }}</p>
         </div>
         <div class="cards">
-            <div class="card c1"><div class="label">Subvention reçue</div><div class="value">{{ $fcfa((float) $report->total_recettes) }}</div></div>
+            <div class="card c1"><div class="label">Crédits caisse</div><div class="value">{{ $fcfa((float) $report->total_recettes) }}</div></div>
             <div class="card c2"><div class="label">Dépenses alimentation</div><div class="value">{{ $fcfa((float) $report->total_depenses) }}</div></div>
             <div class="card c3"><div class="label">Solde popote</div><div class="value">{{ $fcfa((float) $report->solde) }}</div></div>
         </div>

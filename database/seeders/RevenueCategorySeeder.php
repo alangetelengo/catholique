@@ -15,40 +15,53 @@ class RevenueCategorySeeder extends Seeder
     {
         $categories = [
             [
+                'code' => 'banque',
+                'nom' => 'BANQUE (économat diocésain)',
+                'description' => 'Versements de la hiérarchie — trésorerie générale uniquement',
+                'ordre' => 0,
+                'actif' => true,
+            ],
+            [
                 'code' => 'quete_ordinaire',
-                'nom' => 'Quête Ordinaire',
-                'description' => 'Messes de la semaine (Lundi à Samedi) et messe du dimanche',
+                'nom' => 'Quête ordinaire',
+                'description' => 'Messes de la semaine (lundi à samedi) et messe du dimanche',
                 'ordre' => 1,
+                'actif' => true,
             ],
             [
                 'code' => 'quete_extraordinaire',
-                'nom' => 'Quête Extraordinaire',
+                'nom' => 'Quête extraordinaire',
                 'description' => 'Mariage, obsèques, action de grâce, caritas, la grotte, etc.',
                 'ordre' => 2,
+                'actif' => true,
             ],
             [
                 'code' => 'location',
                 'nom' => 'Location',
                 'description' => 'Loyers (boutiques), salle de fête, chapiteaux, cour de la paroisse',
                 'ordre' => 3,
+                'actif' => true,
             ],
             [
                 'code' => 'subvention',
                 'nom' => 'Subvention',
-                'description' => 'Subventions mensuelles reçues de la hiérarchie (carburant, hosties, gardiennage, gaz, internet, eau, électricité, salaires, alimentation popote)',
+                'description' => 'Obsolète : remplacé par les caisses (crédit direct / virements)',
                 'ordre' => 4,
+                'actif' => false,
             ],
             [
                 'code' => 'procure',
                 'nom' => 'Procure',
                 'description' => 'Dîmes, denier du culte, casuel (baptêmes des enfants)',
                 'ordre' => 5,
+                'actif' => true,
             ],
             [
                 'code' => 'fete',
                 'nom' => 'Fête',
                 'description' => 'Fêtes de la paroisse',
                 'ordre' => 6,
+                'actif' => true,
             ],
         ];
 
@@ -70,7 +83,7 @@ class RevenueCategorySeeder extends Seeder
                     [
                         'nom' => $category['nom'],
                         'description' => $category['description'],
-                        'actif' => true,
+                        'actif' => $category['actif'] ?? true,
                         'ordre' => $category['ordre'],
                     ]
                 );

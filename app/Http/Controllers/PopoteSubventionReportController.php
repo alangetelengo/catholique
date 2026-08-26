@@ -2,12 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Caisse;
+use App\Models\CaisseMouvement;
 use App\Models\Expense;
 use App\Models\ExpenseFundingSource;
 use App\Models\FinancialReport;
 use App\Models\Paroisse;
-use App\Models\Revenue;
-use App\Models\RevenueType;
 use App\Support\PaginationPerPage;
 use App\Support\SubventionMensuelle;
 use App\Traits\LogsErrors;
@@ -82,7 +82,7 @@ class PopoteSubventionReportController extends Controller
 
             $this->logInfo('Rapport subvention popote créé', ['report_id' => $report->id]);
 
-            return redirect()->route('popote-reports.show', $report)->with('success', 'Rapport Subvention Popote enregistré.');
+            return redirect()->route('popote-reports.show', $report)->with('success', 'Rapport Caisse Popote enregistré.');
         } catch (Throwable $e) {
             $this->logError($e, 'Erreur création rapport Subvention Popote', ['data' => $request->all()]);
 
@@ -219,52 +219,58 @@ class PopoteSubventionReportController extends Controller
             ? Carbon::create((int) $validated['year'], (int) $validated['month'], 1)->startOfMonth()
             : Carbon::create((int) $validated['year'], 1, 1)->startOfYear();
         $dateFin = $isMonthly ? $dateDebut->copy()->endOfMonth() : $dateDebut->copy()->endOfYear();
+        $paroisseId = (int) $validated['paroisse_id'];
 
-        $popoteType = RevenueType::query()
-            ->where('paroisse_id', (int) $validated['paroisse_id'])
-            ->where('code', SubventionMensuelle::POPOTE_TYPE_CODE)
+        $popoteCaisse = Caisse::query()
+            ->where('paroisse_id', $paroisseId)
+            ->where('code', 'alimentation_popote')
             ->first();
 
-        $subventionRevenues = Revenue::query()
-            ->where('paroisse_id', (int) $validated['paroisse_id'])
-            ->where('statut', 'valide')
-            ->when($popoteType, fn ($q) => $q->where('revenue_type_id', $popoteType->id))
-            ->whereNotNull('mois_subvention')
-            ->when(
-                $isMonthly,
-                fn ($q) => $q->where('mois_subvention', $dateDebut->format('Y-m')),
-                fn ($q) => $q->where('mois_subvention', 'like', (int) $validated['year'].'-%')
-            )
-            ->orderBy('mois_subvention')
-            ->orderBy('date_recette')
-            ->orderBy('id')
-            ->get();
+        $credits = collect();
+        $depensesAlimentation = collect();
+        $subventionRecue = 0.0;
+        $totalDepensesAlimentation = 0.0;
 
-        $revenueIds = $subventionRevenues->pluck('id');
+        if ($popoteCaisse) {
+            $credits = CaisseMouvement::query()
+                ->where('caisse_id', $popoteCaisse->id)
+                ->where('sens', CaisseMouvement::SENS_CREDIT)
+                ->whereDate('date_mouvement', '>=', $dateDebut)
+                ->whereDate('date_mouvement', '<=', $dateFin)
+                ->orderBy('date_mouvement')
+                ->orderBy('id')
+                ->get();
 
-        $depensesAlimentation = Expense::query()
-            ->where('paroisse_id', (int) $validated['paroisse_id'])
-            ->where('statut', 'valide')
-            ->when($revenueIds->isNotEmpty(), function ($q) use ($revenueIds): void {
-                $q->whereHas('fundingSources', fn ($builder) => $builder->whereIn('revenue_id', $revenueIds));
-            }, fn ($q) => $q->whereRaw('0 = 1'))
-            ->with(['fundingSources' => fn ($q) => $q->whereIn('revenue_id', $revenueIds)])
-            ->orderBy('date_depense')
-            ->orderBy('id')
-            ->get();
+            $subventionRecue = (float) $credits->sum('montant');
 
-        $subventionRecue = (float) $subventionRevenues->sum('montant');
-        $totalDepensesAlimentation = (float) ExpenseFundingSource::query()
-            ->whereIn('revenue_id', $revenueIds)
-            ->whereHas('expense', fn ($q) => $q->where('statut', 'valide'))
-            ->sum('montant_alloue');
+            $depensesAlimentation = Expense::query()
+                ->where('paroisse_id', $paroisseId)
+                ->where('statut', 'valide')
+                ->whereDate('date_depense', '>=', $dateDebut)
+                ->whereDate('date_depense', '<=', $dateFin)
+                ->whereHas('fundingSources', fn ($q) => $q->where('caisse_id', $popoteCaisse->id))
+                ->with(['fundingSources' => fn ($q) => $q->where('caisse_id', $popoteCaisse->id)])
+                ->orderBy('date_depense')
+                ->orderBy('id')
+                ->get();
+
+            $totalDepensesAlimentation = (float) ExpenseFundingSource::query()
+                ->where('caisse_id', $popoteCaisse->id)
+                ->whereHas('expense', function ($q) use ($paroisseId, $dateDebut, $dateFin): void {
+                    $q->where('paroisse_id', $paroisseId)
+                        ->where('statut', 'valide')
+                        ->whereDate('date_depense', '>=', $dateDebut)
+                        ->whereDate('date_depense', '<=', $dateFin);
+                })
+                ->sum('montant_alloue');
+        }
+
         $solde = $subventionRecue - $totalDepensesAlimentation;
-
         $monthlySummary = $this->buildMonthlySummary(
-            (int) $validated['paroisse_id'],
+            $paroisseId,
             (int) $validated['year'],
             $isMonthly ? (int) $validated['month'] : null,
-            $popoteType?->id
+            $popoteCaisse?->id
         );
 
         return [
@@ -278,23 +284,22 @@ class PopoteSubventionReportController extends Controller
                 'month' => $isMonthly ? (int) $validated['month'] : null,
                 'year' => (int) $validated['year'],
                 'monthly_summary' => $monthlySummary,
-                'revenues' => $subventionRevenues->map(fn ($r) => [
-                    'id' => $r->id,
-                    'mois_subvention' => $r->mois_subvention,
-                    'mois_label' => SubventionMensuelle::formatMoisLabel($r->mois_subvention),
-                    'date' => optional($r->date_recette)->format('Y-m-d'),
-                    'reference' => $r->reference_paiement,
-                    'montant' => (float) $r->montant,
+                'revenues' => $credits->map(fn (CaisseMouvement $m) => [
+                    'id' => $m->id,
+                    'mois_subvention' => optional($m->date_mouvement)->format('Y-m'),
+                    'mois_label' => SubventionMensuelle::formatMoisLabel(optional($m->date_mouvement)->format('Y-m')),
+                    'date' => optional($m->date_mouvement)->format('Y-m-d'),
+                    'reference' => $m->type,
+                    'montant' => (float) $m->montant,
+                    'libelle' => $m->libelle,
                 ])->values()->all(),
             ],
             'details_depenses' => [
                 'period_kind' => $validated['period_kind'],
                 'month' => $isMonthly ? (int) $validated['month'] : null,
                 'year' => (int) $validated['year'],
-                'expenses' => $depensesAlimentation->map(function ($e) use ($revenueIds) {
-                    $montantPopote = (float) $e->fundingSources
-                        ->whereIn('revenue_id', $revenueIds->all())
-                        ->sum('montant_alloue');
+                'expenses' => $depensesAlimentation->map(function (Expense $e) {
+                    $montantPopote = (float) $e->fundingSources->sum('montant_alloue');
 
                     return [
                         'id' => $e->id,
@@ -312,9 +317,9 @@ class PopoteSubventionReportController extends Controller
     /**
      * @return list<array{mois_subvention: string, mois_label: string, subvention_recue: float, depenses: float, solde: float}>
      */
-    private function buildMonthlySummary(int $paroisseId, int $year, ?int $onlyMonth, ?int $popoteTypeId): array
+    private function buildMonthlySummary(int $paroisseId, int $year, ?int $onlyMonth, ?int $popoteCaisseId): array
     {
-        if ($popoteTypeId === null) {
+        if ($popoteCaisseId === null) {
             return [];
         }
 
@@ -322,30 +327,34 @@ class PopoteSubventionReportController extends Controller
         $summary = [];
 
         foreach ($months as $month) {
-            $moisSubvention = SubventionMensuelle::moisSubventionFromParts($year, $month);
+            $moisKey = SubventionMensuelle::moisSubventionFromParts($year, $month);
+            $start = Carbon::create($year, $month, 1)->startOfMonth();
+            $end = $start->copy()->endOfMonth();
 
-            $revenues = Revenue::query()
-                ->where('paroisse_id', $paroisseId)
-                ->where('revenue_type_id', $popoteTypeId)
-                ->where('statut', 'valide')
-                ->where('mois_subvention', $moisSubvention)
-                ->get();
+            $subventionRecue = (float) CaisseMouvement::query()
+                ->where('caisse_id', $popoteCaisseId)
+                ->where('sens', CaisseMouvement::SENS_CREDIT)
+                ->whereDate('date_mouvement', '>=', $start)
+                ->whereDate('date_mouvement', '<=', $end)
+                ->sum('montant');
 
-            $subventionRecue = (float) $revenues->sum('montant');
-            $depenses = $revenues->isNotEmpty()
-                ? (float) ExpenseFundingSource::query()
-                    ->whereIn('revenue_id', $revenues->pluck('id'))
-                    ->whereHas('expense', fn ($q) => $q->where('statut', 'valide'))
-                    ->sum('montant_alloue')
-                : 0.0;
+            $depenses = (float) ExpenseFundingSource::query()
+                ->where('caisse_id', $popoteCaisseId)
+                ->whereHas('expense', function ($q) use ($paroisseId, $start, $end): void {
+                    $q->where('paroisse_id', $paroisseId)
+                        ->where('statut', 'valide')
+                        ->whereDate('date_depense', '>=', $start)
+                        ->whereDate('date_depense', '<=', $end);
+                })
+                ->sum('montant_alloue');
 
             if ($subventionRecue === 0.0 && $depenses === 0.0) {
                 continue;
             }
 
             $summary[] = [
-                'mois_subvention' => $moisSubvention,
-                'mois_label' => SubventionMensuelle::formatMoisLabel($moisSubvention),
+                'mois_subvention' => $moisKey,
+                'mois_label' => SubventionMensuelle::formatMoisLabel($moisKey),
                 'subvention_recue' => $subventionRecue,
                 'depenses' => $depenses,
                 'solde' => $subventionRecue - $depenses,

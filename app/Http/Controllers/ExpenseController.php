@@ -4,8 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Expense;
 use App\Models\ExpenseType;
-use App\Models\RevenueCategory;
-use App\Services\BudgetService;
+use App\Services\CaisseService;
 use App\Support\PaginationPerPage;
 use App\Traits\LogsErrors;
 use Carbon\Carbon;
@@ -23,14 +22,16 @@ class ExpenseController extends Controller
     use LogsErrors;
 
     public function __construct(
-        protected BudgetService $budgetService
+        protected CaisseService $caisseService
     ) {}
 
     public function index(Request $request): View
     {
         try {
+            $userParoisseId = (int) $request->user()?->paroisse_id;
+
             $expenses = $this->expensesIndexFilteredQuery($request)
-                ->with(['createdBy', 'revenueCategory', 'expenseType', 'fundingSources.revenueType', 'fundingSources.revenue'])
+                ->with(['createdBy', 'expenseType', 'fundingSources.caisse'])
                 ->orderByDesc('date_depense')
                 ->orderByDesc('id')
                 ->paginate(PaginationPerPage::resolve($request))
@@ -43,12 +44,14 @@ class ExpenseController extends Controller
                 ->value('montant');
             $montantDerniereDepense = $montantDerniereDepense !== null ? (float) $montantDerniereDepense : null;
             $expenseTypes = ExpenseType::query()->where('actif', true)->orderBy('ordre')->orderBy('nom')->get();
+            $caisses = $this->caisseService->getCaissesAvecSolde($userParoisseId, onlyOperatives: true);
 
             return view('expenses.index', compact(
                 'expenses',
                 'totalMontantDepenses',
                 'montantDerniereDepense',
                 'expenseTypes',
+                'caisses',
             ));
         } catch (Throwable $e) {
             $this->logError($e, 'Erreur lors du chargement des dépenses');
@@ -58,18 +61,9 @@ class ExpenseController extends Controller
 
     public function create(Request $request): View
     {
-        $userParoisseId = $request->user()?->paroisse_id;
+        $userParoisseId = (int) $request->user()?->paroisse_id;
 
-        // Récupérer les catégories de recettes (sources des fonds)
-        $revenueCategories = RevenueCategory::where('paroisse_id', $userParoisseId)
-            ->where('actif', true)
-            ->orderBy('ordre')
-            ->orderBy('nom')
-            ->get();
-
-        // Récupérer les types de recettes avec solde disponible > 0
-        $revenueTypes = $this->budgetService->getSourcesAvecSolde($userParoisseId);
-        $subventionEnvelopes = $this->budgetService->getSubventionEnvelopesForExpenseForm((int) $userParoisseId);
+        $caisses = $this->caisseService->getCaissesAvecSolde($userParoisseId, onlyOperatives: true, onlyWithSolde: true);
         $expenseTypes = ExpenseType::query()->where('actif', true)->orderBy('ordre')->orderBy('nom')->get();
 
         $expense = new Expense([
@@ -77,7 +71,7 @@ class ExpenseController extends Controller
             'methode_paiement' => 'especes',
         ]);
 
-        return view('expenses.create', compact('expense', 'revenueCategories', 'revenueTypes', 'subventionEnvelopes', 'expenseTypes'));
+        return view('expenses.create', compact('expense', 'caisses', 'expenseTypes'));
     }
 
     public function store(Request $request): RedirectResponse
@@ -85,26 +79,27 @@ class ExpenseController extends Controller
         try {
             $validated = $this->validateExpense($request);
             $validated['created_by'] = $request->user()?->id;
+            $validated['paroisse_id'] = $request->user()?->paroisse_id;
 
             $fundingSources = $request->input('funding_sources', []);
 
             DB::transaction(function () use ($validated, $fundingSources, &$expense) {
-                // Créer la dépense
                 $expense = Expense::create($validated);
 
-                // Créer les sources de financement
                 if (! empty($fundingSources)) {
                     foreach ($fundingSources as $index => $source) {
-                        if (! empty($source['revenue_type_id']) && ! empty($source['montant_alloue'])) {
+                        if (! empty($source['caisse_id']) && ! empty($source['montant_alloue'])) {
                             $expense->fundingSources()->create([
-                                'revenue_type_id' => $source['revenue_type_id'],
-                                'revenue_id' => ! empty($source['revenue_id']) ? (int) $source['revenue_id'] : null,
+                                'caisse_id' => $source['caisse_id'],
                                 'montant_alloue' => $source['montant_alloue'],
                                 'ordre' => $index + 1,
                             ]);
                         }
                     }
                 }
+
+                $expense->load('fundingSources');
+                $this->caisseService->syncDepenseMouvements($expense, $fundingSources);
             });
 
             $this->logInfo('Dépense créée', ['expense_id' => $expense->id, 'montant' => $expense->montant]);
@@ -116,9 +111,6 @@ class ExpenseController extends Controller
         }
     }
 
-    /**
-     * Pas de fiche détail : les liens GET /expenses/{id} (favoris, anciennes URL) redirigent vers l’édition.
-     */
     public function show(Expense $expense): RedirectResponse
     {
         return redirect()->route('expenses.edit', $expense);
@@ -126,18 +118,15 @@ class ExpenseController extends Controller
 
     public function edit(Request $request, Expense $expense): View
     {
-        $userParoisseId = $request->user()?->paroisse_id;
+        $userParoisseId = (int) $request->user()?->paroisse_id;
 
-        // Récupérer les catégories de recettes (sources des fonds)
-        $revenueCategories = RevenueCategory::where('paroisse_id', $userParoisseId)
-            ->where('actif', true)
-            ->orderBy('ordre')
-            ->orderBy('nom')
-            ->get();
+        $caisses = $this->caisseService->getCaissesAvecSolde($userParoisseId, $expense, onlyOperatives: true);
+        $usedCaisseIds = $expense->fundingSources()->whereNotNull('caisse_id')->pluck('caisse_id');
+        $caisses = $caisses->filter(function ($caisse) use ($usedCaisseIds) {
+            return round((float) ($caisse->solde_disponible ?? 0), 2) > 0
+                || $usedCaisseIds->contains($caisse->id);
+        })->values();
 
-        // Récupérer les types de recettes avec solde disponible > 0 (en excluant la dépense actuelle)
-        $revenueTypes = $this->budgetService->getSourcesAvecSolde($userParoisseId, $expense);
-        $subventionEnvelopes = $this->budgetService->getSubventionEnvelopesForExpenseForm((int) $userParoisseId, $expense);
         $expenseTypes = ExpenseType::query()
             ->where(function ($query) use ($expense): void {
                 $query->where('actif', true);
@@ -149,10 +138,9 @@ class ExpenseController extends Controller
             ->orderBy('nom')
             ->get();
 
-        // Charger les sources de financement existantes
-        $expense->load('fundingSources.revenueType', 'fundingSources.revenue', 'expenseType');
+        $expense->load('fundingSources.caisse', 'expenseType');
 
-        return view('expenses.edit', compact('expense', 'revenueCategories', 'revenueTypes', 'subventionEnvelopes', 'expenseTypes'));
+        return view('expenses.edit', compact('expense', 'caisses', 'expenseTypes'));
     }
 
     public function update(Request $request, Expense $expense): RedirectResponse
@@ -166,25 +154,23 @@ class ExpenseController extends Controller
             $fundingSources = $request->input('funding_sources', []);
 
             DB::transaction(function () use ($expense, $validated, $fundingSources) {
-                // Mettre à jour la dépense
                 $expense->update($validated);
-
-                // Supprimer les anciennes sources
                 $expense->fundingSources()->delete();
 
-                // Créer les nouvelles sources de financement
                 if (! empty($fundingSources)) {
                     foreach ($fundingSources as $index => $source) {
-                        if (! empty($source['revenue_type_id']) && ! empty($source['montant_alloue'])) {
+                        if (! empty($source['caisse_id']) && ! empty($source['montant_alloue'])) {
                             $expense->fundingSources()->create([
-                                'revenue_type_id' => $source['revenue_type_id'],
-                                'revenue_id' => ! empty($source['revenue_id']) ? (int) $source['revenue_id'] : null,
+                                'caisse_id' => $source['caisse_id'],
                                 'montant_alloue' => $source['montant_alloue'],
                                 'ordre' => $index + 1,
                             ]);
                         }
                     }
                 }
+
+                $expense->load('fundingSources');
+                $this->caisseService->syncDepenseMouvements($expense, $fundingSources);
             });
 
             $this->logInfo('Dépense mise à jour', ['expense_id' => $expense->id, 'montant' => $expense->montant]);
@@ -199,7 +185,10 @@ class ExpenseController extends Controller
     public function destroy(Expense $expense): RedirectResponse
     {
         try {
-            $expense->delete();
+            DB::transaction(function () use ($expense): void {
+                $this->caisseService->removeDepenseMouvements($expense);
+                $expense->delete();
+            });
             $this->logInfo('Dépense supprimée logiquement', ['expense_id' => $expense->id]);
 
             return redirect()->route('expenses.index')->with('success', 'Dépense supprimée.');
@@ -213,18 +202,15 @@ class ExpenseController extends Controller
     {
         $query = Expense::query();
 
-        // Filtrer par catégorie de recette (source des fonds)
-        if ($request->filled('revenue_category_id')) {
-            $query->where('revenue_category_id', $request->integer('revenue_category_id'));
-        }
-
         if ($request->filled('expense_type_id')) {
             $query->where('expense_type_id', $request->integer('expense_type_id'));
         }
 
-        // Filtrer par type de recette (source précise des fonds)
-        if ($request->filled('revenue_type_id')) {
-            $query->where('revenue_type_id', $request->integer('revenue_type_id'));
+        if ($request->filled('caisse_id')) {
+            $caisseId = $request->integer('caisse_id');
+            $query->whereHas('fundingSources', function (Builder $builder) use ($caisseId): void {
+                $builder->where('caisse_id', $caisseId);
+            });
         }
 
         if ($request->filled('date_from')) {
@@ -252,7 +238,6 @@ class ExpenseController extends Controller
     private function validateExpense(Request $request, ?Expense $expense = null): array
     {
         $validated = $request->validate([
-            'revenue_category_id' => ['required', 'integer', 'exists:revenue_categories,id'],
             'expense_type_id' => [
                 'required',
                 'integer',
@@ -274,14 +259,19 @@ class ExpenseController extends Controller
             'piece_recu' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:5120'],
             'piece_autre' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:5120'],
             'funding_sources' => ['required', 'array', 'min:1'],
-            'funding_sources.*.revenue_type_id' => ['required', 'integer', 'exists:revenue_types,id'],
-            'funding_sources.*.revenue_id' => ['nullable', 'integer', 'exists:revenues,id'],
-            'funding_sources.*.montant_alloue' => ['required', 'numeric', 'min:0'],
+            'funding_sources.*.caisse_id' => ['required', 'integer', 'exists:caisses,id'],
+            'funding_sources.*.montant_alloue' => ['required', 'numeric', 'min:0.01'],
         ]);
 
-        // Valider les sources de financement avec le BudgetService
+        // Financement via caisses uniquement — plus de catégorie de reporting.
+        $validated['revenue_category_id'] = null;
+        $validated['revenue_type_id'] = null;
+
         $fundingSources = $request->input('funding_sources', []);
-        $validation = $this->budgetService->validateFundingSources($fundingSources, $expense);
+        $paroisseId = $expense?->paroisse_id
+            ? (int) $expense->paroisse_id
+            : (int) $request->user()?->paroisse_id;
+        $validation = $this->caisseService->validateFundingSources($fundingSources, $expense, $paroisseId);
 
         if (! $validation['valid']) {
             throw ValidationException::withMessages([
@@ -289,7 +279,6 @@ class ExpenseController extends Controller
             ]);
         }
 
-        // Vérifier que le total des sources = montant de la dépense
         $montantDepense = (float) $validated['montant'];
         $totalAlloue = $validation['total_alloue'];
 
@@ -297,7 +286,7 @@ class ExpenseController extends Controller
             throw ValidationException::withMessages([
                 'funding_sources' => [
                     sprintf(
-                        'Le total des sources (%s FCFA) doit être égal au montant de la dépense (%s FCFA)',
+                        'Le total des caisses (%s FCFA) doit être égal au montant de la dépense (%s FCFA)',
                         number_format($totalAlloue, 0, ',', ' '),
                         number_format($montantDepense, 0, ',', ' ')
                     ),
@@ -305,10 +294,8 @@ class ExpenseController extends Controller
             ]);
         }
 
-        // Calculer automatiquement le jour de la semaine
         $validated['jour_semaine'] = $this->weekdayFromDate($validated['date_depense']);
 
-        // Gérer l'upload des documents justificatifs
         if ($request->hasFile('piece_facture')) {
             $validated['piece_facture_path'] = $request->file('piece_facture')
                 ->store('expenses/factures', 'public');
@@ -324,12 +311,14 @@ class ExpenseController extends Controller
                 ->store('expenses/autres', 'public');
         }
 
+        $validated['statut'] = $validated['statut'] ?? 'valide';
+
         return $validated;
     }
 
     private function weekdayFromDate(string $date): string
     {
-        $weekdayMap = [
+        $map = [
             0 => 'dimanche',
             1 => 'lundi',
             2 => 'mardi',
@@ -339,6 +328,6 @@ class ExpenseController extends Controller
             6 => 'samedi',
         ];
 
-        return $weekdayMap[Carbon::parse($date)->dayOfWeek] ?? 'lundi';
+        return $map[Carbon::parse($date)->dayOfWeek] ?? 'lundi';
     }
 }

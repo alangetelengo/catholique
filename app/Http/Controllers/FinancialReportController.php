@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Helpers\FlashAlert;
 use App\Helpers\ParoisseConfig;
+use App\Models\Caisse;
+use App\Models\CaisseMouvement;
 use App\Models\Expense;
 use App\Models\ExpenseType;
 use App\Models\FinancialReport;
@@ -35,15 +37,17 @@ class FinancialReportController extends Controller implements HasMiddleware
     use LogsErrors;
 
     /**
-     * Recettes prises en compte dans le rapport hub mensuel (hors Procure).
+     * Recettes prises en compte dans le rapport hub mensuel
+     * (hors Procure ; hors ancienne catégorie Subvention).
      *
      * @var list<string>
      */
     private const REVENUE_CATEGORY_CODES_HUB = [
+        'banque',
         'quete_ordinaire',
         'quete_extraordinaire',
         'location',
-        'popote_subvention',
+        'fete',
     ];
 
     /**
@@ -207,7 +211,7 @@ class FinancialReportController extends Controller implements HasMiddleware
         $totalRecettes = (float) $revenues->sum('montant');
 
         $expenses = Expense::query()
-            ->with(['revenueCategory', 'fundingSources.revenueType'])
+            ->with(['revenueCategory', 'fundingSources.caisse', 'fundingSources.revenueType'])
             ->where('paroisse_id', $paroisseId)
             ->where('statut', 'valide')
             ->whereDate('date_depense', '>=', $dateDebut)
@@ -217,12 +221,14 @@ class FinancialReportController extends Controller implements HasMiddleware
 
         $totalDepenses = (float) $expenses->sum('montant');
 
-        // Regroupement des dépenses par catégorie de revenu source
+        // Regroupement des dépenses par caisse de financement
         $detailsDepenses = [];
-        foreach ($expenses->groupBy('revenue_category_id') as $categoryId => $categoryExpenses) {
-            $category = RevenueCategory::find($categoryId);
-            if ($category) {
-                $detailsDepenses[$category->code] = (float) $categoryExpenses->sum('montant');
+        foreach ($expenses as $expense) {
+            foreach ($expense->fundingSources as $source) {
+                $code = $source->caisse?->code
+                    ?? $source->revenueType?->code
+                    ?? 'autre';
+                $detailsDepenses[$code] = ($detailsDepenses[$code] ?? 0.0) + (float) $source->montant_alloue;
             }
         }
 
@@ -806,6 +812,7 @@ class FinancialReportController extends Controller implements HasMiddleware
                 $categories = RevenueCategory::query()
                     ->where('paroisse_id', $selectedParoisseId)
                     ->where('actif', true)
+                    ->where('code', '!=', 'subvention')
                     ->orderBy('ordre')
                     ->orderBy('nom')
                     ->get();
@@ -865,6 +872,7 @@ class FinancialReportController extends Controller implements HasMiddleware
         $categories = RevenueCategory::query()
             ->where('paroisse_id', $paroisseId)
             ->where('actif', true)
+            ->where('code', '!=', 'subvention')
             ->orderBy('ordre')
             ->orderBy('nom')
             ->get(['id', 'nom']);
@@ -1203,8 +1211,8 @@ class FinancialReportController extends Controller implements HasMiddleware
      * @return array{
      *     revenues: Collection<int, Revenue>,
      *     by_category: array<int|string, array{nom: string, code: string, montant: float, count: int, revenues: Collection<int, Revenue>}>,
-     *     by_type: array<string, array{id: int, nom: string, mois_subvention: string|null, mois_label: string|null, montant: float, count: int}>,
-     *     subvention_envelopes: list<array{key: string, type_id: int, type_nom: string, mois_subvention: string, mois_label: string, label: string, montant: float, count: int}>,
+     *     by_type: array<string, array{id: int, nom: string, mois_capital: string|null, mois_label: string|null, montant: float, count: int}>,
+     *     subvention_envelopes: list<array<string, mixed>>,
      *     total_general: float,
      *     date_debut: Carbon,
      *     date_fin: Carbon,
@@ -1243,7 +1251,6 @@ class FinancialReportController extends Controller implements HasMiddleware
         }
 
         $byType = [];
-        $subventionEnvelopeBuckets = [];
 
         foreach ($revenues as $revenue) {
             $type = $revenue->type;
@@ -1255,21 +1262,21 @@ class FinancialReportController extends Controller implements HasMiddleware
                 continue;
             }
 
-            $moisSubvention = $revenue->mois_subvention;
-            $isSubvention = SubventionMensuelle::isSubventionType($type);
-            $groupKey = $isSubvention && $moisSubvention
-                ? $type->id.'-'.$moisSubvention
+            $moisCapital = $revenue->mois_capital;
+            $isBanque = SubventionMensuelle::isBanqueCategory($revenue->category);
+            $groupKey = $isBanque && $moisCapital
+                ? $type->id.'-'.$moisCapital
                 : (string) $type->id;
-            $groupLabel = $isSubvention && $moisSubvention
-                ? SubventionMensuelle::envelopeLabel($type, $moisSubvention)
+            $groupLabel = $isBanque && $moisCapital
+                ? $type->nom.' — '.SubventionMensuelle::formatMoisCapital($moisCapital)
                 : $type->nom;
 
             if (! isset($byType[$groupKey])) {
                 $byType[$groupKey] = [
                     'id' => (int) $type->id,
                     'nom' => $groupLabel,
-                    'mois_subvention' => $moisSubvention,
-                    'mois_label' => $moisSubvention ? SubventionMensuelle::formatMoisLabel($moisSubvention) : null,
+                    'mois_capital' => $moisCapital,
+                    'mois_label' => $moisCapital ? SubventionMensuelle::formatMoisCapital($moisCapital) : null,
                     'montant' => 0.0,
                     'count' => 0,
                 ];
@@ -1278,32 +1285,7 @@ class FinancialReportController extends Controller implements HasMiddleware
             $montant = (float) $revenue->montant;
             $byType[$groupKey]['montant'] += $montant;
             $byType[$groupKey]['count']++;
-
-            if ($isSubvention && $moisSubvention) {
-                if (! isset($subventionEnvelopeBuckets[$groupKey])) {
-                    $subventionEnvelopeBuckets[$groupKey] = [
-                        'key' => $groupKey,
-                        'type_id' => (int) $type->id,
-                        'type_nom' => $type->nom,
-                        'mois_subvention' => $moisSubvention,
-                        'mois_label' => SubventionMensuelle::formatMoisLabel($moisSubvention),
-                        'label' => $groupLabel,
-                        'montant' => 0.0,
-                        'count' => 0,
-                    ];
-                }
-
-                $subventionEnvelopeBuckets[$groupKey]['montant'] += $montant;
-                $subventionEnvelopeBuckets[$groupKey]['count']++;
-            }
         }
-
-        $subventionEnvelopes = array_values($subventionEnvelopeBuckets);
-        usort($subventionEnvelopes, function (array $a, array $b): int {
-            $cmp = strcmp($a['mois_subvention'], $b['mois_subvention']);
-
-            return $cmp !== 0 ? $cmp : strcmp($a['type_nom'], $b['type_nom']);
-        });
 
         $totalGeneral = (float) $revenues->sum('montant');
         $weekly = $this->splitRevenuesSemaineDimanche($revenues);
@@ -1313,7 +1295,7 @@ class FinancialReportController extends Controller implements HasMiddleware
             'revenues' => $revenues,
             'by_category' => $byCategory,
             'by_type' => $byType,
-            'subvention_envelopes' => $subventionEnvelopes,
+            'subvention_envelopes' => [],
             'total_general' => $totalGeneral,
             'date_debut' => $dateDebut,
             'date_fin' => $dateFin,
@@ -1344,17 +1326,21 @@ class FinancialReportController extends Controller implements HasMiddleware
             $dateDebut = $now->copy()->startOfMonth()->format('Y-m-d');
             $dateFin = $now->copy()->endOfMonth()->format('Y-m-d');
 
-            // Récupérer les catégories de recettes (sources de fonds pour dépenses)
-            $revenueCategories = RevenueCategory::where('actif', 1)
+            // Caisses = sources de financement des dépenses
+            $caissesQuery = Caisse::query()
+                ->where('actif', true)
                 ->orderBy('ordre')
-                ->orderBy('nom')
-                ->get();
+                ->orderBy('nom');
 
-            // Récupérer les types de recettes
-            $revenueTypes = RevenueType::where('actif', 1)
-                ->orderBy('ordre')
-                ->orderBy('nom')
-                ->get();
+            if ($selectedParoisseId) {
+                $caissesQuery->where('paroisse_id', $selectedParoisseId);
+            } elseif ($user->hasRole('super_admin')) {
+                $caissesQuery->with('paroisse:id,nom');
+            } else {
+                $caissesQuery->whereRaw('1 = 0');
+            }
+
+            $caisses = $caissesQuery->get();
 
             $expenseTypes = ExpenseType::query()
                 ->where('actif', true)
@@ -1367,8 +1353,7 @@ class FinancialReportController extends Controller implements HasMiddleware
                 'selectedParoisseId' => $selectedParoisseId,
                 'dateDebut' => $dateDebut,
                 'dateFin' => $dateFin,
-                'revenueCategories' => $revenueCategories,
-                'revenueTypes' => $revenueTypes,
+                'caisses' => $caisses,
                 'expenseTypes' => $expenseTypes,
                 'ajaxCalculateRoute' => route('financial-reports.expenses-by-category.calculate'),
             ]);
@@ -1381,8 +1366,7 @@ class FinancialReportController extends Controller implements HasMiddleware
                 'selectedParoisseId' => null,
                 'dateDebut' => now()->startOfMonth()->format('Y-m-d'),
                 'dateFin' => now()->endOfMonth()->format('Y-m-d'),
-                'revenueCategories' => collect(),
-                'revenueTypes' => collect(),
+                'caisses' => collect(),
                 'expenseTypes' => collect(),
                 'ajaxCalculateRoute' => route('financial-reports.expenses-by-category.calculate'),
             ]);
@@ -1398,8 +1382,7 @@ class FinancialReportController extends Controller implements HasMiddleware
                 'paroisse_id' => ['required', 'integer', 'exists:paroisses,id'],
                 'date_debut' => ['required', 'date'],
                 'date_fin' => ['required', 'date', 'after_or_equal:date_debut'],
-                'revenue_category_id' => ['nullable', 'integer', 'exists:revenue_categories,id'],
-                'revenue_type_id' => ['nullable', 'integer', 'exists:revenue_types,id'],
+                'caisse_id' => ['nullable', 'integer', 'exists:caisses,id'],
                 'expense_type_id' => ['nullable', 'integer', 'exists:expense_types,id'],
             ]);
 
@@ -1407,8 +1390,7 @@ class FinancialReportController extends Controller implements HasMiddleware
                 return response()->json(['message' => 'Vous ne pouvez consulter que les rapports de votre paroisse.'], 403);
             }
 
-            $revenueCategoryId = $validated['revenue_category_id'] ?? null;
-            $revenueTypeId = $validated['revenue_type_id'] ?? null;
+            $caisseId = $validated['caisse_id'] ?? null;
             $expenseTypeId = $validated['expense_type_id'] ?? null;
 
             $dateDebut = Carbon::parse($validated['date_debut'])->startOfDay();
@@ -1418,8 +1400,7 @@ class FinancialReportController extends Controller implements HasMiddleware
                 (int) $validated['paroisse_id'],
                 $dateDebut,
                 $dateFin,
-                $revenueCategoryId,
-                $revenueTypeId,
+                $caisseId,
                 $expenseTypeId
             );
 
@@ -1427,8 +1408,7 @@ class FinancialReportController extends Controller implements HasMiddleware
                 'report' => $report,
                 'dateDebut' => $validated['date_debut'],
                 'dateFin' => $validated['date_fin'],
-                'selectedRevenueCategoryId' => $revenueCategoryId,
-                'selectedRevenueTypeId' => $revenueTypeId,
+                'selectedCaisseId' => $caisseId,
                 'selectedExpenseTypeId' => $expenseTypeId,
             ])->render();
 
@@ -1436,8 +1416,7 @@ class FinancialReportController extends Controller implements HasMiddleware
                 'paroisse_id' => (int) $validated['paroisse_id'],
                 'date_debut' => $validated['date_debut'],
                 'date_fin' => $validated['date_fin'],
-                'revenue_category_id' => $revenueCategoryId,
-                'revenue_type_id' => $revenueTypeId,
+                'caisse_id' => $caisseId,
                 'expense_type_id' => $expenseTypeId,
             ]));
 
@@ -1464,8 +1443,7 @@ class FinancialReportController extends Controller implements HasMiddleware
                 'paroisse_id' => ['required', 'exists:paroisses,id'],
                 'date_debut' => ['required', 'date'],
                 'date_fin' => ['required', 'date', 'after_or_equal:date_debut'],
-                'revenue_category_id' => ['nullable', 'integer', 'exists:revenue_categories,id'],
-                'revenue_type_id' => ['nullable', 'integer', 'exists:revenue_types,id'],
+                'caisse_id' => ['nullable', 'integer', 'exists:caisses,id'],
                 'expense_type_id' => ['nullable', 'integer', 'exists:expense_types,id'],
             ]);
 
@@ -1477,16 +1455,14 @@ class FinancialReportController extends Controller implements HasMiddleware
 
             $dateDebut = Carbon::parse($validated['date_debut'])->startOfDay();
             $dateFin = Carbon::parse($validated['date_fin'])->endOfDay();
-            $revenueCategoryId = $validated['revenue_category_id'] ?? null;
-            $revenueTypeId = $validated['revenue_type_id'] ?? null;
+            $caisseId = $validated['caisse_id'] ?? null;
             $expenseTypeId = $validated['expense_type_id'] ?? null;
 
             $report = $this->calculateExpensesByCategoryReport(
                 (int) $validated['paroisse_id'],
                 $dateDebut,
                 $dateFin,
-                $revenueCategoryId,
-                $revenueTypeId,
+                $caisseId,
                 $expenseTypeId
             );
 
@@ -1499,13 +1475,12 @@ class FinancialReportController extends Controller implements HasMiddleware
                 'headerConfig' => $headerConfig,
                 'dateDebut' => $dateDebut,
                 'dateFin' => $dateFin,
-                'selectedRevenueCategoryId' => $revenueCategoryId,
-                'selectedRevenueTypeId' => $revenueTypeId,
+                'selectedCaisseId' => $caisseId,
                 'selectedExpenseTypeId' => $expenseTypeId,
                 'signataires' => FinancialReportSignatories::defaultPdfBlocks(),
             ])->setPaper('a4', 'portrait');
 
-            $filename = 'rapport-depenses-par-categorie-'.Str::slug($paroisse->nom).'-'.$dateDebut->format('Y-m-d').'-'.$dateFin->format('Y-m-d').'.pdf';
+            $filename = 'rapport-depenses-par-caisse-'.Str::slug($paroisse->nom).'-'.$dateDebut->format('Y-m-d').'-'.$dateFin->format('Y-m-d').'.pdf';
 
             return $pdf->download($filename);
         } catch (Throwable $e) {
@@ -1523,6 +1498,7 @@ class FinancialReportController extends Controller implements HasMiddleware
      *     by_type: array<string, array{id: int, nom: string, montant: float, count: int, mois_subvention: string|null, mois_label: string|null}>,
      *     by_expense_type: array<int|string, array{id: int|null, nom: string, montant: float, count: int}>,
      *     subvention_envelopes: list<array{key: string, type_id: int, type_nom: string, mois_subvention: string|null, mois_label: string|null, label: string, subvention_recue: float|null, depenses: float, solde: float|null, count: int}>,
+     *     caisse_summary: list<array{key: string, caisse_id: int, nom: string, credits: float, depenses: float, solde: float, count: int}>,
      *     total_general: float,
      *     date_debut: Carbon,
      *     date_fin: Carbon
@@ -1532,46 +1508,29 @@ class FinancialReportController extends Controller implements HasMiddleware
         int $paroisseId,
         Carbon $dateDebut,
         Carbon $dateFin,
-        ?int $revenueCategoryId = null,
-        ?int $revenueTypeId = null,
+        ?int $caisseId = null,
         ?int $expenseTypeId = null
     ): array {
         $query = Expense::query()
-            ->with(['revenueCategory', 'expenseType', 'fundingSources.revenueType', 'fundingSources.revenue'])
+            ->with(['revenueCategory', 'expenseType', 'fundingSources.caisse', 'fundingSources.revenueType', 'fundingSources.revenue'])
             ->where('paroisse_id', $paroisseId)
             ->where('statut', 'valide')
             ->whereDate('date_depense', '>=', $dateDebut)
             ->whereDate('date_depense', '<=', $dateFin);
 
-        if ($revenueCategoryId) {
-            $query->where('revenue_category_id', $revenueCategoryId);
-        }
-
         if ($expenseTypeId) {
             $query->where('expense_type_id', $expenseTypeId);
         }
 
-        if ($revenueTypeId) {
-            $query->whereHas('fundingSources', function ($fundingQuery) use ($revenueTypeId): void {
-                $fundingQuery->where('revenue_type_id', $revenueTypeId);
+        if ($caisseId) {
+            $query->whereHas('fundingSources', function ($fundingQuery) use ($caisseId): void {
+                $fundingQuery->where('caisse_id', $caisseId);
             });
         }
 
         $expenses = $query->orderBy('date_depense')->orderBy('id')->get();
 
         $byCategory = [];
-        foreach ($expenses->groupBy('revenue_category_id') as $categoryId => $items) {
-            $category = RevenueCategory::find($categoryId);
-            if ($category) {
-                $byCategory[$categoryId] = [
-                    'id' => $categoryId,
-                    'nom' => $category->nom,
-                    'montant' => (float) $items->sum('montant'),
-                    'count' => $items->count(),
-                ];
-            }
-        }
-
         $byExpenseType = [];
         foreach ($expenses->groupBy('expense_type_id') as $typeId => $items) {
             $expenseType = $items->first()?->expenseType;
@@ -1587,71 +1546,105 @@ class FinancialReportController extends Controller implements HasMiddleware
         uasort($byExpenseType, fn (array $a, array $b): int => $b['montant'] <=> $a['montant']);
 
         $byType = [];
-        $subventionEnvelopeBuckets = [];
+        $caisseBuckets = [];
 
         foreach ($expenses as $expense) {
             foreach ($expense->fundingSources as $fundingSource) {
+                if ($caisseId && (int) $fundingSource->caisse_id !== (int) $caisseId) {
+                    continue;
+                }
+
+                $caisse = $fundingSource->caisse;
                 $type = $fundingSource->revenueType;
-                if (! $type) {
-                    continue;
-                }
-
-                if ($revenueTypeId && (int) $type->id !== (int) $revenueTypeId) {
-                    continue;
-                }
-
-                $moisSubvention = $fundingSource->revenue?->mois_subvention;
-                $isSubvention = SubventionMensuelle::isSubventionType($type);
-                $groupKey = $isSubvention && $moisSubvention
-                    ? $type->id.'-'.$moisSubvention
-                    : (string) $type->id;
-                $groupLabel = $isSubvention && $moisSubvention
-                    ? SubventionMensuelle::envelopeLabel($type, $moisSubvention)
-                    : $type->nom;
-
-                if (! isset($byType[$groupKey])) {
-                    $byType[$groupKey] = [
-                        'id' => (int) $type->id,
-                        'nom' => $groupLabel,
-                        'mois_subvention' => $moisSubvention,
-                        'mois_label' => $moisSubvention ? SubventionMensuelle::formatMoisLabel($moisSubvention) : null,
-                        'montant' => 0.0,
-                        'count' => 0,
-                    ];
-                }
-
                 $allocated = (float) $fundingSource->montant_alloue;
-                $byType[$groupKey]['montant'] += $allocated;
-                $byType[$groupKey]['count']++;
 
-                if ($isSubvention && $moisSubvention) {
-                    if (! isset($subventionEnvelopeBuckets[$groupKey])) {
-                        $subventionEnvelopeBuckets[$groupKey] = [
-                            'key' => $groupKey,
-                            'type_id' => (int) $type->id,
-                            'type_nom' => $type->nom,
-                            'mois_subvention' => $moisSubvention,
-                            'mois_label' => SubventionMensuelle::formatMoisLabel($moisSubvention),
-                            'label' => $groupLabel,
-                            'depenses' => 0.0,
+                if ($caisse) {
+                    $groupKey = 'caisse-'.$caisse->id;
+                    $groupLabel = $caisse->nom;
+
+                    if (! isset($byCategory[$groupKey])) {
+                        $byCategory[$groupKey] = [
+                            'id' => (int) $caisse->id,
+                            'nom' => $groupLabel,
+                            'montant' => 0.0,
+                            'count' => 0,
+                        ];
+                    }
+                    $byCategory[$groupKey]['montant'] += $allocated;
+                    $byCategory[$groupKey]['count']++;
+
+                    if (! isset($byType[$groupKey])) {
+                        $byType[$groupKey] = [
+                            'id' => (int) $caisse->id,
+                            'nom' => $groupLabel,
+                            'mois_capital' => null,
+                            'mois_label' => null,
+                            'montant' => 0.0,
                             'count' => 0,
                         ];
                     }
 
-                    $subventionEnvelopeBuckets[$groupKey]['depenses'] += $allocated;
-                    $subventionEnvelopeBuckets[$groupKey]['count']++;
+                    $byType[$groupKey]['montant'] += $allocated;
+                    $byType[$groupKey]['count']++;
+
+                    if (! isset($caisseBuckets[$caisse->id])) {
+                        $caisseBuckets[$caisse->id] = [
+                            'key' => $groupKey,
+                            'caisse_id' => (int) $caisse->id,
+                            'nom' => $caisse->nom,
+                            'depenses' => 0.0,
+                            'count' => 0,
+                        ];
+                    }
+                    $caisseBuckets[$caisse->id]['depenses'] += $allocated;
+                    $caisseBuckets[$caisse->id]['count']++;
+
+                    continue;
                 }
+
+                if (! $type) {
+                    continue;
+                }
+
+                $groupKey = 'legacy-'.$type->id;
+                if (! isset($byType[$groupKey])) {
+                    $byType[$groupKey] = [
+                        'id' => (int) $type->id,
+                        'nom' => $type->nom.' (historique)',
+                        'mois_capital' => null,
+                        'mois_label' => null,
+                        'montant' => 0.0,
+                        'count' => 0,
+                    ];
+                }
+                $byType[$groupKey]['montant'] += $allocated;
+                $byType[$groupKey]['count']++;
+
+                if (! isset($byCategory[$groupKey])) {
+                    $byCategory[$groupKey] = [
+                        'id' => (int) $type->id,
+                        'nom' => $type->nom.' (historique)',
+                        'montant' => 0.0,
+                        'count' => 0,
+                    ];
+                }
+                $byCategory[$groupKey]['montant'] += $allocated;
+                $byCategory[$groupKey]['count']++;
             }
         }
 
-        $subventionEnvelopes = $this->finalizeSubventionEnvelopeSummary($paroisseId, $subventionEnvelopeBuckets);
+        uasort($byCategory, fn (array $a, array $b): int => $b['montant'] <=> $a['montant']);
+        uasort($byType, fn (array $a, array $b): int => $b['montant'] <=> $a['montant']);
+
+        $caisseSummary = $this->finalizeCaisseSummary($paroisseId, $dateDebut, $dateFin, $caisseBuckets);
 
         return [
             'expenses' => $expenses,
             'by_category' => $byCategory,
             'by_type' => $byType,
             'by_expense_type' => $byExpenseType,
-            'subvention_envelopes' => $subventionEnvelopes,
+            'subvention_envelopes' => [],
+            'caisse_summary' => $caisseSummary,
             'total_general' => (float) $expenses->sum('montant'),
             'date_debut' => $dateDebut,
             'date_fin' => $dateFin,
@@ -1659,35 +1652,236 @@ class FinancialReportController extends Controller implements HasMiddleware
     }
 
     /**
+     * @param  array<int, array{key: string, caisse_id: int, nom: string, depenses: float, count: int}>  $buckets
+     * @return list<array{key: string, caisse_id: int, nom: string, credits: float, depenses: float, solde: float, count: int}>
+     */
+    private function finalizeCaisseSummary(int $paroisseId, Carbon $dateDebut, Carbon $dateFin, array $buckets): array
+    {
+        $summary = [];
+
+        foreach ($buckets as $bucket) {
+            $credits = (float) CaisseMouvement::query()
+                ->where('caisse_id', $bucket['caisse_id'])
+                ->where('paroisse_id', $paroisseId)
+                ->where('sens', CaisseMouvement::SENS_CREDIT)
+                ->whereDate('date_mouvement', '>=', $dateDebut)
+                ->whereDate('date_mouvement', '<=', $dateFin)
+                ->sum('montant');
+
+            $depenses = (float) $bucket['depenses'];
+
+            $summary[] = [
+                ...$bucket,
+                'credits' => $credits,
+                'solde' => $credits - $depenses,
+            ];
+        }
+
+        usort($summary, fn (array $a, array $b): int => strcmp($a['nom'], $b['nom']));
+
+        return $summary;
+    }
+
+    /**
+     * @deprecated Remplacé par finalizeCaisseSummary
+     *
      * @param  array<string, array{key: string, type_id: int, type_nom: string, mois_subvention: string, mois_label: string, label: string, depenses: float, count: int}>  $buckets
      * @return list<array{key: string, type_id: int, type_nom: string, mois_subvention: string, mois_label: string, label: string, subvention_recue: float, depenses: float, solde: float, count: int}>
      */
     private function finalizeSubventionEnvelopeSummary(int $paroisseId, array $buckets): array
     {
-        $summary = [];
+        return [];
+    }
 
-        foreach ($buckets as $bucket) {
-            $subventionRecue = (float) Revenue::query()
+    public function capitalUsage(Request $request): View
+    {
+        try {
+            $user = $request->user();
+
+            $paroisses = $user->hasRole('super_admin')
+                ? Paroisse::orderBy('nom')->get()
+                : Paroisse::whereKey($user->paroisse_id)->get();
+
+            $selectedParoisseId = $user->hasRole('super_admin')
+                ? ($request->integer('paroisse_id') ?: null)
+                : (int) $user->paroisse_id;
+
+            $dateDebut = $request->input('date_debut', now()->startOfMonth()->format('Y-m-d'));
+            $dateFin = $request->input('date_fin', now()->endOfMonth()->format('Y-m-d'));
+
+            $report = null;
+            if ($selectedParoisseId) {
+                $report = $this->calculateCapitalUsageReport(
+                    (int) $selectedParoisseId,
+                    Carbon::parse($dateDebut)->startOfDay(),
+                    Carbon::parse($dateFin)->endOfDay()
+                );
+            }
+
+            return view('financial-reports.capital-usage', [
+                'paroisses' => $paroisses,
+                'selectedParoisseId' => $selectedParoisseId,
+                'dateDebut' => $dateDebut,
+                'dateFin' => $dateFin,
+                'report' => $report,
+            ]);
+        } catch (Throwable $e) {
+            $this->logError($e, 'Erreur rapport capital → dépenses');
+            FlashAlert::error('Une erreur est survenue lors du chargement du rapport capital.');
+
+            return view('financial-reports.capital-usage', [
+                'paroisses' => collect(),
+                'selectedParoisseId' => null,
+                'dateDebut' => now()->startOfMonth()->format('Y-m-d'),
+                'dateFin' => now()->endOfMonth()->format('Y-m-d'),
+                'report' => null,
+            ]);
+        }
+    }
+
+    /**
+     * @return array{
+     *     total_capital: float,
+     *     total_virements: float,
+     *     total_depenses: float,
+     *     reste_alloue: float,
+     *     capitals: Collection<int, Revenue>,
+     *     virements: Collection<int, CaisseMouvement>,
+     *     expenses: Collection<int, Expense>,
+     *     by_caisse: list<array{id: int, nom: string, alloue: float, depense: float, solde: float}>
+     * }
+     */
+    private function calculateCapitalUsageReport(int $paroisseId, Carbon $dateDebut, Carbon $dateFin): array
+    {
+        $capitals = Revenue::query()
+            ->with(['category', 'type'])
+            ->where('paroisse_id', $paroisseId)
+            ->where('statut', 'valide')
+            ->whereHas('category', fn ($q) => $q->where('code', 'banque'))
+            ->whereDate('date_recette', '>=', $dateDebut)
+            ->whereDate('date_recette', '<=', $dateFin)
+            ->orderBy('date_recette')
+            ->orderBy('id')
+            ->get();
+
+        $tresorerie = Caisse::query()
+            ->where('paroisse_id', $paroisseId)
+            ->where('code', Caisse::CODE_TRESORERIE)
+            ->first();
+
+        $virements = collect();
+        if ($tresorerie) {
+            $virements = CaisseMouvement::query()
+                ->with(['caisse', 'contrepartieCaisse'])
                 ->where('paroisse_id', $paroisseId)
-                ->where('revenue_type_id', $bucket['type_id'])
-                ->where('mois_subvention', $bucket['mois_subvention'])
-                ->where('statut', 'valide')
-                ->sum('montant');
-            $depenses = (float) $bucket['depenses'];
-
-            $summary[] = [
-                ...$bucket,
-                'subvention_recue' => $subventionRecue,
-                'solde' => $subventionRecue - $depenses,
-            ];
+                ->where('caisse_id', $tresorerie->id)
+                ->where('type', CaisseMouvement::TYPE_VIREMENT)
+                ->where('sens', CaisseMouvement::SENS_DEBIT)
+                ->whereDate('date_mouvement', '>=', $dateDebut)
+                ->whereDate('date_mouvement', '<=', $dateFin)
+                ->orderBy('date_mouvement')
+                ->orderBy('id')
+                ->get();
         }
 
-        usort($summary, function (array $a, array $b): int {
-            $cmp = strcmp($a['mois_subvention'], $b['mois_subvention']);
+        $destinationCaisseIds = $virements
+            ->pluck('contrepartie_caisse_id')
+            ->filter()
+            ->unique()
+            ->values();
 
-            return $cmp !== 0 ? $cmp : strcmp($a['type_nom'], $b['type_nom']);
-        });
+        $expensesQuery = Expense::query()
+            ->with(['expenseType', 'fundingSources.caisse'])
+            ->where('paroisse_id', $paroisseId)
+            ->where('statut', 'valide')
+            ->whereDate('date_depense', '>=', $dateDebut)
+            ->whereDate('date_depense', '<=', $dateFin)
+            ->whereHas('fundingSources', function ($q) use ($destinationCaisseIds): void {
+                $q->whereNotNull('caisse_id');
+                if ($destinationCaisseIds->isNotEmpty()) {
+                    $q->whereIn('caisse_id', $destinationCaisseIds);
+                }
+            });
 
-        return $summary;
+        // Si aucun virement sur la période, montrer toutes les dépenses financées par caisses opérationnelles
+        // (hors trésorerie) pour ne pas masquer l’usage du capital déjà alloué.
+        if ($destinationCaisseIds->isEmpty()) {
+            $expensesQuery = Expense::query()
+                ->with(['expenseType', 'fundingSources.caisse'])
+                ->where('paroisse_id', $paroisseId)
+                ->where('statut', 'valide')
+                ->whereDate('date_depense', '>=', $dateDebut)
+                ->whereDate('date_depense', '<=', $dateFin)
+                ->whereHas('fundingSources', function ($q): void {
+                    $q->whereNotNull('caisse_id')
+                        ->whereHas('caisse', fn ($caisse) => $caisse->where('est_tresorerie', false));
+                });
+        }
+
+        $expenses = $expensesQuery->orderBy('date_depense')->orderBy('id')->get();
+
+        $byCaisse = [];
+        foreach ($virements as $virement) {
+            $caisseId = (int) $virement->contrepartie_caisse_id;
+            if ($caisseId < 1) {
+                continue;
+            }
+            if (! isset($byCaisse[$caisseId])) {
+                $byCaisse[$caisseId] = [
+                    'id' => $caisseId,
+                    'nom' => $virement->contrepartieCaisse?->nom ?? 'Caisse #'.$caisseId,
+                    'alloue' => 0.0,
+                    'depense' => 0.0,
+                    'solde' => 0.0,
+                ];
+            }
+            $byCaisse[$caisseId]['alloue'] += (float) $virement->montant;
+        }
+
+        $totalDepenses = 0.0;
+        foreach ($expenses as $expense) {
+            foreach ($expense->fundingSources as $source) {
+                if (! $source->caisse_id) {
+                    continue;
+                }
+                if ($destinationCaisseIds->isNotEmpty() && ! $destinationCaisseIds->contains((int) $source->caisse_id)) {
+                    continue;
+                }
+                $allocated = (float) $source->montant_alloue;
+                $totalDepenses += $allocated;
+                $caisseId = (int) $source->caisse_id;
+                if (! isset($byCaisse[$caisseId])) {
+                    $byCaisse[$caisseId] = [
+                        'id' => $caisseId,
+                        'nom' => $source->caisse?->nom ?? 'Caisse #'.$caisseId,
+                        'alloue' => 0.0,
+                        'depense' => 0.0,
+                        'solde' => 0.0,
+                    ];
+                }
+                $byCaisse[$caisseId]['depense'] += $allocated;
+            }
+        }
+
+        foreach ($byCaisse as &$row) {
+            $row['solde'] = round($row['alloue'] - $row['depense'], 2);
+        }
+        unset($row);
+
+        usort($byCaisse, fn (array $a, array $b): int => strcmp($a['nom'], $b['nom']));
+
+        $totalCapital = (float) $capitals->sum('montant');
+        $totalVirements = (float) $virements->sum('montant');
+
+        return [
+            'total_capital' => $totalCapital,
+            'total_virements' => $totalVirements,
+            'total_depenses' => $totalDepenses,
+            'reste_alloue' => round($totalVirements - $totalDepenses, 2),
+            'capitals' => $capitals,
+            'virements' => $virements,
+            'expenses' => $expenses,
+            'by_caisse' => array_values($byCaisse),
+        ];
     }
 }

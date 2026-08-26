@@ -9,6 +9,7 @@ class ExpenseFundingSource extends Model
 {
     protected $fillable = [
         'expense_id',
+        'caisse_id',
         'revenue_type_id',
         'revenue_id',
         'montant_alloue',
@@ -23,6 +24,11 @@ class ExpenseFundingSource extends Model
     public function expense(): BelongsTo
     {
         return $this->belongsTo(Expense::class);
+    }
+
+    public function caisse(): BelongsTo
+    {
+        return $this->belongsTo(Caisse::class);
     }
 
     public function revenueType(): BelongsTo

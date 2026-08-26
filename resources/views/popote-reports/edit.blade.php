@@ -1,7 +1,7 @@
 @extends('layouts.app')
 
-@section('title', 'Modifier rapport Subvention Popote - Catholique')
-@section('page-title', 'Modifier rapport Subvention Popote')
+@section('title', 'Modifier rapport Caisse Popote - Catholique')
+@section('page-title', 'Modifier rapport Caisse Popote')
 @section('page-title-info', 'Mettre à jour la période du rapport puis régénérer.')
 
 @section('header-back')

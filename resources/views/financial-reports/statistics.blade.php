@@ -55,7 +55,7 @@
                 <i class="fas fa-info-circle mt-0.5 shrink-0 text-sky-600 dark:text-sky-400" aria-hidden="true"></i>
                 <span>
                     <strong class="font-semibold">Règle (alignée sur le rapport mensuel) :</strong>
-                    les <strong>recettes</strong> comptabilisées excluent la catégorie <strong>Procure</strong> et regroupent quête ordinaire, quête extraordinaire, location et popote/subvention (recettes au statut « validé » uniquement).
+                    les <strong>recettes</strong> comptabilisées excluent la catégorie <strong>Procure</strong> et regroupent toutes les recettes validées (y compris Banque) (recettes au statut « validé » uniquement).
                     Les <strong>dépenses</strong> incluent toutes les catégories de charges (statut « validé »). Le <strong>solde</strong> est recettes − dépenses.
                 </span>
             </p>

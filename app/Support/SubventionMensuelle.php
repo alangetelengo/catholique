@@ -4,7 +4,6 @@ namespace App\Support;
 
 use App\Models\RevenueCategory;
 use App\Models\RevenueType;
-use Carbon\Carbon;
 
 class SubventionMensuelle
 {
@@ -13,29 +12,38 @@ class SubventionMensuelle
     public const POPOTE_TYPE_CODE = 'subvention_popote';
 
     /**
+     * @return array<string, string>
+     */
+    public static function moisOptions(): array
+    {
+        return [
+            '01' => 'Janvier',
+            '02' => 'Février',
+            '03' => 'Mars',
+            '04' => 'Avril',
+            '05' => 'Mai',
+            '06' => 'Juin',
+            '07' => 'Juillet',
+            '08' => 'Août',
+            '09' => 'Septembre',
+            '10' => 'Octobre',
+            '11' => 'Novembre',
+            '12' => 'Décembre',
+        ];
+    }
+
+    /**
      * @return array<int, string>
      */
     public static function moisLabels(): array
     {
-        return [
-            1 => 'Janvier',
-            2 => 'Février',
-            3 => 'Mars',
-            4 => 'Avril',
-            5 => 'Mai',
-            6 => 'Juin',
-            7 => 'Juillet',
-            8 => 'Août',
-            9 => 'Septembre',
-            10 => 'Octobre',
-            11 => 'Novembre',
-            12 => 'Décembre',
-        ];
-    }
+        $options = self::moisOptions();
+        $labels = [];
+        foreach ($options as $mm => $label) {
+            $labels[(int) $mm] = $label;
+        }
 
-    public static function requiresMoisSubvention(?RevenueCategory $category): bool
-    {
-        return $category !== null && $category->code === self::CATEGORY_CODE;
+        return $labels;
     }
 
     public static function isSubventionType(RevenueType $type): bool
@@ -45,36 +53,38 @@ class SubventionMensuelle
         return $type->category?->code === self::CATEGORY_CODE;
     }
 
-    public static function formatMoisLabel(?string $moisSubvention): string
+    public static function isBanqueCategory(?RevenueCategory $category): bool
     {
-        if ($moisSubvention === null || ! preg_match('/^(\d{4})-(\d{2})$/', $moisSubvention, $matches)) {
+        return $category !== null && $category->code === 'banque';
+    }
+
+    public static function formatMoisCapital(?string $moisCapital): string
+    {
+        if ($moisCapital === null || $moisCapital === '') {
             return '—';
         }
 
-        $month = (int) $matches[2];
-        $labels = self::moisLabels();
+        $key = str_pad($moisCapital, 2, '0', STR_PAD_LEFT);
 
-        return ($labels[$month] ?? $matches[2]).' '.$matches[1];
+        return self::moisOptions()[$key] ?? $moisCapital;
     }
 
-    public static function isValidMoisSubvention(string $value): bool
+    /**
+     * Libellé pour une clé AAAA-MM (rapports caisses / historiques).
+     */
+    public static function formatMoisLabel(?string $yearMonth): string
     {
-        if (! preg_match('/^(\d{4})-(\d{2})$/', $value, $matches)) {
-            return false;
+        if ($yearMonth === null || ! preg_match('/^(\d{4})-(\d{2})$/', $yearMonth, $matches)) {
+            return self::formatMoisCapital($yearMonth);
         }
 
-        $month = (int) $matches[2];
+        $labels = self::moisLabels();
 
-        return $month >= 1 && $month <= 12;
+        return ($labels[(int) $matches[2]] ?? $matches[2]).' '.$matches[1];
     }
 
-    public static function moisSubventionFromParts(int $year, int $month): string
+    public static function isValidMoisCapital(string $value): bool
     {
-        return Carbon::create($year, $month, 1)->format('Y-m');
-    }
-
-    public static function envelopeLabel(RevenueType $type, ?string $moisSubvention): string
-    {
-        return $type->nom.' — '.self::formatMoisLabel($moisSubvention);
+        return array_key_exists($value, self::moisOptions());
     }
 }

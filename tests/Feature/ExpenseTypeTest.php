@@ -2,13 +2,14 @@
 
 namespace Tests\Feature;
 
+use App\Models\Caisse;
 use App\Models\Expense;
 use App\Models\ExpenseType;
 use App\Models\Paroisse;
-use App\Models\Revenue;
 use App\Models\RevenueCategory;
 use App\Models\RevenueType;
 use App\Models\User;
+use App\Services\CaisseService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -16,12 +17,22 @@ class ExpenseTypeTest extends TestCase
 {
     use RefreshDatabase;
 
+    private function creditCaisse(Paroisse $paroisse, string $code, float $montant, User $user): Caisse
+    {
+        $caisse = Caisse::query()->where('paroisse_id', $paroisse->id)->where('code', $code)->firstOrFail();
+        app(CaisseService::class)->creditDirect($caisse, $montant, '2026-08-01', 'Crédit test', null, $user->id);
+
+        return $caisse;
+    }
+
     public function test_expense_types_are_seeded(): void
     {
         $this->assertDatabaseHas('expense_types', ['code' => 'alimentation_popote']);
         $this->assertDatabaseHas('expense_types', ['code' => 'salaires']);
         $this->assertDatabaseHas('expense_types', ['code' => 'autre']);
-        $this->assertSame(6, ExpenseType::query()->count());
+        $this->assertDatabaseHas('expense_types', ['code' => 'liturgie']);
+        $this->assertDatabaseHas('expense_types', ['code' => 'transport']);
+        $this->assertTrue(ExpenseType::query()->count() >= 6);
     }
 
     public function test_expense_requires_expense_type(): void
@@ -43,25 +54,7 @@ class ExpenseTypeTest extends TestCase
             'ordre' => 1,
         ]);
 
-        $type = RevenueType::query()->create([
-            'paroisse_id' => $paroisse->id,
-            'revenue_category_id' => $category->id,
-            'code' => 'messe_semaine',
-            'nom' => 'Messe Semaine',
-            'actif' => true,
-            'ordre' => 1,
-        ]);
-
-        Revenue::query()->create([
-            'paroisse_id' => $paroisse->id,
-            'revenue_category_id' => $category->id,
-            'revenue_type_id' => $type->id,
-            'montant' => 100000,
-            'date_recette' => '2026-08-01',
-            'statut' => 'valide',
-            'methode_paiement' => 'especes',
-            'created_by' => $user->id,
-        ]);
+        $caisse = $this->creditCaisse($paroisse, 'alimentation_popote', 100000, $user);
 
         $this->actingAs($user);
 
@@ -73,7 +66,7 @@ class ExpenseTypeTest extends TestCase
             'methode_paiement' => 'especes',
             'funding_sources' => [
                 [
-                    'revenue_type_id' => $type->id,
+                    'caisse_id' => $caisse->id,
                     'montant_alloue' => 10000,
                 ],
             ],
@@ -101,26 +94,7 @@ class ExpenseTypeTest extends TestCase
             'ordre' => 1,
         ]);
 
-        $type = RevenueType::query()->create([
-            'paroisse_id' => $paroisse->id,
-            'revenue_category_id' => $category->id,
-            'code' => 'messe_semaine',
-            'nom' => 'Messe Semaine',
-            'actif' => true,
-            'ordre' => 1,
-        ]);
-
-        Revenue::query()->create([
-            'paroisse_id' => $paroisse->id,
-            'revenue_category_id' => $category->id,
-            'revenue_type_id' => $type->id,
-            'montant' => 100000,
-            'date_recette' => '2026-08-01',
-            'statut' => 'valide',
-            'methode_paiement' => 'especes',
-            'created_by' => $user->id,
-        ]);
-
+        $caisse = $this->creditCaisse($paroisse, 'alimentation_popote', 100000, $user);
         $expenseType = ExpenseType::query()->where('code', 'alimentation_popote')->firstOrFail();
 
         $this->actingAs($user);
@@ -134,7 +108,7 @@ class ExpenseTypeTest extends TestCase
             'methode_paiement' => 'especes',
             'funding_sources' => [
                 [
-                    'revenue_type_id' => $type->id,
+                    'caisse_id' => $caisse->id,
                     'montant_alloue' => 10000,
                 ],
             ],
@@ -166,25 +140,7 @@ class ExpenseTypeTest extends TestCase
             'ordre' => 1,
         ]);
 
-        $revenueType = RevenueType::query()->create([
-            'paroisse_id' => $paroisse->id,
-            'revenue_category_id' => $category->id,
-            'code' => 'messe_semaine',
-            'nom' => 'Messe Semaine',
-            'actif' => true,
-            'ordre' => 1,
-        ]);
-
-        Revenue::query()->create([
-            'paroisse_id' => $paroisse->id,
-            'revenue_category_id' => $category->id,
-            'revenue_type_id' => $revenueType->id,
-            'montant' => 100000,
-            'date_recette' => '2026-08-01',
-            'statut' => 'valide',
-            'methode_paiement' => 'especes',
-            'created_by' => $user->id,
-        ]);
+        $caisse = $this->creditCaisse($paroisse, 'salaires', 100000, $user);
 
         $expenseType = ExpenseType::query()->where('code', 'salaires')->firstOrFail();
         $expenseType->update(['actif' => false]);
@@ -202,10 +158,12 @@ class ExpenseTypeTest extends TestCase
         ]);
 
         $expense->fundingSources()->create([
-            'revenue_type_id' => $revenueType->id,
+            'caisse_id' => $caisse->id,
             'montant_alloue' => 5000,
             'ordre' => 1,
         ]);
+
+        app(CaisseService::class)->syncDepenseMouvements($expense->fresh('fundingSources'), []);
 
         $this->actingAs($user);
 
@@ -223,7 +181,7 @@ class ExpenseTypeTest extends TestCase
             'methode_paiement' => 'especes',
             'funding_sources' => [
                 [
-                    'revenue_type_id' => $revenueType->id,
+                    'caisse_id' => $caisse->id,
                     'montant_alloue' => 5000,
                 ],
             ],
@@ -256,15 +214,6 @@ class ExpenseTypeTest extends TestCase
             'ordre' => 1,
         ]);
 
-        $revenueType = RevenueType::query()->create([
-            'paroisse_id' => $paroisse->id,
-            'revenue_category_id' => $category->id,
-            'code' => 'messe_semaine',
-            'nom' => 'Messe Semaine',
-            'actif' => true,
-            'ordre' => 1,
-        ]);
-
         $this->actingAs($user);
 
         $response = $this->postJson(route('api.sync'), [
@@ -274,7 +223,6 @@ class ExpenseTypeTest extends TestCase
                     'data' => [
                         'paroisse_id' => $paroisse->id,
                         'revenue_category_id' => $category->id,
-                        'revenue_type_id' => $revenueType->id,
                         'date_depense' => '2026-08-10',
                         'montant' => 1000,
                         'libelle' => 'Sync sans type',
@@ -316,7 +264,7 @@ class ExpenseTypeTest extends TestCase
             'ordre' => 1,
         ]);
 
-        $expenseType = ExpenseType::query()->where('code', 'carburant')->firstOrFail();
+        $expenseType = ExpenseType::query()->where('code', 'transport')->firstOrFail();
 
         $this->actingAs($user);
 

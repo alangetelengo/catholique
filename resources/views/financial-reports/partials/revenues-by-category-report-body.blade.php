@@ -7,8 +7,8 @@
     $selectedType = ! empty($selectedTypeId)
         ? \App\Models\RevenueType::find($selectedTypeId)
         : null;
-    $isSubventionCategory = $selectedCategory && $selectedCategory->code === \App\Support\SubventionMensuelle::CATEGORY_CODE;
-    $envelopes = collect($report['subvention_envelopes'] ?? []);
+    $isSubventionCategory = false;
+    $envelopes = collect();
     $w = $report['weekly'] ?? null;
     $showWeeklyBreakdown = ($showWeeklyBreakdown ?? false) && $w;
     $showRptSemaine = $showRptSemaine ?? true;
@@ -37,7 +37,7 @@
 @if ($isSubventionCategory && $envelopes->isNotEmpty())
     <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
         <div class="adventiste-card-pro-static p-4 border-t-4 border-t-emerald-500">
-            <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Subvention reçue</p>
+            <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Recettes subvention (historique)</p>
             <p class="mt-1 text-2xl font-bold text-emerald-700 dark:text-emerald-400 tabular-nums">{{ $fmt($envelopes->sum('montant')) }}</p>
             <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">{{ $envelopes->count() }} enveloppe(s)</p>
         </div>
@@ -220,8 +220,8 @@
                     </div>
                     @if ($revenue->type)
                         <p class="text-xs text-emerald-700 dark:text-emerald-400 mb-0.5">
-                            @if ($revenue->mois_subvention)
-                                {{ \App\Support\SubventionMensuelle::envelopeLabel($revenue->type, $revenue->mois_subvention) }}
+                            @if ($revenue->mois_capital)
+                                {{ $revenue->type->nom }} — {{ \App\Support\SubventionMensuelle::formatMoisCapital($revenue->mois_capital) }}
                             @else
                                 {{ $revenue->type->nom }}
                             @endif

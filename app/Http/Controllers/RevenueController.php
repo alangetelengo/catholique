@@ -7,6 +7,7 @@ use App\Models\Paroisse;
 use App\Models\Revenue;
 use App\Models\RevenueCategory;
 use App\Models\RevenueType;
+use App\Services\CaisseService;
 use App\Support\PaginationPerPage;
 use App\Support\SubventionMensuelle;
 use App\Traits\LogsErrors;
@@ -15,6 +16,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 use Throwable;
@@ -22,6 +24,10 @@ use Throwable;
 class RevenueController extends Controller
 {
     use LogsErrors;
+
+    public function __construct(
+        protected CaisseService $caisseService
+    ) {}
 
     public function index(Request $request): View
     {
@@ -74,8 +80,14 @@ class RevenueController extends Controller
             $validated['paroisse_id'] = $this->resolveParoisseId($request);
             $validated['created_by'] = $request->user()?->id;
             $validated['reference_paiement'] = $this->generateReference();
+            $validated['statut'] = $validated['statut'] ?? 'valide';
 
-            $revenue = Revenue::create($validated);
+            $revenue = DB::transaction(function () use ($validated) {
+                $created = Revenue::create($validated);
+                $this->caisseService->syncCreditFromBanqueRevenue($created);
+
+                return $created;
+            });
             $this->logInfo('Recette créée', ['revenue_id' => $revenue->id, 'montant' => $revenue->montant]);
 
             return redirect()->route('revenues.index')->with('success', 'Recette enregistrée avec succès.');
@@ -102,7 +114,11 @@ class RevenueController extends Controller
                 $validated['reference_paiement'] = $this->generateReference();
             }
 
-            $revenue->update($validated);
+            DB::transaction(function () use ($revenue, $validated): void {
+                $revenue->update($validated);
+                $revenue->refresh(['category', 'type']);
+                $this->caisseService->syncCreditFromBanqueRevenue($revenue);
+            });
             $revenue->refresh(['category', 'type']);
             $this->logInfo('Recette mise à jour', ['revenue_id' => $revenue->id, 'montant' => $revenue->montant]);
 
@@ -121,7 +137,10 @@ class RevenueController extends Controller
     public function destroy(Revenue $revenue): RedirectResponse
     {
         try {
-            $revenue->delete();
+            DB::transaction(function () use ($revenue): void {
+                $this->caisseService->removeCreditsLinkedToRevenue($revenue);
+                $revenue->delete();
+            });
             $this->logInfo('Recette supprimée logiquement', ['revenue_id' => $revenue->id]);
 
             return redirect()->route('revenues.index')->with('success', 'Recette supprimée.');
@@ -239,7 +258,7 @@ class RevenueController extends Controller
             'donateur_nom' => ['nullable', 'string', 'max:255'],
             'donateur_telephone' => ['nullable', 'string', 'max:50'],
             'mois_location' => ['nullable', 'in:01,02,03,04,05,06,07,08,09,10,11,12'],
-            'mois_subvention' => ['nullable', 'regex:/^\d{4}-\d{2}$/'],
+            'mois_capital' => ['nullable', 'in:01,02,03,04,05,06,07,08,09,10,11,12'],
         ]);
 
         $paroisseIdForRules = $existingRevenue !== null && ! empty($existingRevenue->paroisse_id)
@@ -252,6 +271,12 @@ class RevenueController extends Controller
         if (! $category || (int) $category->paroisse_id !== $paroisseIdForRules) {
             throw ValidationException::withMessages([
                 'revenue_category_id' => 'La catégorie choisie n\'appartient pas à votre paroisse ou n\'est pas utilisable.',
+            ]);
+        }
+
+        if ($category->code === 'subvention') {
+            throw ValidationException::withMessages([
+                'revenue_category_id' => 'La catégorie Subvention est remplacée par les caisses (crédit direct ou virement).',
             ]);
         }
 
@@ -277,27 +302,23 @@ class RevenueController extends Controller
         $validated['jour_semaine'] = $jourDepuisDate;
         $validated['periode_messe'] = $jourDepuisDate === 'dimanche' ? 'dimanche' : 'semaine';
 
-        if (SubventionMensuelle::requiresMoisSubvention($category)) {
-            if (empty($validated['mois_subvention']) || ! SubventionMensuelle::isValidMoisSubvention($validated['mois_subvention'])) {
+        if (SubventionMensuelle::isBanqueCategory($category)) {
+            if (empty($validated['mois_capital']) || ! SubventionMensuelle::isValidMoisCapital($validated['mois_capital'])) {
                 throw ValidationException::withMessages([
-                    'mois_subvention' => 'Le mois concerné est obligatoire pour toute subvention (format AAAA-MM).',
+                    'mois_capital' => 'Le mois du capital (janvier–décembre) est obligatoire pour une recette Banque.',
                 ]);
             }
-
             $validated['mois_location'] = null;
-        } elseif ($category && $category->code === 'quete_ordinaire') {
-            $validated['mois_location'] = null;
-            $validated['mois_subvention'] = null;
         } elseif ($category && $category->code === 'location' && $revenueType && in_array($revenueType->code, ['loyer-boutique', 'loyer_boutique'], true)) {
             if (empty($validated['mois_location'])) {
                 throw ValidationException::withMessages([
                     'mois_location' => 'Le mois de location est obligatoire pour un loyer boutique.',
                 ]);
             }
-            $validated['mois_subvention'] = null;
+            $validated['mois_capital'] = null;
         } else {
             $validated['mois_location'] = null;
-            $validated['mois_subvention'] = null;
+            $validated['mois_capital'] = null;
         }
 
         if (! $category || $category->code !== 'procure') {

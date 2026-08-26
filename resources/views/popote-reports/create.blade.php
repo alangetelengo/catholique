@@ -1,7 +1,7 @@
 @extends('layouts.app')
 
-@section('title', 'Nouveau rapport Subvention Popote - Catholique')
-@section('page-title', 'Nouveau rapport Subvention Popote')
+@section('title', 'Nouveau rapport Caisse Popote - Catholique')
+@section('page-title', 'Nouveau rapport Caisse Popote')
 @section('page-title-info', 'Comparer la subvention reçue aux dépenses alimentation (mensuel/annuel).')
 
 @section('header-back')

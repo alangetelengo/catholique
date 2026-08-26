@@ -5,31 +5,27 @@
     <title>Rapport dépenses — {{ $paroisse?->nom ?? 'Paroisse' }}</title>
     @php
         $fmt = static fn (?float $n): string => \App\Helpers\ParoisseConfig::formatMontant($n, $paroisse?->id);
-        $selectedCategory = ! empty($selectedRevenueCategoryId)
-            ? \App\Models\RevenueCategory::find($selectedRevenueCategoryId)
-            : null;
-        $selectedType = ! empty($selectedRevenueTypeId)
-            ? \App\Models\RevenueType::find($selectedRevenueTypeId)
+        $selectedCaisse = ! empty($selectedCaisseId)
+            ? \App\Models\Caisse::find($selectedCaisseId)
             : null;
         $selectedExpenseType = ! empty($selectedExpenseTypeId)
             ? \App\Models\ExpenseType::find($selectedExpenseTypeId)
             : null;
         $byExpenseType = collect($report['by_expense_type'] ?? []);
-        $isSubventionCategory = $selectedCategory && $selectedCategory->code === \App\Support\SubventionMensuelle::CATEGORY_CODE;
-        $envelopes = collect($report['subvention_envelopes'] ?? []);
-        $totalSubventionRecue = (float) $envelopes->sum('subvention_recue');
-        $totalSubventionDepenses = (float) $envelopes->sum('depenses');
-        $totalSubventionSolde = (float) $envelopes->sum('solde');
+        $caisseSummary = collect($report['caisse_summary'] ?? []);
+        $totalCaisseCredits = (float) $caisseSummary->sum('credits');
+        $totalCaisseDepenses = (float) $caisseSummary->sum('depenses');
+        $totalCaisseSolde = (float) $caisseSummary->sum('solde');
         $fundingSourceLabel = static function ($source): string {
+            if ($source->caisse) {
+                return $source->caisse->nom;
+            }
             $type = $source->revenueType;
             if (! $type) {
                 return '—';
             }
-            if ($source->revenue?->mois_subvention) {
-                return \App\Support\SubventionMensuelle::envelopeLabel($type, $source->revenue->mois_subvention);
-            }
 
-            return $type->nom;
+            return $type->nom.' (historique)';
         };
         $brandColor = $headerConfig['header_bg_color'] ?? '#003366';
     @endphp
@@ -201,11 +197,8 @@
                 @if ($selectedExpenseType)
                     — Type : {{ $selectedExpenseType->nom }}
                 @endif
-                @if ($selectedCategory)
-                    — Source : {{ $selectedCategory->nom }}
-                    @if ($selectedType)
-                        · {{ $selectedType->nom }}
-                    @endif
+                @if ($selectedCaisse)
+                    — Caisse : {{ $selectedCaisse->nom }}
                 @endif
             </p>
             <p>Période : {{ $dateDebut->format('d/m/Y') }} → {{ $dateFin->format('d/m/Y') }}</p>
@@ -240,58 +233,49 @@
         </table>
     @endif
 
-    @if ($isSubventionCategory && $envelopes->isNotEmpty())
-        <div class="report-heading">Synthèse subvention</div>
+    @if ($caisseSummary->isNotEmpty())
+        <div class="report-heading">Synthèse par caisse</div>
         <table class="kpi-row">
             <tr>
                 <td class="kpi-received">
-                    <div class="kpi-label">Subvention reçue</div>
-                    <div class="kpi-value">{{ $fmt($totalSubventionRecue) }}</div>
-                    <div class="kpi-sub">{{ $envelopes->count() }} enveloppe(s)</div>
+                    <div class="kpi-label">Crédits caisses (période)</div>
+                    <div class="kpi-value">{{ $fmt($totalCaisseCredits) }}</div>
+                    <div class="kpi-sub">{{ $caisseSummary->count() }} caisse(s)</div>
                 </td>
                 <td class="kpi-spent">
                     <div class="kpi-label">Dépensé (période)</div>
-                    <div class="kpi-value">{{ $fmt($totalSubventionDepenses) }}</div>
+                    <div class="kpi-value">{{ $fmt($totalCaisseDepenses) }}</div>
                     <div class="kpi-sub">{{ $report['expenses']->count() }} opération(s)</div>
                 </td>
                 <td class="kpi-balance">
-                    <div class="kpi-label">Solde restant</div>
-                    <div class="kpi-value">{{ $fmt($totalSubventionSolde) }}</div>
-                    <div class="kpi-sub">recettes − dépenses</div>
+                    <div class="kpi-label">Solde période</div>
+                    <div class="kpi-value">{{ $fmt($totalCaisseSolde) }}</div>
+                    <div class="kpi-sub">crédits − dépenses</div>
                 </td>
             </tr>
         </table>
 
-        @if ($envelopes->count() > 1)
-            <div class="section-title">Détail par mois concerné</div>
-            <table class="simple-table">
-                <thead>
+        <div class="section-title">Répartition par caisse</div>
+        <table class="simple-table">
+            <thead>
+                <tr>
+                    <th>Caisse</th>
+                    <th class="text-right">Crédits</th>
+                    <th class="text-right">Dépensé</th>
+                    <th class="text-right">Solde période</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach ($caisseSummary as $row)
                     <tr>
-                        <th>Type</th>
-                        <th>Mois</th>
-                        <th class="text-right">Reçu</th>
-                        <th class="text-right">Dépensé</th>
-                        <th class="text-right">Solde</th>
+                        <td>{{ $row['nom'] }}</td>
+                        <td class="text-right">{{ $fmt($row['credits']) }}</td>
+                        <td class="text-right">{{ $fmt($row['depenses']) }}</td>
+                        <td class="text-right">{{ $fmt($row['solde']) }}</td>
                     </tr>
-                </thead>
-                <tbody>
-                    @foreach ($envelopes as $row)
-                        <tr>
-                            <td>{{ $row['type_nom'] }}</td>
-                            <td>{{ $row['mois_label'] }}</td>
-                            <td class="text-right">{{ $fmt($row['subvention_recue']) }}</td>
-                            <td class="text-right">{{ $fmt($row['depenses']) }}</td>
-                            <td class="text-right">{{ $fmt($row['solde']) }}</td>
-                        </tr>
-                    @endforeach
-                </tbody>
-            </table>
-        @elseif ($envelopes->count() === 1)
-            @php $env = $envelopes->first(); @endphp
-            <p style="font-size:11px;color:#64748b;margin-bottom:12px;">
-                Enveloppe : <strong>{{ $env['label'] }}</strong>
-            </p>
-        @endif
+                @endforeach
+            </tbody>
+        </table>
     @else
         <table class="kpi-row kpi-total-only">
             <tr>
@@ -303,12 +287,12 @@
             </tr>
         </table>
 
-        @if (! $selectedRevenueCategoryId && count($report['by_category']) > 0)
-            <div class="section-title">Par catégorie</div>
+        @if (! $selectedCaisseId && count($report['by_category']) > 0)
+            <div class="section-title">Par catégorie / caisse</div>
             <table class="simple-table">
                 <thead>
                     <tr>
-                        <th>Catégorie</th>
+                        <th>Catégorie / caisse</th>
                         <th class="text-right">Montant</th>
                     </tr>
                 </thead>
@@ -327,7 +311,7 @@
             </table>
         @endif
 
-        @if ($selectedRevenueCategoryId && count($report['by_type']) > 0)
+        @if ($selectedCaisseId && count($report['by_type']) > 0)
             <div class="section-title">Par type de source</div>
             <table class="simple-table">
                 <thead>

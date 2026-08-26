@@ -11,8 +11,8 @@
         $selectedType = ! empty($selectedTypeId)
             ? \App\Models\RevenueType::find($selectedTypeId)
             : null;
-        $isSubventionCategory = $selectedCategory && $selectedCategory->code === \App\Support\SubventionMensuelle::CATEGORY_CODE;
-        $envelopes = collect($report['subvention_envelopes'] ?? []);
+        $isSubventionCategory = false;
+        $envelopes = collect();
         $w = $report['weekly'] ?? null;
         $showWeeklyBreakdown = ($showWeeklyBreakdown ?? false) && $w;
         $showRptSemaine = $showRptSemaine ?? true;

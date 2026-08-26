@@ -10,7 +10,7 @@
         </button>
     </div>
     <div class="px-6 py-4 max-h-[min(70vh,28rem)] overflow-y-auto text-sm text-slate-600 dark:text-slate-300">
-        <p class="mb-3">Ce rapport agrège les <strong>recettes</strong> des catégories quête ordinaire, quête extraordinaire, location et popote/subvention (hors <strong>Procure</strong>), les <strong>dépenses</strong> de toutes les catégories sur la période, puis affiche le <strong>solde</strong> (excédent ou déficit). Seules les lignes au statut « validé » sont prises en compte.</p>
+        <p class="mb-3">Ce rapport agrège les <strong>recettes</strong> des catégories Banque, quêtes, location et fête (hors <strong>Procure</strong>), les <strong>dépenses</strong> de toutes les catégories sur la période, puis affiche le <strong>solde</strong> (excédent ou déficit). Seules les lignes au statut « validé » sont prises en compte.</p>
         <ul class="list-none m-0 p-0 space-y-2">
             <li><strong class="text-slate-800 dark:text-slate-100">Paroisse</strong> — (Super admin uniquement) Choisissez la paroisse pour laquelle générer le rapport.</li>
             <li><strong class="text-slate-800 dark:text-slate-100">Mois / Année</strong> — Sélectionnez le mois et l’année de la période à analyser.</li>

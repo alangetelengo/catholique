@@ -4,7 +4,7 @@
 @section('page-title', 'Rapport par catégories de dépenses')
 
 @section('page-title-info')
-    Filtrez par paroisse, période, <strong class="font-semibold">type de dépense</strong> (nature), et/ou <strong class="font-semibold">source de fonds</strong> (quête, subvention…). Pour les <strong class="font-semibold">subventions</strong>, le rapport distingue chaque enveloppe mensuelle et affiche reçu / dépensé / solde.
+    Filtrez par paroisse, période, <strong class="font-semibold">type de dépense</strong> (nature), et/ou <strong class="font-semibold">caisse</strong> de financement. La synthèse affiche crédits / dépensé / solde par caisse sur la période.
     <span id="ebc-period-display" class="hidden block mt-1 text-slate-500 dark:text-slate-400"></span>
 @endsection
 
@@ -35,7 +35,7 @@
     <div class="rounded-xl border border-sky-200/90 dark:border-sky-800/50 bg-sky-50/90 dark:bg-sky-950/25 px-4 py-3 mb-6 text-sm text-sky-950 dark:text-sky-100 leading-relaxed">
         <p class="m-0 flex gap-2">
             <i class="fas fa-info-circle mt-0.5 shrink-0 text-sky-600 dark:text-sky-400" aria-hidden="true"></i>
-            <span>Les montants regroupent les <strong class="font-semibold">dépenses validées</strong> sur l’intervalle choisi. Les subventions sont ventilées par <strong class="font-semibold">mois concerné</strong> (enveloppe mensuelle), et non par cumul global. Calcul <strong class="font-semibold">sans recharger la page</strong>.</span>
+            <span>Les montants regroupent les <strong class="font-semibold">dépenses validées</strong> sur l’intervalle choisi, ventilées par <strong class="font-semibold">caisse</strong> de financement. Calcul <strong class="font-semibold">sans recharger la page</strong>.</span>
         </p>
     </div>
 
@@ -87,21 +87,12 @@
                     @endforeach
                 </select>
             </div>
-            <div class="lg:col-span-2">
-                <label for="ebc_category" class="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-300">Catégorie (source fonds)</label>
-                <select id="ebc_category" name="revenue_category_id" class="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2.5 text-sm" @if (auth()->user()->hasRole('super_admin') && ! $selectedParoisseId) disabled @endif>
-                    <option value="">Toutes les catégories</option>
-                    @foreach ($revenueCategories as $cat)
-                        <option value="{{ $cat->id }}">{{ $cat->nom }}</option>
-                    @endforeach
-                </select>
-            </div>
-            <div class="lg:col-span-2">
-                <label for="ebc_type" class="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-300">Source (précision)</label>
-                <select id="ebc_type" name="revenue_type_id" class="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2.5 text-sm" aria-describedby="ebc-filter-hint">
-                    <option value="">Toutes les sources</option>
-                    @foreach ($revenueTypes as $type)
-                        <option value="{{ $type->id }}" data-category-id="{{ $type->revenue_category_id }}">{{ $type->nom }}</option>
+            <div class="lg:col-span-4">
+                <label for="ebc_caisse" class="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-300">Caisse de financement</label>
+                <select id="ebc_caisse" name="caisse_id" class="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2.5 text-sm" aria-describedby="ebc-filter-hint" @if (auth()->user()->hasRole('super_admin') && ! $selectedParoisseId) disabled @endif>
+                    <option value="">Toutes les caisses</option>
+                    @foreach (($caisses ?? collect()) as $caisse)
+                        <option value="{{ $caisse->id }}" data-paroisse-id="{{ $caisse->paroisse_id }}">{{ $caisse->nom }}</option>
                     @endforeach
                 </select>
             </div>
@@ -110,7 +101,7 @@
                     <span class="block sm:inline">Choisissez d’abord une <strong class="font-medium text-slate-700 dark:text-slate-300">paroisse</strong> pour activer les filtres.</span>
                     <span class="hidden sm:inline text-slate-400 dark:text-slate-500" aria-hidden="true"> · </span>
                 @endif
-                <span class="block sm:inline">Filtrez par <strong class="font-medium text-slate-700 dark:text-slate-300">type de dépense</strong> (nature) et/ou par <strong class="font-medium text-slate-700 dark:text-slate-300">source de fonds</strong>.</span>
+                <span class="block sm:inline">Filtrez par <strong class="font-medium text-slate-700 dark:text-slate-300">type de dépense</strong> (nature) et/ou par <strong class="font-medium text-slate-700 dark:text-slate-300">caisse</strong>.</span>
             </div>
             <div class="lg:col-span-12 flex flex-wrap gap-2 justify-end border-t border-slate-200/80 pt-3 dark:border-slate-600/60 lg:pt-4">
                 <button type="button" id="ebc-btn-calculate" class="adventiste-btn-primary">
@@ -131,7 +122,7 @@
                 @if (auth()->user()->hasRole('super_admin'))
                     Choisissez une <strong class="font-medium">paroisse</strong>, les dates, puis cliquez sur <strong class="font-medium">Calculer</strong>.
                 @else
-                    Choisissez la période, éventuellement une <strong class="font-medium">catégorie</strong> et un <strong class="font-medium">type</strong>, puis <strong class="font-medium">Calculer</strong>.
+                    Choisissez la période, éventuellement une <strong class="font-medium">caisse</strong> et un <strong class="font-medium">type</strong>, puis <strong class="font-medium">Calculer</strong>.
                 @endif
             </p>
         </div>
@@ -153,43 +144,6 @@
                     return h && h.value ? parseInt(h.value, 10) : null;
                 }
 
-                // Gestion du filtrage dynamique des types par catégorie
-                var catEl = document.getElementById('ebc_category');
-                var typeEl = document.getElementById('ebc_type');
-
-                function filterTypesByCategory() {
-                    if (!catEl || !typeEl) return;
-                    
-                    var selectedCatId = catEl.value;
-                    var options = typeEl.querySelectorAll('option');
-                    
-                    options.forEach(function(option) {
-                        if (option.value === '') {
-                            option.style.display = '';
-                            return;
-                        }
-                        
-                        var optCatId = option.getAttribute('data-category-id');
-                        if (!selectedCatId || optCatId === selectedCatId) {
-                            option.style.display = '';
-                        } else {
-                            option.style.display = 'none';
-                        }
-                    });
-                    
-                    // Réinitialiser le type si la catégorie change et que le type n'est plus applicable
-                    if (typeEl.value !== '') {
-                        var currentOption = typeEl.querySelector('option[value="' + typeEl.value + '"]');
-                        if (currentOption && currentOption.style.display === 'none') {
-                            typeEl.value = '';
-                        }
-                    }
-                }
-
-                if (catEl) {
-                    catEl.addEventListener('change', filterTypesByCategory);
-                }
-
                 document.querySelectorAll('.ebc-shortcut').forEach(function (btn) {
                     btn.addEventListener('click', function () {
                         var d0 = btn.getAttribute('data-debut');
@@ -204,10 +158,25 @@
                 if (isSuperAdmin) {
                     document.getElementById('ebc_paroisse')?.addEventListener('change', function () {
                         var pid = paroisseId();
-                        var cat = document.getElementById('ebc_category');
-                        if (cat) {
-                            cat.disabled = !pid;
-                            if (!pid) cat.value = '';
+                        var caisse = document.getElementById('ebc_caisse');
+                        if (!caisse) return;
+                        caisse.disabled = !pid;
+                        if (!pid) {
+                            caisse.value = '';
+                        }
+                        Array.prototype.forEach.call(caisse.options, function (opt) {
+                            if (!opt.value) {
+                                opt.hidden = false;
+                                return;
+                            }
+                            var optPid = opt.getAttribute('data-paroisse-id');
+                            opt.hidden = !!(pid && optPid && String(optPid) !== String(pid));
+                        });
+                        if (caisse.value) {
+                            var selected = caisse.options[caisse.selectedIndex];
+                            if (selected && selected.hidden) {
+                                caisse.value = '';
+                            }
                         }
                     });
                 }
@@ -216,10 +185,8 @@
                     var pid = paroisseId();
                     var d0 = document.getElementById('ebc_date_debut')?.value;
                     var d1 = document.getElementById('ebc_date_fin')?.value;
-                    var catEl = document.getElementById('ebc_category');
-                    var cid = catEl && !catEl.disabled ? catEl.value : '';
-                    var tidEl = document.getElementById('ebc_type');
-                    var tid = tidEl ? tidEl.value : '';
+                    var caisseEl = document.getElementById('ebc_caisse');
+                    var caisseId = caisseEl && !caisseEl.disabled ? caisseEl.value : '';
                     var etidEl = document.getElementById('ebc_expense_type');
                     var etid = etidEl ? etidEl.value : '';
 
@@ -242,11 +209,10 @@
                         date_debut: d0,
                         date_fin: d1
                     };
-                    if (cid) payload.revenue_category_id = parseInt(cid, 10);
-                    if (tid) payload.revenue_type_id = parseInt(tid, 10);
+                    if (caisseId) payload.caisse_id = parseInt(caisseId, 10);
                     if (etid) payload.expense_type_id = parseInt(etid, 10);
 
-                    fetch(calculateUrl, {
+                                        fetch(calculateUrl, {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
@@ -286,8 +252,6 @@
                     });
                 });
 
-                // Initialiser le filtre des types au chargement
-                filterTypesByCategory();
             })();
         </script>
     @endpush

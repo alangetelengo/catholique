@@ -4,6 +4,7 @@
     // Recettes : saisie uniquement
     $isRevenueRoute = request()->routeIs('revenues.*');
     $isExpenseRoute = request()->routeIs('expenses.*');
+    $isCaisseRoute = request()->routeIs('caisses.*');
     
     // Rapports mensuels (tous les rapports exportables)
     $isMonthlyReportsRoute = request()->routeIs(
@@ -13,12 +14,14 @@
         'financial-reports.statistics',
         'financial-reports.download-pdf',
         'financial-reports.revenues-by-category*',
-        'financial-reports.expenses-by-category*'
+        'financial-reports.expenses-by-category*',
+        'financial-reports.capital-usage*'
     );
     $isMonthlyReportsGeneration = request()->routeIs('financial-reports.index');
     $isMonthlyReportsHistory = request()->routeIs('financial-reports.list', 'financial-reports.show', 'financial-reports.statistics', 'financial-reports.download-pdf');
     $isMonthlyReportsRevenues = request()->routeIs('financial-reports.revenues-by-category*');
     $isMonthlyReportsExpenses = request()->routeIs('financial-reports.expenses-by-category*');
+    $isMonthlyReportsCapital = request()->routeIs('financial-reports.capital-usage*');
     
     // Statistiques (vue d'ensemble uniquement)
     $isStatsRoute = request()->routeIs('financial-statistics.*');
@@ -85,7 +88,20 @@
                     <ul class="sidebar-sub-menu mt-1" role="list">
                         <li class="sidebar-sub-item"><a href="{{ route('expenses.index') }}" class="sidebar-sub-link {{ request()->routeIs('expenses.index') ? 'is-active' : '' }}">Toutes les dépenses</a></li>
                         <li class="sidebar-sub-item"><a href="{{ route('expenses.create') }}" class="sidebar-sub-link {{ request()->routeIs('expenses.create') ? 'is-active' : '' }}">Ajouter une dépense</a></li>
-                        {{-- <li class="sidebar-sub-item"><a href="{{ route('charges-fixes-reports.index') }}" class="sidebar-sub-link {{ request()->routeIs('charges-fixes-reports.*') ? 'is-active' : '' }}">Rapports charges fixes</a></li> --}}
+                    </ul>
+                </details>
+            </li>
+            <li>
+                <details class="group" @if($isCaisseRoute) open @endif>
+                    <summary class="{{ $isCaisseRoute ? $navBase . ' nav-link-active' : $navBase }} cursor-pointer list-none">
+                        <span>🏦</span>
+                        <span class="nav-text">Caisses</span>
+                        <span class="sidebar-chevron" aria-hidden="true"></span>
+                    </summary>
+                    <ul class="sidebar-sub-menu mt-1" role="list">
+                        <li class="sidebar-sub-item"><a href="{{ route('caisses.index') }}" class="sidebar-sub-link {{ request()->routeIs('caisses.index', 'caisses.show') ? 'is-active' : '' }}">Soldes des caisses</a></li>
+                        <li class="sidebar-sub-item"><a href="{{ route('caisses.credit.create') }}" class="sidebar-sub-link {{ request()->routeIs('caisses.credit.*') ? 'is-active' : '' }}">Crédit direct</a></li>
+                        <li class="sidebar-sub-item"><a href="{{ route('caisses.virement.create') }}" class="sidebar-sub-link {{ request()->routeIs('caisses.virement.*') ? 'is-active' : '' }}">Alimenter une caisse</a></li>
                     </ul>
                 </details>
             </li>
@@ -118,6 +134,7 @@
                         <li class="sidebar-sub-item"><a href="{{ route('financial-reports.list') }}" class="sidebar-sub-link {{ $isMonthlyReportsHistory ? 'is-active' : '' }}">Historique</a></li>
                         <li class="sidebar-sub-item"><a href="{{ route('financial-reports.revenues-by-category') }}" class="sidebar-sub-link {{ $isMonthlyReportsRevenues ? 'is-active' : '' }}">Recettes par catégorie</a></li>
                         <li class="sidebar-sub-item"><a href="{{ route('financial-reports.expenses-by-category') }}" class="sidebar-sub-link {{ $isMonthlyReportsExpenses ? 'is-active' : '' }}">Dépenses par catégorie</a></li>
+                        <li class="sidebar-sub-item"><a href="{{ route('financial-reports.capital-usage') }}" class="sidebar-sub-link {{ $isMonthlyReportsCapital ? 'is-active' : '' }}">Capital → dépenses</a></li>
                         @endcan
                     </ul>
                 </details>

@@ -53,7 +53,7 @@
                 @endif
             @endisset
 
-            <main class="py-6 sm:py-8">
+            <main class="@yield('main-class', 'py-6 sm:py-8')">
                 <div class="@yield('content-container-class', 'max-w-7xl mx-auto px-4 sm:px-6 lg:px-8')">
                     @include('partials.flash-messages')
                     @hasSection('page-aide')

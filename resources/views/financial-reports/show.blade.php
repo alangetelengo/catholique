@@ -39,7 +39,7 @@
     <div class="rounded-xl border border-emerald-200/90 dark:border-emerald-900/40 bg-emerald-50/90 dark:bg-emerald-950/20 px-4 py-3 mb-6 text-sm text-emerald-950 dark:text-emerald-100 leading-relaxed print:hidden">
         <p class="m-0 flex gap-2">
             <i class="fas fa-file-invoice-dollar mt-0.5 shrink-0 text-emerald-600 dark:text-emerald-400" aria-hidden="true"></i>
-            <span>Rapport <strong class="font-semibold">figé</strong> à la date d’enregistrement : recettes hors Procure (quêtes, locations, popote/subvention), dépenses toutes catégories et <strong class="font-semibold">solde</strong> pour la période affichée. Utilisez « PDF » ou « Imprimer » pour une version papier.</span>
+            <span>Rapport <strong class="font-semibold">figé</strong> à la date d’enregistrement : recettes hors Procure (quêtes, locations, fête, Banque), dépenses toutes catégories et <strong class="font-semibold">solde</strong> pour la période affichée. Utilisez « PDF » ou « Imprimer » pour une version papier.</span>
         </p>
     </div>
 
@@ -67,7 +67,7 @@
                     Total recettes
                 </p>
                 <p class="mt-1 text-xl font-bold text-emerald-700 dark:text-emerald-400 tabular-nums">{{ $fmt($report['total_recettes']) }}</p>
-                <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">Quêtes, locations, popote (hors Procure)</p>
+                <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">Banque, quêtes, location, fête (hors Procure)</p>
             </div>
             <div class="adventiste-card-pro-static p-4 sm:p-5 border-t-4 border-t-rose-500">
                 <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400 flex items-center gap-2">
@@ -266,7 +266,7 @@
                                             @php
                                                 $sourceLabels = $expense->fundingSources
                                                     ? $expense->fundingSources
-                                                        ->map(fn ($source) => $source->revenueType?->nom)
+                                                        ->map(fn ($source) => $source->caisse?->nom ?? $source->revenueType?->nom)
                                                         ->filter()
                                                         ->values()
                                                     : collect();
@@ -294,7 +294,7 @@
         <div class="adventiste-card-pro-static p-4 sm:p-5 border border-slate-200/80 dark:border-slate-600/60 bg-slate-50/50 dark:bg-slate-900/30 print-footer text-sm text-slate-600 dark:text-slate-400">
             <p class="mb-2 m-0 flex gap-2">
                 <i class="fas fa-info-circle mt-0.5 shrink-0 text-slate-500" aria-hidden="true"></i>
-                <span><strong class="text-slate-800 dark:text-slate-200">Note :</strong> le solde compare les recettes retenues (quête ordinaire et extraordinaire, location, popote/subvention ; hors Procure) à l’ensemble des dépenses validées sur la période.</span>
+                <span><strong class="text-slate-800 dark:text-slate-200">Note :</strong> le solde compare les recettes retenues (quête ordinaire et extraordinaire, location, fête, Banque ; hors Procure) à l’ensemble des dépenses validées sur la période.</span>
             </p>
             <p class="text-xs text-slate-500 dark:text-slate-500 m-0">Document consulté / imprimé le {{ now()->format('d/m/Y à H:i') }}</p>
         </div>

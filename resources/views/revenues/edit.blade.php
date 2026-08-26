@@ -9,14 +9,15 @@
 @endsection
 
 @section('content-container-class', 'w-full max-w-none px-4 sm:px-6 lg:px-8')
+@section('main-class', 'pt-2 pb-6 sm:pt-3 sm:pb-8')
 
 @section('content')
     <div class="adventiste-card-pro-static w-full p-5 sm:p-6">
-        <p class="text-sm text-slate-600 dark:text-slate-400 mb-6 leading-relaxed border-b border-slate-200/80 dark:border-slate-600/60 pb-6">
+        <p class="text-sm text-slate-600 dark:text-slate-400 mb-4 leading-relaxed border-b border-slate-200/80 dark:border-slate-600/60 pb-4">
             Enregistrez la recette avec la catégorie et le type exacts. Le jour de la semaine (affiché sous la date) et la période (semaine ou dimanche) sont dérivés de la date de recette et enregistrés pour les rapports.
             Référence: <span class="font-mono">{{ $revenue->reference_paiement ?? 'N/A' }}</span>
         </p>
-        <form method="post" action="{{ route('revenues.update', $revenue) }}" class="space-y-8">
+        <form method="post" action="{{ route('revenues.update', $revenue) }}" class="space-y-6">
             @csrf
             @method('put')
             @include('revenues._form', ['formColumns' => 3])

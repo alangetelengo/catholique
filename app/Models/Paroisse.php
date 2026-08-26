@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Database\Seeders\CaisseSeeder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -26,9 +27,36 @@ class Paroisse extends Model
         'actif' => 'boolean',
     ];
 
-    /**
-     * Relation avec les configurations
-     */
+    protected static function booted(): void
+    {
+        static::created(function (Paroisse $paroisse): void {
+            if (! class_exists(CaisseSeeder::class)) {
+                return;
+            }
+
+            foreach (CaisseSeeder::definitions() as $definition) {
+                Caisse::query()->firstOrCreate(
+                    [
+                        'paroisse_id' => $paroisse->id,
+                        'code' => $definition['code'],
+                    ],
+                    [
+                        'nom' => $definition['nom'],
+                        'description' => $definition['description'],
+                        'est_tresorerie' => $definition['est_tresorerie'],
+                        'actif' => true,
+                        'ordre' => $definition['ordre'],
+                    ]
+                );
+            }
+        });
+    }
+
+    public function caisses(): HasMany
+    {
+        return $this->hasMany(Caisse::class);
+    }
+
     public function configurations(): HasMany
     {
         return $this->hasMany(Configuration::class);

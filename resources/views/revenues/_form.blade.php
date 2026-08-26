@@ -14,21 +14,8 @@
     if ($selectedMoisLocation === null) {
         $selectedMoisLocation = now()->format('m');
     }
-    $selectedMoisSubvention = old('mois_subvention', $revenue->mois_subvention ?? now()->format('Y-m'));
-    $moisOptions = [
-        '01' => 'Janvier',
-        '02' => 'Fevrier',
-        '03' => 'Mars',
-        '04' => 'Avril',
-        '05' => 'Mai',
-        '06' => 'Juin',
-        '07' => 'Juillet',
-        '08' => 'Aout',
-        '09' => 'Septembre',
-        '10' => 'Octobre',
-        '11' => 'Novembre',
-        '12' => 'Decembre',
-    ];
+    $selectedMoisCapital = old('mois_capital', $revenue->mois_capital ?? now()->format('m'));
+    $moisOptions = \App\Support\SubventionMensuelle::moisOptions();
 @endphp
 
 <div class="{{ $gridClass }}">
@@ -135,17 +122,16 @@
         @error('methode_paiement')<p class="mt-1.5 text-sm text-red-600 dark:text-red-400">{{ $message }}</p>@enderror
     </div>
 
-    <div id="moisSubventionWrapper">
-        <label class="block text-sm font-semibold text-slate-800 dark:text-slate-200 mb-1.5">Mois concerné (subvention) <span class="text-red-600">*</span></label>
-        <input
-            type="month"
-            name="mois_subvention"
-            id="mois_subvention"
-            value="{{ $selectedMoisSubvention }}"
-            class="{{ $field }}"
-        >
-        <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Mois auquel cette subvention s&apos;applique (carburant, eau, popote, etc.), indépendamment de la date de réception.</p>
-        @error('mois_subvention')<p class="mt-1.5 text-sm text-red-600 dark:text-red-400">{{ $message }}</p>@enderror
+    <div id="moisCapitalWrapper">
+        <label class="block text-sm font-semibold text-slate-800 dark:text-slate-200 mb-1.5">Mois du capital <span class="text-red-600">*</span></label>
+        <select name="mois_capital" id="mois_capital" class="{{ $field }}">
+            <option value="">-- Choisir un mois --</option>
+            @foreach ($moisOptions as $value => $label)
+                <option value="{{ $value }}" {{ (string) $selectedMoisCapital === (string) $value ? 'selected' : '' }}>{{ $label }}</option>
+            @endforeach
+        </select>
+        <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Mois auquel ce versement de capital (économat) s&apos;applique. Plusieurs versements sont autorisés pour le même mois.</p>
+        @error('mois_capital')<p class="mt-1.5 text-sm text-red-600 dark:text-red-400">{{ $message }}</p>@enderror
     </div>
 
     <div id="moisLocationWrapper">
@@ -200,8 +186,8 @@
             const dateInput = document.getElementById('date_recette');
             const dayAutoInput = document.getElementById('jour_semaine_auto');
             const monthWrapper = document.getElementById('moisLocationWrapper');
-            const moisSubventionWrapper = document.getElementById('moisSubventionWrapper');
-            const moisSubventionInput = document.getElementById('mois_subvention');
+            const moisCapitalWrapper = document.getElementById('moisCapitalWrapper');
+            const moisCapitalSelect = document.getElementById('mois_capital');
             const donorNomWrapper = document.getElementById('donateurNomWrapper');
             const donorTelephoneWrapper = document.getElementById('donateurTelephoneWrapper');
 
@@ -260,13 +246,15 @@
 
                 const isLocationBoutique = categoryCode === 'location' && (typeCode === 'loyer-boutique' || typeCode === 'loyer_boutique');
                 const isProcure = categoryCode === 'procure';
-                const isSubvention = categoryCode === 'subvention';
+                const isBanque = categoryCode === 'banque';
+                const jourWrapper = document.getElementById('jourSemaineWrapper');
 
                 if (monthWrapper) monthWrapper.style.display = isLocationBoutique ? '' : 'none';
-                if (moisSubventionWrapper) moisSubventionWrapper.style.display = isSubvention ? '' : 'none';
-                if (moisSubventionInput) moisSubventionInput.required = isSubvention;
+                if (moisCapitalWrapper) moisCapitalWrapper.style.display = isBanque ? '' : 'none';
+                if (moisCapitalSelect) moisCapitalSelect.required = isBanque;
                 if (donorNomWrapper) donorNomWrapper.style.display = isProcure ? '' : 'none';
                 if (donorTelephoneWrapper) donorTelephoneWrapper.style.display = isProcure ? '' : 'none';
+                if (jourWrapper) jourWrapper.style.display = isBanque ? 'none' : '';
             }
 
             categorySelect.addEventListener('change', function () {

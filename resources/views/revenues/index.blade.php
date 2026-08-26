@@ -235,8 +235,10 @@
                             <td class="px-4 py-3">{{ $revenue->category?->nom ?? '-' }}</td>
                             <td class="px-4 py-3">{{ $revenue->type?->nom ?? '-' }}</td>
                             <td class="px-4 py-3">
-                                @if ($revenue->mois_subvention)
-                                    {{ \App\Support\SubventionMensuelle::formatMoisLabel($revenue->mois_subvention) }}
+                                @if ($revenue->mois_capital)
+                                    {{ \App\Support\SubventionMensuelle::formatMoisCapital($revenue->mois_capital) }}
+                                @elseif ($revenue->mois_location)
+                                    {{ \App\Support\SubventionMensuelle::formatMoisCapital($revenue->mois_location) }}
                                 @else
                                     <span class="text-slate-400">—</span>
                                 @endif
@@ -244,7 +246,13 @@
                             <td class="px-4 py-3 font-semibold">{{ $formatFcfa((float) $revenue->montant) }}</td>
                             <td class="px-4 py-3">
                                 <span class="inline-flex items-center rounded-full bg-slate-100 dark:bg-slate-700 px-2.5 py-1 text-xs font-semibold text-slate-700 dark:text-slate-200">
-                                    {{ str_replace('_', ' ', ucfirst($revenue->methode_paiement)) }}
+                                    {{ [
+                                        'especes' => 'Espèces',
+                                        'cheque' => 'Chèque',
+                                        'virement' => 'Virement',
+                                        'carte' => 'Carte',
+                                        'mobile_money' => 'Mobile money',
+                                    ][$revenue->methode_paiement] ?? ucfirst(str_replace('_', ' ', (string) $revenue->methode_paiement)) }}
                                 </span>
                             </td>
                             <td class="px-4 py-3">

@@ -435,7 +435,7 @@
                                 @php
                                     $sourceLabels = $expense->fundingSources
                                         ? $expense->fundingSources
-                                            ->map(fn ($source) => $source->revenueType?->nom)
+                                            ->map(fn ($source) => $source->caisse?->nom ?? $source->revenueType?->nom)
                                             ->filter()
                                             ->values()
                                         : collect();

@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\SyncController;
 use App\Http\Controllers\ApplicationConfigurationController;
+use App\Http\Controllers\CaisseController;
 use App\Http\Controllers\ConfigurationController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\EventController;
@@ -49,6 +50,12 @@ Route::middleware('auth')->group(function (): void {
     Route::resource('groups', GroupController::class)->except(['show']);
     Route::resource('revenues', RevenueController::class)->except(['show']);
     Route::resource('expenses', ExpenseController::class);
+    Route::get('caisses', [CaisseController::class, 'index'])->name('caisses.index');
+    Route::get('caisses/credit', [CaisseController::class, 'createCredit'])->name('caisses.credit.create');
+    Route::post('caisses/credit', [CaisseController::class, 'storeCredit'])->name('caisses.credit.store');
+    Route::get('caisses/virement', [CaisseController::class, 'createVirement'])->name('caisses.virement.create');
+    Route::post('caisses/virement', [CaisseController::class, 'storeVirement'])->name('caisses.virement.store');
+    Route::get('caisses/{caisse}', [CaisseController::class, 'show'])->name('caisses.show');
     Route::resource('inventories', InventoryController::class)->except(['show']);
     Route::resource('inventaire-magasin', InventaireMagasinController::class)->except(['show']);
     Route::resource('inventaire-patrimoine', InventairePatrimoineController::class)->except(['show']);
@@ -79,6 +86,7 @@ Route::middleware('auth')->group(function (): void {
     Route::post('financial-reports/expenses-by-category/calculate', [FinancialReportController::class, 'expensesByCategoryCalculate'])->name('financial-reports.expenses-by-category.calculate');
     Route::get('financial-reports/expenses-by-category/pdf', [FinancialReportController::class, 'downloadExpensesByCategoryPdf'])->name('financial-reports.expenses-by-category.pdf');
     Route::get('financial-reports/expenses-by-category', [FinancialReportController::class, 'expensesByCategory'])->name('financial-reports.expenses-by-category');
+    Route::get('financial-reports/capital-usage', [FinancialReportController::class, 'capitalUsage'])->name('financial-reports.capital-usage');
     Route::get('financial-reports/revenues-by-category/revenue-categories', [FinancialReportController::class, 'revenueCategoriesForParoisse'])->name('financial-reports.revenues-by-category.revenue-categories');
     Route::get('financial-reports/revenues-by-category/revenue-types', [FinancialReportController::class, 'revenueTypesForCategory'])->name('financial-reports.revenues-by-category.revenue-types');
     Route::post('financial-reports/revenues-by-category/calculate', [FinancialReportController::class, 'revenuesByCategoryCalculate'])->name('financial-reports.revenues-by-category.calculate');
