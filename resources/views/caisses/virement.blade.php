@@ -13,16 +13,20 @@
 
 @section('content')
     @php
+        use App\Support\SubventionMensuelle;
         $field = 'w-full rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900/90 px-3 py-2 text-sm';
         $selectedCaisse = old('caisse_id', request('caisse_id'));
         $mode = old('mode', 'tresorerie');
+        $selectedMois = old('mois_capital');
+        $selectedAnnee = (int) old('annee_capital', now()->format('Y'));
+        $moisOptions = SubventionMensuelle::moisOptions();
     @endphp
     <div class="adventiste-card-pro-static w-full p-5 sm:p-6">
         <p class="text-sm text-slate-600 dark:text-slate-400 mb-4 leading-relaxed border-b border-slate-200/80 dark:border-slate-600/60 pb-4">
             Alimentez une caisse opérationnelle depuis la
             <strong class="font-semibold">trésorerie générale</strong>
-            (capital Banque) ou depuis le solde disponible d’un autre type de recette.
-            Solde trésorerie disponible :
+            (capital Banque, par mois) ou depuis le solde disponible d’un autre type de recette.
+            Solde trésorerie total :
             <strong class="tabular-nums">{{ number_format($tresorerie->solde_disponible ?? 0, 0, ',', ' ') }} FCFA</strong>.
         </p>
         <form method="post" action="{{ route('caisses.virement.store') }}" class="space-y-6">
@@ -34,6 +38,28 @@
                         <option value="tresorerie" @selected($mode === 'tresorerie')>Trésorerie générale (Banque)</option>
                         <option value="recette" @selected($mode === 'recette')>Autre recette (quête, location…)</option>
                     </select>
+                </div>
+                <div id="envelope_wrapper" class="{{ $mode === 'tresorerie' ? '' : 'hidden' }}">
+                    <label class="block text-sm font-semibold mb-1.5">Mois du capital <span class="text-red-600">*</span></label>
+                    @if (($envelopesCapital ?? collect())->isNotEmpty())
+                        <select name="mois_capital" id="mois_capital" class="{{ $field }}">
+                            <option value="">-- Choisir le mois --</option>
+                            @foreach ($envelopesCapital as $envelope)
+                                <option value="{{ $envelope['mois_capital'] }}"
+                                    data-annee="{{ $envelope['annee_capital'] }}"
+                                    data-disponible="{{ $envelope['disponible'] }}"
+                                    @selected((string) $selectedMois === (string) $envelope['mois_capital'] && $selectedAnnee === (int) $envelope['annee_capital'])>
+                                    {{ $envelope['label'] }} — {{ number_format($envelope['disponible'], 0, ',', ' ') }} FCFA dispo
+                                </option>
+                            @endforeach
+                        </select>
+                        <input type="hidden" name="annee_capital" id="annee_capital" value="{{ old('annee_capital') }}">
+                        <p id="envelope_disponible_hint" class="mt-1.5 text-xs text-slate-500 dark:text-slate-400"></p>
+                    @else
+                        <p class="text-sm text-amber-700 dark:text-amber-300">Aucune enveloppe de capital disponible. Enregistrez d&apos;abord une recette Banque.</p>
+                    @endif
+                    @error('mois_capital')<p class="mt-1.5 text-sm text-red-600 dark:text-red-400">{{ $message }}</p>@enderror
+                    @error('annee_capital')<p class="mt-1.5 text-sm text-red-600 dark:text-red-400">{{ $message }}</p>@enderror
                 </div>
                 <div id="revenue_type_wrapper" class="{{ $mode === 'recette' ? '' : 'hidden' }}">
                     <label class="block text-sm font-semibold mb-1.5">Type de recette source</label>
@@ -61,7 +87,7 @@
                 </div>
                 <div>
                     <label class="block text-sm font-semibold mb-1.5">Montant (FCFA) <span class="text-red-600">*</span></label>
-                    <input type="number" step="0.01" min="0.01" name="montant" value="{{ old('montant') }}" class="{{ $field }}" required>
+                    <input type="text" name="montant" id="montant_virement" value="{{ old('montant') }}" class="{{ $field }} js-montant-fcfa" placeholder="700 000 fcfa" required>
                     @error('montant')<p class="mt-1.5 text-sm text-red-600 dark:text-red-400">{{ $message }}</p>@enderror
                 </div>
                 <div>
@@ -91,11 +117,68 @@
 <script>
     (function () {
         const mode = document.getElementById('alimentation_mode');
-        const wrapper = document.getElementById('revenue_type_wrapper');
-        if (!mode || !wrapper) return;
-        mode.addEventListener('change', function () {
-            wrapper.classList.toggle('hidden', mode.value !== 'recette');
-        });
+        const revenueWrapper = document.getElementById('revenue_type_wrapper');
+        const envelopeWrapper = document.getElementById('envelope_wrapper');
+        const moisSelect = document.getElementById('mois_capital');
+        const anneeInput = document.getElementById('annee_capital');
+        const hint = document.getElementById('envelope_disponible_hint');
+        const montantInput = document.getElementById('montant_virement');
+
+        function formatFcfa(value) {
+            return new Intl.NumberFormat('fr-FR').format(value) + ' FCFA';
+        }
+
+        function parseMontantRaw(value) {
+            const raw = (value || '').toString().replace(/\s/g, '').replace(/fcfa/ig, '').replace(',', '.');
+            return parseFloat(raw) || 0;
+        }
+
+        function syncEnvelopeFields() {
+            if (!moisSelect || !anneeInput) return;
+            const option = moisSelect.options[moisSelect.selectedIndex];
+            if (!option || !option.value) {
+                anneeInput.value = '';
+                if (hint) hint.textContent = '';
+                if (montantInput) montantInput.removeAttribute('data-max-disponible');
+                return;
+            }
+            anneeInput.value = option.dataset.annee || '';
+            const dispo = parseFloat(option.dataset.disponible || '0');
+            if (hint) {
+                hint.textContent = 'Disponible en trésorerie pour ce mois : ' + formatFcfa(dispo);
+            }
+            if (montantInput && dispo > 0) {
+                montantInput.setAttribute('data-max-disponible', String(dispo));
+            }
+        }
+
+        const form = document.querySelector('form[action="{{ route('caisses.virement.store') }}"]');
+        if (form && montantInput) {
+            form.addEventListener('submit', function (e) {
+                if (!mode || mode.value !== 'tresorerie' || !moisSelect || !moisSelect.value) {
+                    return;
+                }
+                const maxDispo = parseFloat(montantInput.getAttribute('data-max-disponible') || '0');
+                const montant = parseMontantRaw(montantInput.value);
+                if (maxDispo > 0 && montant > maxDispo + 0.01) {
+                    e.preventDefault();
+                    alert('Montant supérieur au disponible pour ce mois : ' + formatFcfa(maxDispo));
+                }
+            });
+        }
+
+        if (mode) {
+            mode.addEventListener('change', function () {
+                const isTresorerie = mode.value === 'tresorerie';
+                if (revenueWrapper) revenueWrapper.classList.toggle('hidden', isTresorerie);
+                if (envelopeWrapper) envelopeWrapper.classList.toggle('hidden', !isTresorerie);
+            });
+        }
+
+        if (moisSelect) {
+            moisSelect.addEventListener('change', syncEnvelopeFields);
+            syncEnvelopeFields();
+        }
     })();
 </script>
 @endpush

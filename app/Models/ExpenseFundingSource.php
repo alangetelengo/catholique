@@ -10,6 +10,8 @@ class ExpenseFundingSource extends Model
     protected $fillable = [
         'expense_id',
         'caisse_id',
+        'mois_capital',
+        'annee_capital',
         'revenue_type_id',
         'revenue_id',
         'montant_alloue',

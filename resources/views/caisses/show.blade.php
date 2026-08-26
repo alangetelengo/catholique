@@ -25,6 +25,34 @@
             </div>
         </div>
 
+        @if ($caisse->est_tresorerie && ($envelopesCapital ?? collect())->isNotEmpty())
+            <div>
+                <h2 class="text-sm font-semibold text-slate-800 dark:text-slate-200 mb-3">Enveloppes mensuelles</h2>
+                <div class="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700">
+                    <table class="min-w-full text-sm">
+                        <thead class="bg-slate-50 dark:bg-slate-800/60 text-left">
+                            <tr>
+                                <th class="px-4 py-3 font-semibold">Mois</th>
+                                <th class="px-4 py-3 font-semibold text-right">Reçu</th>
+                                <th class="px-4 py-3 font-semibold text-right">Alloué</th>
+                                <th class="px-4 py-3 font-semibold text-right">Disponible</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach ($envelopesCapital as $envelope)
+                                <tr class="border-t border-slate-200 dark:border-slate-700">
+                                    <td class="px-4 py-3">{{ $envelope['label'] }}</td>
+                                    <td class="px-4 py-3 text-right tabular-nums">{{ number_format($envelope['recu'], 0, ',', ' ') }}</td>
+                                    <td class="px-4 py-3 text-right tabular-nums">{{ number_format($envelope['alloue'], 0, ',', ' ') }}</td>
+                                    <td class="px-4 py-3 text-right tabular-nums font-medium">{{ number_format($envelope['disponible'], 0, ',', ' ') }}</td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        @endif
+
         <div class="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700">
             <table class="min-w-full text-sm">
                 <thead class="bg-slate-50 dark:bg-slate-800/60 text-left">

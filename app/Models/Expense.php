@@ -41,6 +41,8 @@ class Expense extends Model
         'revenue_type_id',
         'montant',
         'date_depense',
+        'mois_capital',
+        'annee_capital',
         'jour_semaine',
         'libelle',
         'facture_reference',

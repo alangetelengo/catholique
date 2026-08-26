@@ -98,6 +98,8 @@ class CaisseBusinessRulesTest extends TestCase
             'revenue_category_id' => $category->id,
             'expense_type_id' => $expenseType->id,
             'date_depense' => '2026-08-10',
+            'mois_capital' => '08',
+            'annee_capital' => 2026,
             'montant' => 90000,
             'libelle' => 'Achats mixtes',
             'methode_paiement' => 'especes',
@@ -158,6 +160,8 @@ class CaisseBusinessRulesTest extends TestCase
             'revenue_category_id' => $category->id,
             'expense_type_id' => $expenseType->id,
             'date_depense' => '2026-08-10',
+            'mois_capital' => '08',
+            'annee_capital' => 2026,
             'montant' => 10000,
             'libelle' => 'Interdit',
             'methode_paiement' => 'especes',
@@ -214,6 +218,8 @@ class CaisseBusinessRulesTest extends TestCase
         $response = $this->post(route('caisses.virement.store'), [
             'mode' => 'tresorerie',
             'caisse_id' => $charges->id,
+            'mois_capital' => '08',
+            'annee_capital' => 2026,
             'montant' => 75000,
             'date_mouvement' => '2026-08-05',
             'libelle' => 'Alim charges',
@@ -269,6 +275,8 @@ class CaisseBusinessRulesTest extends TestCase
             'revenue_category_id' => $category->id,
             'expense_type_id' => $expenseType->id,
             'date_depense' => '2026-08-10',
+            'mois_capital' => '08',
+            'annee_capital' => 2026,
             'montant' => 10000,
             'libelle' => 'Dépense liturgie filtrable',
             'methode_paiement' => 'especes',
@@ -281,6 +289,8 @@ class CaisseBusinessRulesTest extends TestCase
             'revenue_category_id' => $category->id,
             'expense_type_id' => ExpenseType::query()->where('code', 'transport')->firstOrFail()->id,
             'date_depense' => '2026-08-11',
+            'mois_capital' => '08',
+            'annee_capital' => 2026,
             'montant' => 15000,
             'libelle' => 'Dépense transport filtrable',
             'methode_paiement' => 'especes',
@@ -418,7 +428,7 @@ class CaisseBusinessRulesTest extends TestCase
         $service = app(CaisseService::class);
         $service->syncCreditFromBanqueRevenue($revenue);
         $popote = Caisse::query()->where('paroisse_id', $paroisse->id)->where('code', 'alimentation_popote')->firstOrFail();
-        $service->virementTresorerieVersCaisse($popote, 80000, '2026-08-12', 'Alim popote', null, $user->id);
+        $service->virementTresorerieVersCaisse($popote, 80000, '2026-08-12', 'Alim popote', '08', 2026, null, $user->id);
 
         $this->actingAs($user);
         $response = $this->get(route('financial-reports.capital-usage', [
@@ -431,5 +441,150 @@ class CaisseBusinessRulesTest extends TestCase
         $response->assertSee('Capital reçu → dépenses', false);
         $response->assertSee('Capital Banque reçu', false);
         $response->assertSee('Caisse alimentation', false);
+    }
+
+    public function test_monthly_envelopes_are_independent(): void
+    {
+        $paroisse = Paroisse::query()->create([
+            'nom' => 'Saint Esprit',
+            'code_paroisse' => 'SE-ENVELOPES',
+        ]);
+        $user = User::factory()->create(['paroisse_id' => $paroisse->id]);
+
+        $banque = RevenueCategory::query()->create([
+            'paroisse_id' => $paroisse->id,
+            'code' => 'banque',
+            'nom' => 'BANQUE',
+            'actif' => true,
+            'ordre' => 0,
+        ]);
+        $type = RevenueType::query()->create([
+            'paroisse_id' => $paroisse->id,
+            'revenue_category_id' => $banque->id,
+            'code' => 'revenu_principal',
+            'nom' => 'Revenu principal',
+            'actif' => true,
+            'ordre' => 1,
+        ]);
+
+        $service = app(CaisseService::class);
+
+        foreach (['07' => 1103000, '08' => 500000] as $mois => $montant) {
+            $revenue = Revenue::query()->create([
+                'paroisse_id' => $paroisse->id,
+                'revenue_category_id' => $banque->id,
+                'revenue_type_id' => $type->id,
+                'montant' => $montant,
+                'date_recette' => "2026-{$mois}-15",
+                'mois_capital' => $mois,
+                'statut' => 'valide',
+                'methode_paiement' => 'virement',
+                'created_by' => $user->id,
+            ]);
+            $service->syncCreditFromBanqueRevenue($revenue);
+        }
+
+        $envelopes = $service->getEnvelopesCapital((int) $paroisse->id);
+
+        $this->assertCount(2, $envelopes);
+        $juillet = $envelopes->first(fn (array $row): bool => $row['mois_capital'] === '07');
+        $aout = $envelopes->first(fn (array $row): bool => $row['mois_capital'] === '08');
+
+        $this->assertNotNull($juillet);
+        $this->assertNotNull($aout);
+        $this->assertSame(1103000.0, $juillet['disponible']);
+        $this->assertSame(500000.0, $aout['disponible']);
+
+        $popote = Caisse::query()->where('paroisse_id', $paroisse->id)->where('code', 'alimentation_popote')->firstOrFail();
+        $service->virementTresorerieVersCaisse($popote, 200000, '2026-08-16', 'Alim août', '08', 2026);
+
+        $envelopesAfter = $service->getEnvelopesCapital((int) $paroisse->id);
+        $juilletAfter = $envelopesAfter->first(fn (array $row): bool => $row['mois_capital'] === '07');
+        $aoutAfter = $envelopesAfter->first(fn (array $row): bool => $row['mois_capital'] === '08');
+
+        $this->assertSame(1103000.0, $juilletAfter['disponible']);
+        $this->assertSame(300000.0, $aoutAfter['disponible']);
+    }
+
+    public function test_legacy_virement_without_envelope_is_counted_in_alloue(): void
+    {
+        $paroisse = Paroisse::query()->create([
+            'nom' => 'Saint Esprit',
+            'code_paroisse' => 'SE-LEGACY-VIR',
+        ]);
+        $user = User::factory()->create(['paroisse_id' => $paroisse->id]);
+
+        $banque = RevenueCategory::query()->create([
+            'paroisse_id' => $paroisse->id,
+            'code' => 'banque',
+            'nom' => 'BANQUE',
+            'actif' => true,
+            'ordre' => 0,
+        ]);
+        $type = RevenueType::query()->create([
+            'paroisse_id' => $paroisse->id,
+            'revenue_category_id' => $banque->id,
+            'code' => 'revenu_principal',
+            'nom' => 'Revenu principal',
+            'actif' => true,
+            'ordre' => 1,
+        ]);
+
+        $revenue = Revenue::query()->create([
+            'paroisse_id' => $paroisse->id,
+            'revenue_category_id' => $banque->id,
+            'revenue_type_id' => $type->id,
+            'montant' => 500000,
+            'date_recette' => '2026-08-01',
+            'mois_capital' => '08',
+            'statut' => 'valide',
+            'methode_paiement' => 'virement',
+            'created_by' => $user->id,
+        ]);
+
+        $service = app(CaisseService::class);
+        $service->syncCreditFromBanqueRevenue($revenue);
+
+        $tresorerie = Caisse::query()->where('paroisse_id', $paroisse->id)->where('code', Caisse::CODE_TRESORERIE)->firstOrFail();
+        $popote = Caisse::query()->where('paroisse_id', $paroisse->id)->where('code', 'alimentation_popote')->firstOrFail();
+
+        CaisseMouvement::query()->create([
+            'paroisse_id' => $paroisse->id,
+            'caisse_id' => $tresorerie->id,
+            'type' => CaisseMouvement::TYPE_VIREMENT,
+            'sens' => CaisseMouvement::SENS_DEBIT,
+            'montant' => 120000,
+            'date_mouvement' => '2026-08-10',
+            'libelle' => 'Virement legacy sans enveloppe',
+            'contrepartie_caisse_id' => $popote->id,
+        ]);
+
+        $envelope = $service->getEnvelopesCapital((int) $paroisse->id)
+            ->first(fn (array $row): bool => $row['mois_capital'] === '08');
+
+        $this->assertNotNull($envelope);
+        $this->assertSame(120000.0, $envelope['alloue']);
+        $this->assertSame(380000.0, $envelope['disponible']);
+    }
+
+    public function test_envelopes_depense_includes_month_with_credit_direct_only(): void
+    {
+        $paroisse = Paroisse::query()->create([
+            'nom' => 'Saint Esprit',
+            'code_paroisse' => 'SE-CREDIT-ENV',
+        ]);
+        $user = User::factory()->create(['paroisse_id' => $paroisse->id]);
+
+        $liturgie = Caisse::query()->where('paroisse_id', $paroisse->id)->where('code', 'liturgie')->firstOrFail();
+        $service = app(CaisseService::class);
+        $service->creditDirect($liturgie, 45000, '2026-09-05', 'Don diocèse', null, $user->id);
+
+        $envelopes = $service->getEnvelopesDepense((int) $paroisse->id);
+
+        $septembre = $envelopes->first(fn (array $row): bool => $row['mois_capital'] === '09' && $row['annee_capital'] === 2026);
+
+        $this->assertNotNull($septembre);
+        $this->assertTrue($septembre['has_caisse_solde']);
+        $this->assertSame(0.0, $septembre['disponible']);
     }
 }

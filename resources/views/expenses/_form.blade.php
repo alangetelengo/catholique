@@ -1,8 +1,13 @@
 @php
+    use App\Support\SubventionMensuelle;
     $gridColumns = (int) ($formColumns ?? 2);
     $gridClass = $gridColumns === 3 ? 'revenue-form-grid revenue-form-grid--three' : 'revenue-form-grid';
     $field = 'w-full rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900/90 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 shadow-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/35 focus:border-emerald-500/80 transition-shadow';
     $caisses = $caisses ?? collect();
+    $envelopesDepense = $envelopesDepense ?? collect();
+    $selectedMoisCapital = old('mois_capital', $expense->mois_capital ?? now()->format('m'));
+    $selectedAnneeCapital = (int) old('annee_capital', $expense->annee_capital ?? now()->format('Y'));
+    $moisOptions = SubventionMensuelle::moisOptions();
     $caissesJson = $caisses->map(fn ($caisse) => [
         'id' => $caisse->id,
         'code' => $caisse->code,
@@ -13,6 +18,7 @@
         'id' => $type->id,
         'code' => $type->code,
     ])->values();
+    $caissesByEnvelope = $caissesByEnvelope ?? [];
 @endphp
 
 <div class="{{ $gridClass }}">
@@ -49,6 +55,38 @@
         @error('date_depense')<p class="mt-1.5 text-sm text-red-600 dark:text-red-400">{{ $message }}</p>@enderror
     </div>
     <div>
+        <label class="block text-sm font-semibold text-slate-800 dark:text-slate-200 mb-1.5">Mois du capital <span class="text-red-600">*</span></label>
+        @if ($envelopesDepense->isNotEmpty())
+            <select name="mois_capital" id="expense_mois_capital" class="{{ $field }}" required>
+                <option value="">-- Choisir le mois --</option>
+                @foreach ($envelopesDepense as $envelope)
+                    <option value="{{ $envelope['mois_capital'] }}"
+                        data-annee="{{ $envelope['annee_capital'] }}"
+                        data-disponible="{{ $envelope['disponible'] }}"
+                        @selected((string) $selectedMoisCapital === (string) $envelope['mois_capital'] && $selectedAnneeCapital === (int) $envelope['annee_capital'])>
+                        {{ $envelope['label'] }}
+                        @if ($envelope['disponible'] > 0)
+                            (trésorerie : {{ number_format($envelope['disponible'], 0, ',', ' ') }} FCFA)
+                        @elseif ($envelope['has_caisse_solde'] ?? false)
+                            (caisses alimentées)
+                        @endif
+                    </option>
+                @endforeach
+            </select>
+            <input type="hidden" name="annee_capital" id="expense_annee_capital" value="{{ old('annee_capital', $selectedAnneeCapital) }}">
+            <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Les caisses affichées dépendent du mois choisi. Chaque mois est une enveloppe indépendante.</p>
+        @else
+            <select name="mois_capital" id="expense_mois_capital" class="{{ $field }}" required>
+                @foreach ($moisOptions as $value => $label)
+                    <option value="{{ $value }}" @selected((string) $selectedMoisCapital === (string) $value)>{{ $label }}</option>
+                @endforeach
+            </select>
+            <input type="number" name="annee_capital" id="expense_annee_capital" value="{{ old('annee_capital', $selectedAnneeCapital) }}" class="{{ $field }} mt-2" min="2000" max="2100" required>
+        @endif
+        @error('mois_capital')<p class="mt-1.5 text-sm text-red-600 dark:text-red-400">{{ $message }}</p>@enderror
+        @error('annee_capital')<p class="mt-1.5 text-sm text-red-600 dark:text-red-400">{{ $message }}</p>@enderror
+    </div>
+    <div>
         <label class="block text-sm font-semibold text-slate-800 dark:text-slate-200 mb-1.5">Fournisseur</label>
         <input type="text" name="fournisseur" value="{{ old('fournisseur', $expense->fournisseur) }}" class="{{ $field }}" placeholder="Nom du fournisseur ou du vendeur">
         @error('fournisseur')<p class="mt-1.5 text-sm text-red-600 dark:text-red-400">{{ $message }}</p>@enderror
@@ -58,7 +96,8 @@
         <div class="border-t border-slate-200 dark:border-slate-700 pt-4 mt-2">
             <h3 class="text-sm font-semibold text-slate-800 dark:text-slate-200 mb-3">Caisses de financement <span class="text-red-600">*</span></h3>
             <p class="text-xs text-slate-600 dark:text-slate-400 mb-4">
-                Prélevez sur une ou plusieurs caisses opérationnelles. Si une caisse est vide,
+                Prélevez sur une ou plusieurs caisses opérationnelles alimentées pour le mois du capital sélectionné.
+                Si une caisse est vide,
                 <a href="{{ route('caisses.virement.create') }}" class="underline text-emerald-700 dark:text-emerald-400">alimentez-la d&apos;abord</a>
                 (virement trésorerie ou crédit direct). La trésorerie générale n&apos;apparaît pas ici.
             </p>
@@ -228,8 +267,11 @@
         const montantTotalInput = document.getElementById('montant_total');
         const expenseTypeSelect = document.getElementById('expense_type_id');
         const form = container ? container.closest('form') : null;
-        const caissesData = @json($caissesJson);
+        const caissesByEnvelope = @json($caissesByEnvelope);
         const expenseTypesData = @json($expenseTypesJson);
+        const moisCapitalSelect = document.getElementById('expense_mois_capital');
+        const anneeCapitalInput = document.getElementById('expense_annee_capital');
+        let caissesData = @json($caissesJson);
         const typeToCaisseCode = {
             transport: 'transport',
             carburant: 'transport',
@@ -243,6 +285,21 @@
             autre: 'divers'
         };
 
+        function showFormAlert(message, title) {
+            title = title || 'Erreur de saisie';
+            if (typeof window.flashAlert === 'function') {
+                window.flashAlert(message, null, {
+                    title: title,
+                    icon: '⚠️',
+                    noCancel: true,
+                    confirmText: 'Compris',
+                    danger: false,
+                });
+                return;
+            }
+            alert(message);
+        }
+
         function formatFcfa(value) {
             return new Intl.NumberFormat('fr-FR').format(value) + ' FCFA';
         }
@@ -253,6 +310,31 @@
                 .replace(/fcfa/ig, '')
                 .replace(',', '.');
             return parseFloat(raw) || 0;
+        }
+
+        function envelopeKey() {
+            const mois = moisCapitalSelect ? moisCapitalSelect.value : '';
+            const annee = anneeCapitalInput ? anneeCapitalInput.value : '';
+            if (!mois || !annee) return '';
+            return String(annee).padStart(4, '0') + '-' + String(mois).padStart(2, '0');
+        }
+
+        function refreshCaissesForEnvelope() {
+            const key = envelopeKey();
+            if (moisCapitalSelect && anneeCapitalInput && moisCapitalSelect.selectedIndex >= 0) {
+                const option = moisCapitalSelect.options[moisCapitalSelect.selectedIndex];
+                if (option && option.dataset.annee) {
+                    anneeCapitalInput.value = option.dataset.annee;
+                }
+            }
+            caissesData = key && caissesByEnvelope[key] ? caissesByEnvelope[key] : @json($caissesJson);
+
+            document.querySelectorAll('.funding-source-select').forEach(function (select) {
+                const current = select.value;
+                select.innerHTML = buildOptionsHtml(current);
+            });
+            updateTotalAlloue();
+            filterUsedSources();
         }
 
         function buildOptionsHtml(preserveValue) {
@@ -383,7 +465,7 @@
                     totalAlloueHint.textContent = 'Le total correspond au montant de la dépense.';
                     totalAlloueHint.className = 'mt-1 text-xs text-emerald-600';
                 } else {
-                    totalAlloueHint.textContent = 'Doit égaler ' + formatFcfa(montantTotal) + '.';
+                    totalAlloueHint.textContent = 'Doit égaler le montant de la dépense : ' + formatFcfa(montantTotal) + ' (pas le solde de la caisse).';
                     totalAlloueHint.className = 'mt-1 text-xs text-red-600';
                 }
             }
@@ -442,7 +524,7 @@
                         updateTotalAlloue();
                         filterUsedSources();
                     } else {
-                        alert('Au moins une caisse est obligatoire.');
+                        showFormAlert('Au moins une caisse de financement est obligatoire.', 'Caisse requise');
                     }
                 }
             });
@@ -459,6 +541,12 @@
 
         if (montantTotalInput) montantTotalInput.addEventListener('input', updateTotalAlloue);
         if (expenseTypeSelect) expenseTypeSelect.addEventListener('change', suggestCaisseFromExpenseType);
+        if (moisCapitalSelect) {
+            moisCapitalSelect.addEventListener('change', refreshCaissesForEnvelope);
+        }
+        if (anneeCapitalInput && anneeCapitalInput.tagName === 'INPUT') {
+            anneeCapitalInput.addEventListener('change', refreshCaissesForEnvelope);
+        }
 
         if (form) {
             form.addEventListener('submit', function (e) {
@@ -471,17 +559,27 @@
 
                 if (soldeErrors.length) {
                     e.preventDefault();
-                    alert('Solde insuffisant sur une ou plusieurs caisses.\n' + soldeErrors.join('\n'));
+                    showFormAlert(
+                        'Solde insuffisant sur une ou plusieurs caisses :\n\n' + soldeErrors.join('\n'),
+                        'Solde insuffisant'
+                    );
                     return;
                 }
 
                 if (Math.abs(total - montantTotal) > 0.01) {
                     e.preventDefault();
-                    alert('Le total des caisses (' + formatFcfa(total) + ') doit être égal au montant de la dépense (' + formatFcfa(montantTotal) + ').');
+                    showFormAlert(
+                        'Le montant prélevé sur les caisses (' + formatFcfa(total) + ') '
+                            + 'doit être égal au montant de cette dépense (' + formatFcfa(montantTotal) + ').\n\n'
+                            + 'Indiquez combien prélever pour cette dépense, pas le solde total disponible de la caisse. '
+                            + 'Vous pourrez enregistrer d\'autres dépenses tant qu\'il reste de l\'argent sur la caisse.',
+                        'Montants incohérents'
+                    );
                 }
             });
         }
 
+        refreshCaissesForEnvelope();
         updateTotalAlloue();
         filterUsedSources();
         const firstFundingSelect = document.querySelector('.funding-source-select');

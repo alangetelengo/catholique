@@ -39,7 +39,7 @@
                 </div>
                 <div>
                     <label class="block text-sm font-semibold mb-1.5">Montant (FCFA) <span class="text-red-600">*</span></label>
-                    <input type="number" step="0.01" min="0.01" name="montant" value="{{ old('montant') }}" class="{{ $field }}" required>
+                    <input type="text" name="montant" value="{{ old('montant') }}" class="{{ $field }} js-montant-fcfa" placeholder="700 000 fcfa" required>
                     @error('montant')<p class="mt-1.5 text-sm text-red-600 dark:text-red-400">{{ $message }}</p>@enderror
                 </div>
                 <div>

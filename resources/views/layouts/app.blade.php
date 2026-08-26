@@ -99,6 +99,8 @@
         <script>
             (function () {
                 document.addEventListener('submit', function (event) {
+                    if (event.defaultPrevented) return;
+
                     var form = event.target;
                     if (!(form instanceof HTMLFormElement)) return;
                     if (form.dataset.skipSubmitLoading === '1') return;
@@ -125,7 +127,7 @@
                     btn.disabled = true;
                     btn.setAttribute('aria-busy', 'true');
                     btn.classList.add('form-submit-loading');
-                }, true);
+                });
             })();
         </script>
     </body>

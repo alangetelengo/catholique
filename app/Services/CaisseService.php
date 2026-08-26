@@ -8,6 +8,7 @@ use App\Models\Expense;
 use App\Models\ExpenseFundingSource;
 use App\Models\Revenue;
 use App\Models\RevenueType;
+use App\Support\CapitalMensuel;
 use App\Support\SubventionMensuelle;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -17,6 +18,10 @@ class CaisseService
 {
     public function getSolde(Caisse $caisse, ?Expense $excludeExpense = null): float
     {
+        if ($caisse->isTresorerie()) {
+            return $this->getSoldeTresorerieGlobal($caisse);
+        }
+
         $credits = (float) CaisseMouvement::query()
             ->where('caisse_id', $caisse->id)
             ->where('sens', CaisseMouvement::SENS_CREDIT)
@@ -38,11 +43,268 @@ class CaisseService
         return max(0.0, round($credits - $debits, 2));
     }
 
+    public function getSoldeTresorerieGlobal(Caisse $tresorerie): float
+    {
+        $envelopes = $this->getEnvelopesCapital((int) $tresorerie->paroisse_id);
+
+        return round((float) $envelopes->sum('disponible'), 2);
+    }
+
+    public function getSoldeMensuel(
+        Caisse $caisse,
+        string $moisCapital,
+        int $anneeCapital,
+        ?Expense $excludeExpense = null
+    ): float {
+        if ($caisse->isTresorerie()) {
+            return $this->getDisponibleTresorerieMois((int) $caisse->paroisse_id, $moisCapital, $anneeCapital);
+        }
+
+        $credits = (float) CaisseMouvement::query()
+            ->where('caisse_id', $caisse->id)
+            ->where('sens', CaisseMouvement::SENS_CREDIT)
+            ->where('mois_capital', $moisCapital)
+            ->where('annee_capital', $anneeCapital)
+            ->sum('montant');
+
+        $debitsQuery = CaisseMouvement::query()
+            ->where('caisse_id', $caisse->id)
+            ->where('sens', CaisseMouvement::SENS_DEBIT)
+            ->where('mois_capital', $moisCapital)
+            ->where('annee_capital', $anneeCapital);
+
+        if ($excludeExpense) {
+            $debitsQuery->where(function ($q) use ($excludeExpense): void {
+                $q->whereNull('expense_id')
+                    ->orWhere('expense_id', '!=', $excludeExpense->id);
+            });
+        }
+
+        $debits = (float) $debitsQuery->sum('montant');
+
+        return max(0.0, round($credits - $debits, 2));
+    }
+
+    public function getDisponibleTresorerieMois(int $paroisseId, string $moisCapital, int $anneeCapital): float
+    {
+        $envelope = $this->getEnvelopesCapital($paroisseId)
+            ->first(fn (array $row): bool => $row['mois_capital'] === $moisCapital && $row['annee_capital'] === $anneeCapital);
+
+        return $envelope ? (float) $envelope['disponible'] : 0.0;
+    }
+
+    /**
+     * Enveloppes mensuelles indépendantes du revenu principal (Banque).
+     *
+     * @return Collection<int, array{
+     *     mois_capital: string,
+     *     annee_capital: int,
+     *     label: string,
+     *     recu: float,
+     *     alloue: float,
+     *     disponible: float
+     * }>
+     */
+    public function getEnvelopesCapital(int $paroisseId): Collection
+    {
+        $tresorerie = $this->getTresorerie($paroisseId);
+
+        $recuParEnvelope = Revenue::query()
+            ->where('paroisse_id', $paroisseId)
+            ->where('statut', 'valide')
+            ->whereHas('category', fn ($q) => $q->where('code', 'banque'))
+            ->get()
+            ->groupBy(function (Revenue $revenue): string {
+                $mois = $revenue->mois_capital ?: $revenue->date_recette?->format('m') ?? '01';
+                $annee = (int) ($revenue->date_recette?->format('Y') ?? now()->format('Y'));
+
+                return CapitalMensuel::envelopeKey($mois, $annee);
+            })
+            ->map(fn (Collection $group): float => (float) $group->sum('montant'));
+
+        $alloueParEnvelope = CaisseMouvement::query()
+            ->where('caisse_id', $tresorerie->id)
+            ->where('type', CaisseMouvement::TYPE_VIREMENT)
+            ->where('sens', CaisseMouvement::SENS_DEBIT)
+            ->get()
+            ->groupBy(fn (CaisseMouvement $m): string => $this->envelopeKeyFromMouvement($m))
+            ->map(fn (Collection $group): float => (float) $group->sum('montant'));
+
+        $keys = $recuParEnvelope->keys()->merge($alloueParEnvelope->keys())->unique()->sort()->values();
+
+        return $keys->map(function (string $key) use ($recuParEnvelope, $alloueParEnvelope): array {
+            [$annee, $mois] = explode('-', $key);
+            $recu = (float) ($recuParEnvelope[$key] ?? 0);
+            $alloue = (float) ($alloueParEnvelope[$key] ?? 0);
+
+            return [
+                'mois_capital' => $mois,
+                'annee_capital' => (int) $annee,
+                'label' => CapitalMensuel::formatEnvelopeLabel($mois, (int) $annee),
+                'recu' => $recu,
+                'alloue' => $alloue,
+                'disponible' => max(0.0, round($recu - $alloue, 2)),
+            ];
+        })->values();
+    }
+
+    /**
+     * Enveloppes sélectionnables pour une dépense : union capital Banque et mois où des caisses ont un solde.
+     *
+     * @return Collection<int, array{
+     *     mois_capital: string,
+     *     annee_capital: int,
+     *     label: string,
+     *     recu: float,
+     *     alloue: float,
+     *     disponible: float,
+     *     has_caisse_solde: bool
+     * }>
+     */
+    public function getEnvelopesDepense(int $paroisseId, ?Expense $excludeExpense = null): Collection
+    {
+        $banqueEnvelopes = $this->getEnvelopesCapital($paroisseId)
+            ->keyBy(fn (array $row): string => CapitalMensuel::envelopeKey($row['mois_capital'], $row['annee_capital']));
+
+        $caisseKeys = $this->getEnvelopeKeysWithCaisseSolde($paroisseId, $excludeExpense);
+
+        $allKeys = $banqueEnvelopes->keys()->merge($caisseKeys)->unique()->sort()->values();
+
+        return $allKeys->map(function (string $key) use ($banqueEnvelopes, $paroisseId, $excludeExpense): array {
+            [$annee, $mois] = explode('-', $key);
+            $banque = $banqueEnvelopes->get($key);
+
+            return [
+                'mois_capital' => $mois,
+                'annee_capital' => (int) $annee,
+                'label' => CapitalMensuel::formatEnvelopeLabel($mois, (int) $annee),
+                'recu' => (float) ($banque['recu'] ?? 0),
+                'alloue' => (float) ($banque['alloue'] ?? 0),
+                'disponible' => (float) ($banque['disponible'] ?? 0),
+                'has_caisse_solde' => $this->operativeCaissesHaveSoldeMensuel($paroisseId, $mois, (int) $annee, $excludeExpense),
+            ];
+        })->values();
+    }
+
+    /**
+     * @return Collection<int, string>
+     */
+    private function getEnvelopeKeysWithCaisseSolde(int $paroisseId, ?Expense $excludeExpense = null): Collection
+    {
+        $caisses = Caisse::query()
+            ->where('paroisse_id', $paroisseId)
+            ->where('actif', true)
+            ->where('est_tresorerie', false)
+            ->get();
+
+        if ($caisses->isEmpty()) {
+            return collect();
+        }
+
+        $keys = CaisseMouvement::query()
+            ->whereIn('caisse_id', $caisses->pluck('id'))
+            ->where('sens', CaisseMouvement::SENS_CREDIT)
+            ->whereIn('type', [
+                CaisseMouvement::TYPE_CREDIT_DIRECT,
+                CaisseMouvement::TYPE_VIREMENT,
+                CaisseMouvement::TYPE_ALIMENTATION_RECETTE,
+            ])
+            ->get()
+            ->map(fn (CaisseMouvement $m): string => $this->envelopeKeyFromMouvement($m))
+            ->unique();
+
+        return $keys->filter(function (string $key) use ($caisses, $excludeExpense): bool {
+            [$annee, $mois] = explode('-', $key);
+
+            return $this->operativeCaissesHaveSoldeMensuel(
+                (int) $caisses->first()->paroisse_id,
+                $mois,
+                (int) $annee,
+                $excludeExpense
+            );
+        })->values();
+    }
+
+    private function operativeCaissesHaveSoldeMensuel(
+        int $paroisseId,
+        string $moisCapital,
+        int $anneeCapital,
+        ?Expense $excludeExpense = null
+    ): bool {
+        $caisses = Caisse::query()
+            ->where('paroisse_id', $paroisseId)
+            ->where('actif', true)
+            ->where('est_tresorerie', false)
+            ->get();
+
+        foreach ($caisses as $caisse) {
+            if ($this->getSoldeMensuel($caisse, $moisCapital, $anneeCapital, $excludeExpense) > 0) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function envelopeKeyFromMouvement(CaisseMouvement $mouvement): string
+    {
+        if ($mouvement->mois_capital !== null && $mouvement->mois_capital !== '' && $mouvement->annee_capital !== null) {
+            return CapitalMensuel::envelopeKey((string) $mouvement->mois_capital, (int) $mouvement->annee_capital);
+        }
+
+        $envelope = CapitalMensuel::envelopeFromDate(
+            $mouvement->date_mouvement?->format('Y-m-d') ?? now()->toDateString()
+        );
+
+        return CapitalMensuel::envelopeKey($envelope['mois_capital'], $envelope['annee_capital']);
+    }
+
+    /**
+     * Renseigne mois_capital / annee_capital sur les mouvements legacy sans enveloppe.
+     */
+    public function backfillMouvementEnvelopes(?int $paroisseId = null): int
+    {
+        $query = CaisseMouvement::query()
+            ->where(function ($builder): void {
+                $builder->whereNull('mois_capital')->orWhereNull('annee_capital');
+            })
+            ->whereIn('type', [
+                CaisseMouvement::TYPE_VIREMENT,
+                CaisseMouvement::TYPE_CREDIT_DIRECT,
+                CaisseMouvement::TYPE_ALIMENTATION_RECETTE,
+                CaisseMouvement::TYPE_DEPENSE,
+            ]);
+
+        if ($paroisseId !== null) {
+            $query->where('paroisse_id', $paroisseId);
+        }
+
+        $count = 0;
+        foreach ($query->cursor() as $mouvement) {
+            $envelope = CapitalMensuel::envelopeFromDate(
+                $mouvement->date_mouvement?->format('Y-m-d') ?? now()->toDateString()
+            );
+            $mouvement->update([
+                'mois_capital' => $envelope['mois_capital'],
+                'annee_capital' => $envelope['annee_capital'],
+            ]);
+            $count++;
+        }
+
+        return $count;
+    }
+
     /**
      * @return Collection<int, Caisse>
      */
-    public function getCaissesAvecSolde(int $paroisseId, ?Expense $excludeExpense = null, bool $onlyOperatives = false, bool $onlyWithSolde = false): Collection
-    {
+    public function getCaissesAvecSolde(
+        int $paroisseId,
+        ?Expense $excludeExpense = null,
+        bool $onlyOperatives = false,
+        bool $onlyWithSolde = false,
+        ?string $moisCapital = null,
+        ?int $anneeCapital = null
+    ): Collection {
         $query = Caisse::query()
             ->where('paroisse_id', $paroisseId)
             ->where('actif', true)
@@ -53,8 +315,14 @@ class CaisseService
             $query->where('est_tresorerie', false);
         }
 
-        return $query->get()->map(function (Caisse $caisse) use ($excludeExpense) {
-            $caisse->solde_disponible = $this->getSolde($caisse, $excludeExpense);
+        return $query->get()->map(function (Caisse $caisse) use ($excludeExpense, $moisCapital, $anneeCapital) {
+            if ($caisse->isTresorerie()) {
+                $caisse->solde_disponible = $this->getSoldeTresorerieGlobal($caisse);
+            } elseif ($moisCapital !== null && $anneeCapital !== null) {
+                $caisse->solde_disponible = $this->getSoldeMensuel($caisse, $moisCapital, $anneeCapital, $excludeExpense);
+            } else {
+                $caisse->solde_disponible = $this->getSolde($caisse, $excludeExpense);
+            }
 
             return $caisse;
         })->when($onlyWithSolde, fn (Collection $items) => $items->filter(
@@ -92,6 +360,8 @@ class CaisseService
             throw new InvalidArgumentException('Le montant du crédit doit être positif.');
         }
 
+        $envelope = CapitalMensuel::envelopeFromDate($dateMouvement);
+
         return CaisseMouvement::query()->create([
             'paroisse_id' => $caisse->paroisse_id,
             'caisse_id' => $caisse->id,
@@ -99,6 +369,8 @@ class CaisseService
             'sens' => CaisseMouvement::SENS_CREDIT,
             'montant' => $montant,
             'date_mouvement' => $dateMouvement,
+            'mois_capital' => $envelope['mois_capital'],
+            'annee_capital' => $envelope['annee_capital'],
             'libelle' => $libelle,
             'notes' => $notes,
             'created_by' => $createdBy,
@@ -121,6 +393,9 @@ class CaisseService
             return;
         }
 
+        $moisCapital = $revenue->mois_capital ?: $revenue->date_recette?->format('m');
+        $anneeCapital = (int) ($revenue->date_recette?->format('Y') ?? now()->format('Y'));
+
         $tresorerie = $this->getTresorerie((int) $revenue->paroisse_id);
         $existing = CaisseMouvement::query()
             ->where('revenue_id', $revenue->id)
@@ -134,8 +409,10 @@ class CaisseService
             'sens' => CaisseMouvement::SENS_CREDIT,
             'montant' => $revenue->montant,
             'date_mouvement' => $revenue->date_recette?->format('Y-m-d') ?? now()->toDateString(),
+            'mois_capital' => $moisCapital,
+            'annee_capital' => $anneeCapital,
             'libelle' => 'Recette Banque — '.($revenue->type?->nom ?? 'Revenu principal')
-                .($revenue->mois_capital ? ' ('.SubventionMensuelle::formatMoisCapital($revenue->mois_capital).')' : ''),
+                .($moisCapital ? ' ('.SubventionMensuelle::formatMoisCapital($moisCapital).' '.$anneeCapital.')' : ''),
             'revenue_id' => $revenue->id,
             'revenue_type_id' => $revenue->revenue_type_id,
             'created_by' => $revenue->created_by,
@@ -166,6 +443,8 @@ class CaisseService
         float $montant,
         string $dateMouvement,
         string $libelle,
+        string $moisCapital,
+        int $anneeCapital,
         ?string $notes = null,
         ?int $createdBy = null
     ): array {
@@ -173,12 +452,16 @@ class CaisseService
             throw new InvalidArgumentException('La destination doit être une caisse opérationnelle.');
         }
 
+        if (! CapitalMensuel::isValidEnvelope($moisCapital, $anneeCapital)) {
+            throw new InvalidArgumentException('Le mois du capital est invalide.');
+        }
+
         if ((int) $destination->paroisse_id < 1) {
             throw new InvalidArgumentException('Paroisse invalide pour le virement.');
         }
 
         $tresorerie = $this->getTresorerie((int) $destination->paroisse_id);
-        $solde = $this->getSolde($tresorerie);
+        $solde = $this->getDisponibleTresorerieMois((int) $destination->paroisse_id, $moisCapital, $anneeCapital);
 
         if ($montant <= 0) {
             throw new InvalidArgumentException('Le montant du virement doit être positif.');
@@ -186,13 +469,16 @@ class CaisseService
 
         if ($montant > $solde) {
             throw new InvalidArgumentException(sprintf(
-                'Trésorerie insuffisante : %s FCFA demandé, %s FCFA disponible.',
+                'Capital %s insuffisant : %s FCFA demandé, %s FCFA disponible en trésorerie.',
+                CapitalMensuel::formatEnvelopeLabel($moisCapital, $anneeCapital),
                 number_format($montant, 0, ',', ' '),
                 number_format($solde, 0, ',', ' ')
             ));
         }
 
-        return DB::transaction(function () use ($tresorerie, $destination, $montant, $dateMouvement, $libelle, $notes, $createdBy) {
+        $moisLabel = CapitalMensuel::formatEnvelopeLabel($moisCapital, $anneeCapital);
+
+        return DB::transaction(function () use ($tresorerie, $destination, $montant, $dateMouvement, $libelle, $notes, $createdBy, $moisCapital, $anneeCapital, $moisLabel) {
             $debit = CaisseMouvement::query()->create([
                 'paroisse_id' => $tresorerie->paroisse_id,
                 'caisse_id' => $tresorerie->id,
@@ -200,7 +486,9 @@ class CaisseService
                 'sens' => CaisseMouvement::SENS_DEBIT,
                 'montant' => $montant,
                 'date_mouvement' => $dateMouvement,
-                'libelle' => $libelle ?: 'Virement vers '.$destination->nom,
+                'mois_capital' => $moisCapital,
+                'annee_capital' => $anneeCapital,
+                'libelle' => $libelle ?: 'Virement vers '.$destination->nom.' ('.$moisLabel.')',
                 'notes' => $notes,
                 'contrepartie_caisse_id' => $destination->id,
                 'created_by' => $createdBy,
@@ -213,7 +501,9 @@ class CaisseService
                 'sens' => CaisseMouvement::SENS_CREDIT,
                 'montant' => $montant,
                 'date_mouvement' => $dateMouvement,
-                'libelle' => $libelle ?: 'Virement depuis '.$tresorerie->nom,
+                'mois_capital' => $moisCapital,
+                'annee_capital' => $anneeCapital,
+                'libelle' => $libelle ?: 'Virement depuis '.$tresorerie->nom.' ('.$moisLabel.')',
                 'notes' => $notes,
                 'contrepartie_caisse_id' => $tresorerie->id,
                 'contrepartie_mouvement_id' => $debit->id,
@@ -262,6 +552,8 @@ class CaisseService
             ));
         }
 
+        $envelope = CapitalMensuel::envelopeFromDate($dateMouvement);
+
         return CaisseMouvement::query()->create([
             'paroisse_id' => $destination->paroisse_id,
             'caisse_id' => $destination->id,
@@ -269,6 +561,8 @@ class CaisseService
             'sens' => CaisseMouvement::SENS_CREDIT,
             'montant' => $montant,
             'date_mouvement' => $dateMouvement,
+            'mois_capital' => $envelope['mois_capital'],
+            'annee_capital' => $envelope['annee_capital'],
             'libelle' => $libelle ?: 'Alimentation depuis '.$revenueType->nom,
             'notes' => $notes,
             'revenue_type_id' => $revenueType->id,
@@ -307,12 +601,25 @@ class CaisseService
      * @param  list<array{caisse_id: int|string, montant_alloue: float|int|string}>  $fundingSources
      * @return array{valid: bool, errors: list<string>, total_alloue: float}
      */
-    public function validateFundingSources(array $fundingSources, ?Expense $excludeExpense = null, ?int $paroisseId = null): array
-    {
+    public function validateFundingSources(
+        array $fundingSources,
+        ?Expense $excludeExpense = null,
+        ?int $paroisseId = null,
+        ?string $moisCapital = null,
+        ?int $anneeCapital = null
+    ): array {
         $errors = [];
         $totalAlloue = 0.0;
         $totalsByCaisse = [];
         $resolvedParoisseId = $paroisseId ?? ($excludeExpense?->paroisse_id !== null ? (int) $excludeExpense->paroisse_id : null);
+
+        if (! CapitalMensuel::isValidEnvelope($moisCapital, $anneeCapital)) {
+            return [
+                'valid' => false,
+                'errors' => ['Le mois du capital (revenu principal) est obligatoire pour une dépense.'],
+                'total_alloue' => 0.0,
+            ];
+        }
 
         foreach ($fundingSources as $index => $source) {
             if (empty($source['caisse_id']) || ! isset($source['montant_alloue'])) {
@@ -358,16 +665,19 @@ class CaisseService
             $totalAlloue += $montantAlloue;
         }
 
+        $moisLabel = CapitalMensuel::formatEnvelopeLabel($moisCapital, $anneeCapital);
+
         foreach ($totalsByCaisse as $entry) {
             /** @var Caisse $caisse */
             $caisse = $entry['caisse'];
             $montantDemande = round((float) $entry['montant'], 2);
-            $solde = $this->getSolde($caisse, $excludeExpense);
+            $solde = $this->getSoldeMensuel($caisse, $moisCapital, $anneeCapital, $excludeExpense);
 
             if ($montantDemande > $solde) {
                 $errors[] = sprintf(
-                    '%s : montant demandé %s FCFA mais seulement %s FCFA disponible. Alimentez d\'abord cette caisse.',
+                    '%s (%s) : montant demandé %s FCFA mais seulement %s FCFA disponible. Alimentez d\'abord cette caisse pour ce mois.',
                     $caisse->nom,
+                    $moisLabel,
                     number_format($montantDemande, 0, ',', ' '),
                     number_format($solde, 0, ',', ' ')
                 );
@@ -403,6 +713,8 @@ class CaisseService
                 ->exists();
 
             if ($alreadySynced) {
+                $this->syncCreditFromBanqueRevenue($revenue);
+
                 continue;
             }
 
@@ -423,7 +735,7 @@ class CaisseService
             ->where('type', CaisseMouvement::TYPE_DEPENSE)
             ->delete();
 
-        foreach ($expense->fundingSources as $index => $source) {
+        foreach ($expense->fundingSources as $source) {
             if (! $source->caisse_id) {
                 continue;
             }
@@ -435,6 +747,8 @@ class CaisseService
                 'sens' => CaisseMouvement::SENS_DEBIT,
                 'montant' => $source->montant_alloue,
                 'date_mouvement' => $expense->date_depense?->format('Y-m-d') ?? now()->toDateString(),
+                'mois_capital' => $expense->mois_capital,
+                'annee_capital' => $expense->annee_capital,
                 'libelle' => $expense->libelle,
                 'expense_id' => $expense->id,
                 'expense_funding_source_id' => $source->id,

@@ -28,6 +28,8 @@ class CaisseMouvement extends Model
         'sens',
         'montant',
         'date_mouvement',
+        'mois_capital',
+        'annee_capital',
         'libelle',
         'notes',
         'revenue_id',

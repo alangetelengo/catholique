@@ -389,6 +389,8 @@ class AlignLegacyFinancesToCaissesCommand extends Command
                         $caisse->nom,
                         SubventionMensuelle::formatMoisCapital($moisCapital)
                     ),
+                    $moisCapital,
+                    (int) ($revenue->date_recette?->format('Y') ?? now()->format('Y')),
                     $revenue->notes,
                     $revenue->created_by ? (int) $revenue->created_by : null
                 );
@@ -484,6 +486,8 @@ class AlignLegacyFinancesToCaissesCommand extends Command
                         $caisse->nom,
                         SubventionMensuelle::formatMoisCapital($row['mois_capital'])
                     ),
+                    $row['mois_capital'],
+                    (int) substr($row['date_mouvement'], 0, 4),
                     $row['notes'],
                     $row['created_by']
                 );
@@ -620,6 +624,8 @@ class AlignLegacyFinancesToCaissesCommand extends Command
         float $montant,
         string $dateMouvement,
         string $libelle,
+        string $moisCapital,
+        int $anneeCapital,
         ?string $notes = null,
         ?int $createdBy = null
     ): void {
@@ -635,6 +641,8 @@ class AlignLegacyFinancesToCaissesCommand extends Command
             'sens' => CaisseMouvement::SENS_DEBIT,
             'montant' => $montant,
             'date_mouvement' => $dateMouvement,
+            'mois_capital' => $moisCapital,
+            'annee_capital' => $anneeCapital,
             'libelle' => $libelle,
             'notes' => $notes,
             'contrepartie_caisse_id' => $destination->id,
@@ -648,6 +656,8 @@ class AlignLegacyFinancesToCaissesCommand extends Command
             'sens' => CaisseMouvement::SENS_CREDIT,
             'montant' => $montant,
             'date_mouvement' => $dateMouvement,
+            'mois_capital' => $moisCapital,
+            'annee_capital' => $anneeCapital,
             'libelle' => $libelle,
             'notes' => $notes,
             'contrepartie_caisse_id' => $tresorerie->id,

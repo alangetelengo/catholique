@@ -2,9 +2,11 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Caisse;
 use App\Models\Expense;
 use App\Models\ExpenseType;
 use App\Services\CaisseService;
+use App\Support\CapitalMensuel;
 use App\Support\PaginationPerPage;
 use App\Traits\LogsErrors;
 use Carbon\Carbon;
@@ -63,15 +65,28 @@ class ExpenseController extends Controller
     {
         $userParoisseId = (int) $request->user()?->paroisse_id;
 
-        $caisses = $this->caisseService->getCaissesAvecSolde($userParoisseId, onlyOperatives: true, onlyWithSolde: true);
+        $envelopesDepense = $this->caisseService->getEnvelopesDepense($userParoisseId);
         $expenseTypes = ExpenseType::query()->where('actif', true)->orderBy('ordre')->orderBy('nom')->get();
 
         $expense = new Expense([
             'date_depense' => now()->toDateString(),
             'methode_paiement' => 'especes',
+            'mois_capital' => now()->format('m'),
+            'annee_capital' => (int) now()->format('Y'),
         ]);
 
-        return view('expenses.create', compact('expense', 'caisses', 'expenseTypes'));
+        $selectedMois = old('mois_capital', $expense->mois_capital);
+        $selectedAnnee = (int) old('annee_capital', $expense->annee_capital);
+        $caisses = $this->caisseService->getCaissesAvecSolde(
+            $userParoisseId,
+            onlyOperatives: true,
+            onlyWithSolde: true,
+            moisCapital: $selectedMois,
+            anneeCapital: $selectedAnnee
+        );
+        $caissesByEnvelope = $this->buildCaissesByEnvelopeJson($userParoisseId);
+
+        return view('expenses.create', compact('expense', 'caisses', 'expenseTypes', 'envelopesDepense', 'caissesByEnvelope'));
     }
 
     public function store(Request $request): RedirectResponse
@@ -92,6 +107,8 @@ class ExpenseController extends Controller
                             $expense->fundingSources()->create([
                                 'caisse_id' => $source['caisse_id'],
                                 'montant_alloue' => $source['montant_alloue'],
+                                'mois_capital' => $validated['mois_capital'],
+                                'annee_capital' => $validated['annee_capital'],
                                 'ordre' => $index + 1,
                             ]);
                         }
@@ -120,12 +137,24 @@ class ExpenseController extends Controller
     {
         $userParoisseId = (int) $request->user()?->paroisse_id;
 
-        $caisses = $this->caisseService->getCaissesAvecSolde($userParoisseId, $expense, onlyOperatives: true);
+        $selectedMois = old('mois_capital', $expense->mois_capital ?? now()->format('m'));
+        $selectedAnnee = (int) old('annee_capital', $expense->annee_capital ?? now()->format('Y'));
+
+        $caisses = $this->caisseService->getCaissesAvecSolde(
+            $userParoisseId,
+            $expense,
+            onlyOperatives: true,
+            moisCapital: $selectedMois,
+            anneeCapital: $selectedAnnee
+        );
         $usedCaisseIds = $expense->fundingSources()->whereNotNull('caisse_id')->pluck('caisse_id');
         $caisses = $caisses->filter(function ($caisse) use ($usedCaisseIds) {
             return round((float) ($caisse->solde_disponible ?? 0), 2) > 0
                 || $usedCaisseIds->contains($caisse->id);
         })->values();
+
+        $envelopesDepense = $this->caisseService->getEnvelopesDepense($userParoisseId, $expense);
+        $caissesByEnvelope = $this->buildCaissesByEnvelopeJson($userParoisseId, $expense);
 
         $expenseTypes = ExpenseType::query()
             ->where(function ($query) use ($expense): void {
@@ -140,7 +169,7 @@ class ExpenseController extends Controller
 
         $expense->load('fundingSources.caisse', 'expenseType');
 
-        return view('expenses.edit', compact('expense', 'caisses', 'expenseTypes'));
+        return view('expenses.edit', compact('expense', 'caisses', 'expenseTypes', 'envelopesDepense', 'caissesByEnvelope'));
     }
 
     public function update(Request $request, Expense $expense): RedirectResponse
@@ -163,6 +192,8 @@ class ExpenseController extends Controller
                             $expense->fundingSources()->create([
                                 'caisse_id' => $source['caisse_id'],
                                 'montant_alloue' => $source['montant_alloue'],
+                                'mois_capital' => $validated['mois_capital'],
+                                'annee_capital' => $validated['annee_capital'],
                                 'ordre' => $index + 1,
                             ]);
                         }
@@ -249,6 +280,8 @@ class ExpenseController extends Controller
                 }),
             ],
             'date_depense' => ['required', 'date'],
+            'mois_capital' => ['required', 'in:01,02,03,04,05,06,07,08,09,10,11,12'],
+            'annee_capital' => ['required', 'integer', 'min:2000', 'max:2100'],
             'montant' => ['required', 'numeric', 'min:0'],
             'libelle' => ['required', 'string', 'max:500'],
             'facture_reference' => ['nullable', 'string', 'max:255'],
@@ -271,7 +304,13 @@ class ExpenseController extends Controller
         $paroisseId = $expense?->paroisse_id
             ? (int) $expense->paroisse_id
             : (int) $request->user()?->paroisse_id;
-        $validation = $this->caisseService->validateFundingSources($fundingSources, $expense, $paroisseId);
+        $validation = $this->caisseService->validateFundingSources(
+            $fundingSources,
+            $expense,
+            $paroisseId,
+            $validated['mois_capital'],
+            (int) $validated['annee_capital']
+        );
 
         if (! $validation['valid']) {
             throw ValidationException::withMessages([
@@ -329,5 +368,41 @@ class ExpenseController extends Controller
         ];
 
         return $map[Carbon::parse($date)->dayOfWeek] ?? 'lundi';
+    }
+
+    /**
+     * @return array<string, list<array{id: int, code: string, nom: string, solde_disponible: float}>>
+     */
+    private function buildCaissesByEnvelopeJson(int $paroisseId, ?Expense $excludeExpense = null): array
+    {
+        $envelopes = $this->caisseService->getEnvelopesDepense($paroisseId, $excludeExpense);
+        $allCaisses = Caisse::query()
+            ->where('paroisse_id', $paroisseId)
+            ->where('actif', true)
+            ->where('est_tresorerie', false)
+            ->orderBy('ordre')
+            ->get();
+
+        $result = [];
+        foreach ($envelopes as $envelope) {
+            $key = CapitalMensuel::envelopeKey($envelope['mois_capital'], $envelope['annee_capital']);
+            $result[$key] = $allCaisses->map(function ($caisse) use ($envelope, $excludeExpense) {
+                $solde = app(CaisseService::class)->getSoldeMensuel(
+                    $caisse,
+                    $envelope['mois_capital'],
+                    $envelope['annee_capital'],
+                    $excludeExpense
+                );
+
+                return [
+                    'id' => $caisse->id,
+                    'code' => $caisse->code,
+                    'nom' => $caisse->nom,
+                    'solde_disponible' => round($solde, 2),
+                ];
+            })->filter(fn (array $row): bool => $row['solde_disponible'] > 0)->values()->all();
+        }
+
+        return $result;
     }
 }
