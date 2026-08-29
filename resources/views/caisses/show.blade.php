@@ -62,6 +62,7 @@
                         <th class="px-4 py-3 font-semibold">Libellé</th>
                         <th class="px-4 py-3 font-semibold text-right">Crédit</th>
                         <th class="px-4 py-3 font-semibold text-right">Débit</th>
+                        <th class="px-4 py-3 font-semibold text-right">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -76,10 +77,31 @@
                             <td class="px-4 py-3 text-right tabular-nums text-red-600 dark:text-red-400">
                                 {{ $mouvement->sens === 'debit' ? number_format($mouvement->montant, 0, ',', ' ') : '—' }}
                             </td>
+                            <td class="px-4 py-3">
+                                @if ($mouvement->can_edit_alimentation)
+                                    <div class="flex flex-wrap justify-end gap-2">
+                                        <x-action-button
+                                            variant="edit"
+                                            :href="route('caisses.mouvements.edit', $mouvement)"
+                                            title="Modifier"
+                                        />
+                                        <x-action-button
+                                            variant="delete"
+                                            method="DELETE"
+                                            :action="route('caisses.mouvements.destroy', $mouvement)"
+                                            confirm-message="Supprimer cette alimentation ? Si c’est un virement depuis la trésorerie, le capital du mois sera remis disponible."
+                                            confirm-text="Supprimer"
+                                            title="Supprimer"
+                                        />
+                                    </div>
+                                @else
+                                    <span class="block text-right text-xs text-slate-400">—</span>
+                                @endif
+                            </td>
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="5" class="px-4 py-6 text-center text-slate-500">Aucun mouvement.</td>
+                            <td colspan="6" class="px-4 py-6 text-center text-slate-500">Aucun mouvement.</td>
                         </tr>
                     @endforelse
                 </tbody>

@@ -443,6 +443,175 @@ class CaisseBusinessRulesTest extends TestCase
         $response->assertSee('Caisse alimentation', false);
     }
 
+    public function test_can_update_and_delete_virement_when_no_expense(): void
+    {
+        $paroisse = Paroisse::query()->create([
+            'nom' => 'Saint Esprit',
+            'code_paroisse' => 'SE-EDIT-VIR',
+        ]);
+        $user = User::factory()->create(['paroisse_id' => $paroisse->id]);
+
+        $banque = RevenueCategory::query()->create([
+            'paroisse_id' => $paroisse->id,
+            'code' => 'banque',
+            'nom' => 'BANQUE',
+            'actif' => true,
+            'ordre' => 0,
+        ]);
+        $type = RevenueType::query()->create([
+            'paroisse_id' => $paroisse->id,
+            'revenue_category_id' => $banque->id,
+            'code' => 'revenu_principal',
+            'nom' => 'Revenu principal',
+            'actif' => true,
+            'ordre' => 1,
+        ]);
+
+        $revenue = Revenue::query()->create([
+            'paroisse_id' => $paroisse->id,
+            'revenue_category_id' => $banque->id,
+            'revenue_type_id' => $type->id,
+            'montant' => 500000,
+            'date_recette' => '2026-08-01',
+            'mois_capital' => '08',
+            'statut' => 'valide',
+            'methode_paiement' => 'virement',
+            'created_by' => $user->id,
+        ]);
+
+        $service = app(CaisseService::class);
+        $service->syncCreditFromBanqueRevenue($revenue);
+        $salaires = Caisse::query()->where('paroisse_id', $paroisse->id)->where('code', 'salaires')->firstOrFail();
+        $pair = $service->virementTresorerieVersCaisse($salaires, 150000, '2026-08-05', 'Alim salaires', '08', 2026, null, $user->id);
+        $credit = $pair['credit'];
+
+        $this->actingAs($user);
+
+        $this->put(route('caisses.mouvements.update', $credit), [
+            'montant' => 100000,
+            'date_mouvement' => '2026-08-05',
+            'libelle' => 'Alim salaires corrigée',
+            'mois_capital' => '08',
+            'annee_capital' => 2026,
+        ])->assertRedirect(route('caisses.show', $salaires));
+
+        $this->assertSame(100000.0, $service->getSolde($salaires->fresh()));
+        $tresorerie = Caisse::query()->where('paroisse_id', $paroisse->id)->where('code', Caisse::CODE_TRESORERIE)->firstOrFail();
+        $this->assertSame(400000.0, $service->getSolde($tresorerie));
+
+        $credit->refresh();
+        $this->delete(route('caisses.mouvements.destroy', $credit))
+            ->assertRedirect(route('caisses.show', $salaires));
+
+        $this->assertSame(0.0, $service->getSolde($salaires->fresh()));
+        $this->assertSame(500000.0, $service->getSolde($tresorerie->fresh()));
+    }
+
+    public function test_cannot_delete_virement_when_expense_exists(): void
+    {
+        $paroisse = Paroisse::query()->create([
+            'nom' => 'Saint Esprit',
+            'code_paroisse' => 'SE-BLOCK-VIR',
+        ]);
+        $user = User::factory()->create(['paroisse_id' => $paroisse->id]);
+
+        $banque = RevenueCategory::query()->create([
+            'paroisse_id' => $paroisse->id,
+            'code' => 'banque',
+            'nom' => 'BANQUE',
+            'actif' => true,
+            'ordre' => 0,
+        ]);
+        $type = RevenueType::query()->create([
+            'paroisse_id' => $paroisse->id,
+            'revenue_category_id' => $banque->id,
+            'code' => 'revenu_principal',
+            'nom' => 'Revenu principal',
+            'actif' => true,
+            'ordre' => 1,
+        ]);
+
+        $revenue = Revenue::query()->create([
+            'paroisse_id' => $paroisse->id,
+            'revenue_category_id' => $banque->id,
+            'revenue_type_id' => $type->id,
+            'montant' => 200000,
+            'date_recette' => '2026-08-01',
+            'mois_capital' => '08',
+            'statut' => 'valide',
+            'methode_paiement' => 'virement',
+            'created_by' => $user->id,
+        ]);
+
+        $service = app(CaisseService::class);
+        $service->syncCreditFromBanqueRevenue($revenue);
+        $salaires = Caisse::query()->where('paroisse_id', $paroisse->id)->where('code', 'salaires')->firstOrFail();
+        $pair = $service->virementTresorerieVersCaisse($salaires, 100000, '2026-08-05', 'Alim salaires', '08', 2026, null, $user->id);
+
+        $expenseType = ExpenseType::query()->where('code', 'salaires')->first()
+            ?? ExpenseType::query()->where('code', 'autre')->firstOrFail();
+
+        $this->actingAs($user);
+        $this->post(route('expenses.store'), [
+            'expense_type_id' => $expenseType->id,
+            'date_depense' => '2026-08-10',
+            'mois_capital' => '08',
+            'annee_capital' => 2026,
+            'montant' => 20000,
+            'libelle' => 'Acompte salaire',
+            'methode_paiement' => 'especes',
+            'funding_sources' => [
+                ['caisse_id' => $salaires->id, 'montant_alloue' => 20000],
+            ],
+        ])->assertRedirect(route('expenses.index'));
+
+        $this->delete(route('caisses.mouvements.destroy', $pair['credit']))
+            ->assertSessionHasErrors('mouvement');
+
+        $this->assertSame(80000.0, $service->getSolde($salaires->fresh()));
+    }
+
+    public function test_cannot_move_credit_direct_to_envelope_with_expenses(): void
+    {
+        $paroisse = Paroisse::query()->create([
+            'nom' => 'Saint Esprit',
+            'code_paroisse' => 'SE-MOVE-CREDIT',
+        ]);
+        $user = User::factory()->create(['paroisse_id' => $paroisse->id]);
+        $liturgie = Caisse::query()->where('paroisse_id', $paroisse->id)->where('code', 'liturgie')->firstOrFail();
+        $service = app(CaisseService::class);
+
+        $creditAout = $service->creditDirect($liturgie, 50000, '2026-08-05', 'Crédit août', null, $user->id);
+        $service->creditDirect($liturgie, 30000, '2026-09-05', 'Crédit septembre', null, $user->id);
+
+        $expenseType = ExpenseType::query()->where('code', 'liturgie')->first()
+            ?? ExpenseType::query()->where('code', 'autre')->firstOrFail();
+
+        $this->actingAs($user);
+        $this->post(route('expenses.store'), [
+            'expense_type_id' => $expenseType->id,
+            'date_depense' => '2026-09-10',
+            'mois_capital' => '09',
+            'annee_capital' => 2026,
+            'montant' => 10000,
+            'libelle' => 'Dépense septembre',
+            'methode_paiement' => 'especes',
+            'funding_sources' => [
+                ['caisse_id' => $liturgie->id, 'montant_alloue' => 10000],
+            ],
+        ])->assertRedirect(route('expenses.index'));
+
+        $this->put(route('caisses.mouvements.update', $creditAout), [
+            'montant' => 50000,
+            'date_mouvement' => '2026-09-15',
+            'libelle' => 'Crédit déplacé en septembre',
+        ])->assertSessionHasErrors('montant');
+
+        $creditAout->refresh();
+        $this->assertSame('08', $creditAout->mois_capital);
+        $this->assertSame(2026, (int) $creditAout->annee_capital);
+    }
+
     public function test_monthly_envelopes_are_independent(): void
     {
         $paroisse = Paroisse::query()->create([

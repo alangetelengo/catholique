@@ -43,11 +43,122 @@ class CaisseController extends Controller
             ->orderByDesc('id')
             ->paginate(25)
             ->withQueryString();
+
+        $mouvements->getCollection()->transform(function (CaisseMouvement $mouvement) {
+            $mouvement->can_edit_alimentation = $this->caisseService->isAlimentationEditable($mouvement);
+
+            return $mouvement;
+        });
+
         $envelopesCapital = $caisse->isTresorerie()
             ? $this->caisseService->getEnvelopesCapital((int) $caisse->paroisse_id)
             : collect();
 
         return view('caisses.show', compact('caisse', 'mouvements', 'envelopesCapital'));
+    }
+
+    public function editMouvement(Request $request, CaisseMouvement $mouvement): View|RedirectResponse
+    {
+        $this->authorizeMouvement($request, $mouvement);
+
+        try {
+            $pair = $this->caisseService->resolveAlimentationPair($mouvement);
+            $this->caisseService->assertAlimentationEditable($mouvement);
+        } catch (InvalidArgumentException $e) {
+            $caisseId = $mouvement->caisse_id;
+
+            return redirect()
+                ->route('caisses.show', $caisseId)
+                ->with('error', $e->getMessage());
+        }
+
+        $credit = $pair['credit'];
+        $destination = $pair['destination'];
+        $paroisseId = (int) $destination->paroisse_id;
+        $envelopesCapital = $credit->type === CaisseMouvement::TYPE_VIREMENT
+            ? $this->caisseService->getEnvelopesCapital($paroisseId)
+            : collect();
+
+        // Remettre le montant du virement en disponible pour l'affichage de l'enveloppe courante
+        if ($credit->type === CaisseMouvement::TYPE_VIREMENT) {
+            $envelopesCapital = $envelopesCapital->map(function (array $envelope) use ($credit): array {
+                if ($envelope['mois_capital'] === (string) $credit->mois_capital
+                    && $envelope['annee_capital'] === (int) $credit->annee_capital) {
+                    $envelope['disponible'] = round($envelope['disponible'] + (float) $credit->montant, 2);
+                    $envelope['alloue'] = max(0.0, round($envelope['alloue'] - (float) $credit->montant, 2));
+                }
+
+                return $envelope;
+            });
+        }
+
+        return view('caisses.edit-mouvement', compact('credit', 'destination', 'envelopesCapital'));
+    }
+
+    public function updateMouvement(Request $request, CaisseMouvement $mouvement): RedirectResponse
+    {
+        $this->authorizeMouvement($request, $mouvement);
+
+        try {
+            $pair = $this->caisseService->resolveAlimentationPair($mouvement);
+            $isVirement = $pair['credit']->type === CaisseMouvement::TYPE_VIREMENT;
+
+            $rules = [
+                'montant' => ['required', 'numeric', 'min:0.01'],
+                'date_mouvement' => ['required', 'date'],
+                'libelle' => ['required', 'string', 'max:255'],
+                'notes' => ['nullable', 'string'],
+            ];
+
+            if ($isVirement) {
+                $rules['mois_capital'] = ['required', 'in:01,02,03,04,05,06,07,08,09,10,11,12'];
+                $rules['annee_capital'] = ['required', 'integer', 'min:2000', 'max:2100'];
+            }
+
+            $validated = $request->validate($rules);
+
+            $credit = $this->caisseService->updateAlimentation($mouvement, [
+                'montant' => (float) $validated['montant'],
+                'date_mouvement' => $validated['date_mouvement'],
+                'libelle' => $validated['libelle'],
+                'notes' => $validated['notes'] ?? null,
+                'mois_capital' => $validated['mois_capital'] ?? null,
+                'annee_capital' => isset($validated['annee_capital']) ? (int) $validated['annee_capital'] : null,
+            ]);
+
+            return redirect()
+                ->route('caisses.show', $credit->caisse_id)
+                ->with('success', 'Alimentation mise à jour.');
+        } catch (InvalidArgumentException $e) {
+            throw ValidationException::withMessages(['montant' => $e->getMessage()]);
+        } catch (Throwable $e) {
+            if ($e instanceof ValidationException) {
+                throw $e;
+            }
+            $this->logError($e, 'Erreur modification alimentation caisse');
+            throw $e;
+        }
+    }
+
+    public function destroyMouvement(Request $request, CaisseMouvement $mouvement): RedirectResponse
+    {
+        $this->authorizeMouvement($request, $mouvement);
+
+        try {
+            $destination = $this->caisseService->deleteAlimentation($mouvement);
+
+            return redirect()
+                ->route('caisses.show', $destination)
+                ->with('success', 'Alimentation supprimée. La source (trésorerie ou recette) a été recalculée.');
+        } catch (InvalidArgumentException $e) {
+            throw ValidationException::withMessages(['mouvement' => $e->getMessage()]);
+        } catch (Throwable $e) {
+            if ($e instanceof ValidationException) {
+                throw $e;
+            }
+            $this->logError($e, 'Erreur suppression alimentation caisse');
+            throw $e;
+        }
     }
 
     public function createCredit(Request $request): View
@@ -191,6 +302,13 @@ class CaisseController extends Controller
     private function authorizeCaisse(Request $request, Caisse $caisse): void
     {
         if ((int) $caisse->paroisse_id !== (int) $request->user()?->paroisse_id) {
+            abort(403);
+        }
+    }
+
+    private function authorizeMouvement(Request $request, CaisseMouvement $mouvement): void
+    {
+        if ((int) $mouvement->paroisse_id !== (int) $request->user()?->paroisse_id) {
             abort(403);
         }
     }

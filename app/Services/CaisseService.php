@@ -764,4 +764,247 @@ class CaisseService
             ->where('type', CaisseMouvement::TYPE_DEPENSE)
             ->delete();
     }
+
+    public function isAlimentationEditable(CaisseMouvement $mouvement): bool
+    {
+        try {
+            $this->assertAlimentationEditable($mouvement);
+
+            return true;
+        } catch (InvalidArgumentException) {
+            return false;
+        }
+    }
+
+    /**
+     * @return array{credit: CaisseMouvement, debit: ?CaisseMouvement, destination: Caisse}
+     */
+    public function resolveAlimentationPair(CaisseMouvement $mouvement): array
+    {
+        $editableTypes = [
+            CaisseMouvement::TYPE_CREDIT_DIRECT,
+            CaisseMouvement::TYPE_VIREMENT,
+            CaisseMouvement::TYPE_ALIMENTATION_RECETTE,
+        ];
+
+        if (! in_array($mouvement->type, $editableTypes, true)) {
+            throw new InvalidArgumentException('Ce type de mouvement ne peut pas être modifié ni supprimé ici.');
+        }
+
+        if ($mouvement->type === CaisseMouvement::TYPE_VIREMENT) {
+            if ($mouvement->sens === CaisseMouvement::SENS_CREDIT) {
+                $credit = $mouvement;
+                $debit = $mouvement->contrepartie_mouvement_id
+                    ? CaisseMouvement::query()->find($mouvement->contrepartie_mouvement_id)
+                    : null;
+            } else {
+                $debit = $mouvement;
+                $credit = $mouvement->contrepartie_mouvement_id
+                    ? CaisseMouvement::query()->find($mouvement->contrepartie_mouvement_id)
+                    : null;
+            }
+
+            if (! $credit || ! $debit) {
+                throw new InvalidArgumentException('La contrepartie du virement est introuvable.');
+            }
+
+            if ($credit->sens !== CaisseMouvement::SENS_CREDIT || $debit->sens !== CaisseMouvement::SENS_DEBIT) {
+                throw new InvalidArgumentException('Paire de virement invalide.');
+            }
+
+            $destination = Caisse::query()->findOrFail($credit->caisse_id);
+            if ($destination->isTresorerie()) {
+                throw new InvalidArgumentException('Le crédit du virement doit porter sur une caisse opérationnelle.');
+            }
+
+            return ['credit' => $credit, 'debit' => $debit, 'destination' => $destination];
+        }
+
+        if ($mouvement->sens !== CaisseMouvement::SENS_CREDIT) {
+            throw new InvalidArgumentException('Seul un crédit d\'alimentation peut être modifié ou supprimé.');
+        }
+
+        $destination = Caisse::query()->findOrFail($mouvement->caisse_id);
+        if ($destination->isTresorerie()) {
+            throw new InvalidArgumentException('Ce mouvement ne peut pas être modifié ici.');
+        }
+
+        return ['credit' => $mouvement, 'debit' => null, 'destination' => $destination];
+    }
+
+    public function assertAlimentationEditable(CaisseMouvement $mouvement): void
+    {
+        $pair = $this->resolveAlimentationPair($mouvement);
+        $credit = $pair['credit'];
+        $destination = $pair['destination'];
+
+        $envelope = $this->envelopeFromMouvement($credit);
+
+        if ($this->caisseHasDepensesSurEnvelope($destination, $envelope['mois_capital'], $envelope['annee_capital'])) {
+            throw new InvalidArgumentException(sprintf(
+                'Impossible : des dépenses ont déjà été enregistrées sur « %s » pour %s. Annulez d\'abord ces dépenses.',
+                $destination->nom,
+                CapitalMensuel::formatEnvelopeLabel($envelope['mois_capital'], $envelope['annee_capital'])
+            ));
+        }
+    }
+
+    public function caisseHasDepensesSurEnvelope(Caisse $caisse, string $moisCapital, int $anneeCapital): bool
+    {
+        return CaisseMouvement::query()
+            ->where('caisse_id', $caisse->id)
+            ->where('type', CaisseMouvement::TYPE_DEPENSE)
+            ->where('mois_capital', $moisCapital)
+            ->where('annee_capital', $anneeCapital)
+            ->exists();
+    }
+
+    /**
+     * @param  array{montant: float, date_mouvement: string, libelle: string, notes?: ?string, mois_capital?: ?string, annee_capital?: ?int}  $data
+     */
+    public function updateAlimentation(CaisseMouvement $mouvement, array $data): CaisseMouvement
+    {
+        $this->assertAlimentationEditable($mouvement);
+        $pair = $this->resolveAlimentationPair($mouvement);
+        $credit = $pair['credit'];
+        $debit = $pair['debit'];
+        $destination = $pair['destination'];
+
+        $montant = (float) $data['montant'];
+        $dateMouvement = $data['date_mouvement'];
+        $libelle = $data['libelle'];
+        $notes = $data['notes'] ?? null;
+
+        if ($montant <= 0) {
+            throw new InvalidArgumentException('Le montant doit être positif.');
+        }
+
+        if ($credit->type === CaisseMouvement::TYPE_VIREMENT && $debit) {
+            $oldEnvelope = $this->envelopeFromMouvement($credit);
+            $moisCapital = $data['mois_capital'] ?? $oldEnvelope['mois_capital'];
+            $anneeCapital = (int) ($data['annee_capital'] ?? $oldEnvelope['annee_capital']);
+
+            if (! CapitalMensuel::isValidEnvelope($moisCapital, $anneeCapital)) {
+                throw new InvalidArgumentException('Le mois du capital est invalide.');
+            }
+
+            if ($this->caisseHasDepensesSurEnvelope($destination, $moisCapital, $anneeCapital)
+                && ($moisCapital !== $oldEnvelope['mois_capital'] || $anneeCapital !== $oldEnvelope['annee_capital'])) {
+                throw new InvalidArgumentException(sprintf(
+                    'Impossible : des dépenses existent déjà sur « %s » pour %s.',
+                    $destination->nom,
+                    CapitalMensuel::formatEnvelopeLabel($moisCapital, $anneeCapital)
+                ));
+            }
+
+            $disponible = $this->getDisponibleTresorerieMois((int) $destination->paroisse_id, $moisCapital, $anneeCapital);
+            if ($moisCapital === $oldEnvelope['mois_capital'] && $anneeCapital === $oldEnvelope['annee_capital']) {
+                $disponible += (float) $credit->montant;
+            }
+
+            if ($montant > $disponible + 0.01) {
+                throw new InvalidArgumentException(sprintf(
+                    'Capital %s insuffisant : %s FCFA demandé, %s FCFA disponible en trésorerie.',
+                    CapitalMensuel::formatEnvelopeLabel($moisCapital, $anneeCapital),
+                    number_format($montant, 0, ',', ' '),
+                    number_format($disponible, 0, ',', ' ')
+                ));
+            }
+
+            $moisLabel = CapitalMensuel::formatEnvelopeLabel($moisCapital, $anneeCapital);
+            $tresorerie = $this->getTresorerie((int) $destination->paroisse_id);
+
+            return DB::transaction(function () use ($credit, $debit, $destination, $tresorerie, $montant, $dateMouvement, $libelle, $notes, $moisCapital, $anneeCapital, $moisLabel) {
+                $debit->update([
+                    'montant' => $montant,
+                    'date_mouvement' => $dateMouvement,
+                    'mois_capital' => $moisCapital,
+                    'annee_capital' => $anneeCapital,
+                    'libelle' => $libelle ?: 'Virement vers '.$destination->nom.' ('.$moisLabel.')',
+                    'notes' => $notes,
+                ]);
+
+                $credit->update([
+                    'montant' => $montant,
+                    'date_mouvement' => $dateMouvement,
+                    'mois_capital' => $moisCapital,
+                    'annee_capital' => $anneeCapital,
+                    'libelle' => $libelle ?: 'Virement depuis '.$tresorerie->nom.' ('.$moisLabel.')',
+                    'notes' => $notes,
+                ]);
+
+                return $credit->fresh();
+            });
+        }
+
+        if ($credit->type === CaisseMouvement::TYPE_ALIMENTATION_RECETTE && $credit->revenue_type_id) {
+            $revenueType = RevenueType::query()->findOrFail($credit->revenue_type_id);
+            $disponible = $this->getSoldeDisponibleRevenueType($revenueType) + (float) $credit->montant;
+            if ($montant > $disponible + 0.01) {
+                throw new InvalidArgumentException(sprintf(
+                    '%s : %s FCFA demandé, %s FCFA disponible.',
+                    $revenueType->nom,
+                    number_format($montant, 0, ',', ' '),
+                    number_format($disponible, 0, ',', ' ')
+                ));
+            }
+        }
+
+        $oldEnvelope = $this->envelopeFromMouvement($credit);
+        $envelope = CapitalMensuel::envelopeFromDate($dateMouvement);
+
+        if (($envelope['mois_capital'] !== $oldEnvelope['mois_capital']
+                || $envelope['annee_capital'] !== $oldEnvelope['annee_capital'])
+            && $this->caisseHasDepensesSurEnvelope($destination, $envelope['mois_capital'], $envelope['annee_capital'])) {
+            throw new InvalidArgumentException(sprintf(
+                'Impossible : des dépenses existent déjà sur « %s » pour %s.',
+                $destination->nom,
+                CapitalMensuel::formatEnvelopeLabel($envelope['mois_capital'], $envelope['annee_capital'])
+            ));
+        }
+
+        $credit->update([
+            'montant' => $montant,
+            'date_mouvement' => $dateMouvement,
+            'mois_capital' => $envelope['mois_capital'],
+            'annee_capital' => $envelope['annee_capital'],
+            'libelle' => $libelle,
+            'notes' => $notes,
+        ]);
+
+        return $credit->fresh();
+    }
+
+    public function deleteAlimentation(CaisseMouvement $mouvement): Caisse
+    {
+        $this->assertAlimentationEditable($mouvement);
+        $pair = $this->resolveAlimentationPair($mouvement);
+        $destination = $pair['destination'];
+
+        DB::transaction(function () use ($pair): void {
+            if ($pair['debit']) {
+                $pair['debit']->delete();
+            }
+            $pair['credit']->delete();
+        });
+
+        return $destination;
+    }
+
+    /**
+     * @return array{mois_capital: string, annee_capital: int}
+     */
+    private function envelopeFromMouvement(CaisseMouvement $mouvement): array
+    {
+        if ($mouvement->mois_capital !== null && $mouvement->mois_capital !== '' && $mouvement->annee_capital !== null) {
+            return [
+                'mois_capital' => (string) $mouvement->mois_capital,
+                'annee_capital' => (int) $mouvement->annee_capital,
+            ];
+        }
+
+        return CapitalMensuel::envelopeFromDate(
+            $mouvement->date_mouvement?->format('Y-m-d') ?? now()->toDateString()
+        );
+    }
 }

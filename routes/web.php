@@ -55,6 +55,9 @@ Route::middleware('auth')->group(function (): void {
     Route::post('caisses/credit', [CaisseController::class, 'storeCredit'])->name('caisses.credit.store');
     Route::get('caisses/virement', [CaisseController::class, 'createVirement'])->name('caisses.virement.create');
     Route::post('caisses/virement', [CaisseController::class, 'storeVirement'])->name('caisses.virement.store');
+    Route::get('caisses/mouvements/{mouvement}/edit', [CaisseController::class, 'editMouvement'])->name('caisses.mouvements.edit');
+    Route::put('caisses/mouvements/{mouvement}', [CaisseController::class, 'updateMouvement'])->name('caisses.mouvements.update');
+    Route::delete('caisses/mouvements/{mouvement}', [CaisseController::class, 'destroyMouvement'])->name('caisses.mouvements.destroy');
     Route::get('caisses/{caisse}', [CaisseController::class, 'show'])->name('caisses.show');
     Route::resource('inventories', InventoryController::class)->except(['show']);
     Route::resource('inventaire-magasin', InventaireMagasinController::class)->except(['show']);
