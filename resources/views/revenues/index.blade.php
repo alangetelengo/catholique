@@ -38,11 +38,19 @@
         </div>
         <div class="adventiste-card-pro-static p-4 border-t-4 border-t-rose-500">
             <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Total de dépensé</p>
-            <p class="mt-1 text-2xl font-bold text-rose-700 dark:text-rose-400">{{ $formatFcfa($totalMontantDepenses) }}</p>
+            @if ($soldeComparable ?? true)
+                <p class="mt-1 text-2xl font-bold text-rose-700 dark:text-rose-400">{{ $formatFcfa($totalMontantDepenses) }}</p>
+            @else
+                <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Non comparable avec le filtre catégorie / type / recherche.</p>
+            @endif
         </div>
-        <div class="adventiste-card-pro-static p-4 border-t-4 {{ $soldeRestant >= 0 ? 'border-t-sky-500' : 'border-t-amber-500' }}">
+        <div class="adventiste-card-pro-static p-4 border-t-4 {{ ($soldeComparable ?? true) && ($soldeRestant ?? 0) >= 0 ? 'border-t-sky-500' : (($soldeComparable ?? true) ? 'border-t-amber-500' : 'border-t-slate-300') }}">
             <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Solde restant</p>
-            <p class="mt-1 text-2xl font-bold {{ $soldeRestant >= 0 ? 'text-sky-800 dark:text-sky-300' : 'text-amber-700 dark:text-amber-400' }}">{{ $formatFcfa($soldeRestant) }}</p>
+            @if ($soldeComparable ?? true)
+                <p class="mt-1 text-2xl font-bold {{ ($soldeRestant ?? 0) >= 0 ? 'text-sky-800 dark:text-sky-300' : 'text-amber-700 dark:text-amber-400' }}">{{ $formatFcfa($soldeRestant) }}</p>
+            @else
+                <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Affiché uniquement pour une période (sans filtre catégorie / type / recherche).</p>
+            @endif
         </div>
     </div>
 

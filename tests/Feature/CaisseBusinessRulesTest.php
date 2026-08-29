@@ -12,6 +12,7 @@ use App\Models\RevenueType;
 use App\Models\User;
 use App\Services\CaisseService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Spatie\Permission\Models\Permission;
 use Tests\TestCase;
 
 class CaisseBusinessRulesTest extends TestCase
@@ -429,6 +430,9 @@ class CaisseBusinessRulesTest extends TestCase
         $service->syncCreditFromBanqueRevenue($revenue);
         $popote = Caisse::query()->where('paroisse_id', $paroisse->id)->where('code', 'alimentation_popote')->firstOrFail();
         $service->virementTresorerieVersCaisse($popote, 80000, '2026-08-12', 'Alim popote', '08', 2026, null, $user->id);
+
+        Permission::findOrCreate('view_financial_reports');
+        $user->givePermissionTo('view_financial_reports');
 
         $this->actingAs($user);
         $response = $this->get(route('financial-reports.capital-usage', [

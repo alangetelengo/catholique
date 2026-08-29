@@ -40,8 +40,15 @@ class RevenueController extends Controller
                 ->withQueryString();
 
             $totalMontantRecettes = (float) $this->revenuesIndexFilteredQuery($request)->sum('montant');
-            $totalMontantDepenses = (float) $this->expensesSummaryQuery($request)->sum('montant');
-            $soldeRestant = $totalMontantRecettes - $totalMontantDepenses;
+            $soldeComparable = ! $request->filled('categorie')
+                && ! $request->filled('type')
+                && ! $request->filled('q');
+            $totalMontantDepenses = $soldeComparable
+                ? (float) $this->expensesSummaryQuery($request)->sum('montant')
+                : null;
+            $soldeRestant = $soldeComparable && $totalMontantDepenses !== null
+                ? $totalMontantRecettes - $totalMontantDepenses
+                : null;
 
             $paroisseId = $this->resolveParoisseIdForContext($request);
             $categories = $paroisseId !== null
@@ -54,6 +61,7 @@ class RevenueController extends Controller
                 'totalMontantRecettes',
                 'totalMontantDepenses',
                 'soldeRestant',
+                'soldeComparable',
             ));
         } catch (Throwable $e) {
             $this->logError($e, 'Erreur lors du chargement des recettes');

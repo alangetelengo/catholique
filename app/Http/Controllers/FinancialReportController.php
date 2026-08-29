@@ -64,6 +64,7 @@ class FinancialReportController extends Controller implements HasMiddleware
                 'revenuesByCategory',
                 'revenueCategoriesForParoisse', 'revenueTypesForCategory', 'revenuesByCategoryCalculate',
                 'expensesByCategory', 'expensesByCategoryCalculate',
+                'capitalUsage',
             ]),
             new Middleware('permission:generate_financial_reports', only: [
                 'store', 'destroy', 'downloadPdf', 'downloadRevenuesWeeklyPdf',
@@ -1547,6 +1548,7 @@ class FinancialReportController extends Controller implements HasMiddleware
 
         $byType = [];
         $caisseBuckets = [];
+        $totalGeneral = 0.0;
 
         foreach ($expenses as $expense) {
             foreach ($expense->fundingSources as $fundingSource) {
@@ -1557,6 +1559,7 @@ class FinancialReportController extends Controller implements HasMiddleware
                 $caisse = $fundingSource->caisse;
                 $type = $fundingSource->revenueType;
                 $allocated = (float) $fundingSource->montant_alloue;
+                $totalGeneral += $allocated;
 
                 if ($caisse) {
                     $groupKey = 'caisse-'.$caisse->id;
@@ -1645,7 +1648,7 @@ class FinancialReportController extends Controller implements HasMiddleware
             'by_expense_type' => $byExpenseType,
             'subvention_envelopes' => [],
             'caisse_summary' => $caisseSummary,
-            'total_general' => (float) $expenses->sum('montant'),
+            'total_general' => round($totalGeneral, 2),
             'date_debut' => $dateDebut,
             'date_fin' => $dateFin,
         ];
