@@ -52,18 +52,22 @@ class FinancialReport extends Model
         $details = is_array($this->details_recettes) ? $this->details_recettes : [];
 
         return match ($this->periode_type) {
-            'charges_fixes' => route('charges-fixes-reports.edit', $this),
             'popote_subvention' => route('popote-reports.edit', $this),
+            'depenses' => route('financial-reports.expenses', array_filter([
+                'tab' => 'synthese',
+                'paroisse_id' => $this->paroisse_id,
+                'date_debut' => $this->date_debut?->format('Y-m-d'),
+                'date_fin' => $this->date_fin?->format('Y-m-d'),
+                'calculated' => 1,
+                'caisse_id' => is_array($this->details_depenses) ? ($this->details_depenses['caisse_id'] ?? null) : null,
+                'expense_type_id' => is_array($this->details_depenses) ? ($this->details_depenses['expense_type_id'] ?? null) : null,
+            ], fn ($value) => $value !== null && $value !== '')),
             'revenues_by_category' => isset($details['report_target'])
                 ? route('revenue-reports.edit', $this)
                 : route('financial-reports.revenues-by-category'),
             'total' => isset($details['report_target'])
                 ? route('revenue-reports.edit', $this)
-                : route('financial-reports.index', [
-                    'paroisse_id' => $this->paroisse_id,
-                    'month' => (int) ($this->date_debut?->month ?? 1),
-                    'year' => (int) ($this->date_debut?->year ?? now()->year),
-                ]),
+                : null,
             default => null,
         };
     }

@@ -16,27 +16,27 @@
         @vite(['resources/css/app.css', 'resources/js/app.js'])
         @stack('styles')
     </head>
-    <body class="font-sans antialiased min-h-screen bg-slate-100 dark:bg-slate-950">
+    <body class="font-sans antialiased min-h-screen bg-gray-100 dark:bg-slate-900">
         <div id="main-wrapper" style="display: flex; flex-direction: column; min-height: 100vh;">
         @include('partials.preload')
         @include('partials.nav-header')
         @include('partials.header')
         @include('partials.sidebar')
 
-        <div id="mainContent" class="main-content flex-1 flex flex-col transition-all duration-300 adventiste-content-canvas" style="margin-top: 80px;">
+        <div id="mainContent" class="main-content pt-20 flex-1 flex flex-col transition-all duration-300">
             @isset($header)
-                <header class="adventiste-page-header-shell relative">
-                    <div class="relative max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+                <header class="bg-white dark:bg-slate-800 shadow">
+                    <div class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
                         {{ $header }}
                     </div>
                 </header>
             @else
                 @hasSection('page-title')
-                <header class="@yield('page-header-class', 'adventiste-page-header-shell relative')">
-                    <div class="relative @yield('content-container-class', 'max-w-7xl mx-auto px-4 sm:px-6 lg:px-8') py-6 sm:py-8 flex flex-wrap items-start sm:items-center justify-between gap-4">
+                <header class="@yield('page-header-class', 'bg-white dark:bg-slate-800 shadow')">
+                    <div class="@yield('content-container-class', 'max-w-7xl mx-auto px-4 sm:px-6 lg:px-8') py-6 flex flex-wrap items-center justify-between gap-4">
                         <div class="min-w-0 flex-1">
-                            <h1 class="@yield('page-title-class', 'text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 dark:text-white')">@yield('page-title')</h1>
-                            @hasSection('page-title-info')<div class="@yield('page-title-info-class', 'mt-2 text-sm sm:text-base text-slate-600 dark:text-slate-400 leading-relaxed max-w-3xl')">@yield('page-title-info')</div>@endif
+                            <h1 class="@yield('page-title-class', 'text-2xl font-bold text-slate-800 dark:text-slate-100')">@yield('page-title')</h1>
+                            @hasSection('page-title-info')<div class="@yield('page-title-info-class', 'text-sm text-slate-500 dark:text-slate-400 mt-1')">@yield('page-title-info')</div>@endif
                         </div>
                         <div class="flex w-full min-w-0 shrink-0 flex-wrap items-center justify-end gap-2 sm:w-auto">
                             @unless(request()->routeIs('home'))
@@ -53,7 +53,7 @@
                 @endif
             @endisset
 
-            <main class="@yield('main-class', 'py-6 sm:py-8')">
+            <main class="@yield('main-class', 'py-6')">
                 <div class="@yield('content-container-class', 'max-w-7xl mx-auto px-4 sm:px-6 lg:px-8')">
                     @include('partials.flash-messages')
                     @hasSection('page-aide')

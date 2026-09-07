@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Caisse;
+use App\Models\CaisseMouvement;
 use App\Models\ExpenseType;
 use App\Models\Paroisse;
 use App\Models\Revenue;
@@ -30,20 +31,14 @@ class PopoteSubventionTest extends TestCase
         $service->creditDirect($popote, 700000, '2026-06-05', 'Crédit popote juin', null, $user->id);
         $this->assertSame(700000.0, $service->getSolde($popote));
 
-        $category = RevenueCategory::query()->create([
-            'paroisse_id' => $paroisse->id,
-            'code' => 'quete_ordinaire',
-            'nom' => 'Quête',
-            'actif' => true,
-            'ordre' => 1,
-        ]);
         $expenseType = ExpenseType::query()->where('code', 'alimentation_popote')->firstOrFail();
 
         $this->actingAs($user);
         $response = $this->post(route('expenses.store'), [
-            'revenue_category_id' => $category->id,
             'expense_type_id' => $expenseType->id,
             'date_depense' => '2026-06-12',
+            'mois_capital' => '06',
+            'annee_capital' => 2026,
             'montant' => 200000,
             'libelle' => 'Courses popote juin',
             'methode_paiement' => 'especes',
@@ -70,7 +65,7 @@ class PopoteSubventionTest extends TestCase
         $validation = $service->validateFundingSources([
             ['caisse_id' => $popote->id, 'montant_alloue' => 70000],
             ['caisse_id' => $popote->id, 'montant_alloue' => 50000],
-        ], null, $paroisse->id);
+        ], null, $paroisse->id, '06', 2026);
 
         $this->assertFalse($validation['valid']);
         $this->assertStringContainsString('100 000', $validation['errors'][0]);
@@ -85,20 +80,14 @@ class PopoteSubventionTest extends TestCase
         $caisseB = Caisse::query()->where('paroisse_id', $paroisseB->id)->where('code', 'liturgie')->firstOrFail();
         app(CaisseService::class)->creditDirect($caisseB, 50000, '2026-06-01', 'Crédit B', null, $user->id);
 
-        $category = RevenueCategory::query()->create([
-            'paroisse_id' => $paroisseA->id,
-            'code' => 'quete_ordinaire',
-            'nom' => 'Quête',
-            'actif' => true,
-            'ordre' => 1,
-        ]);
         $expenseType = ExpenseType::query()->where('code', 'autre')->firstOrFail();
 
         $this->actingAs($user);
         $response = $this->post(route('expenses.store'), [
-            'revenue_category_id' => $category->id,
             'expense_type_id' => $expenseType->id,
             'date_depense' => '2026-06-12',
+            'mois_capital' => '06',
+            'annee_capital' => 2026,
             'montant' => 10000,
             'libelle' => 'Dépense illicite',
             'methode_paiement' => 'especes',
@@ -210,12 +199,25 @@ class PopoteSubventionTest extends TestCase
             'created_by' => $user->id,
         ]);
 
+        $revenue = Revenue::query()->where('paroisse_id', $paroisse->id)->firstOrFail();
+
         $service = app(CaisseService::class);
         $tresorerie = Caisse::query()->where('paroisse_id', $paroisse->id)->where('code', Caisse::CODE_TRESORERIE)->firstOrFail();
-        $this->assertSame(0.0, $service->getSolde($tresorerie));
+        $this->assertFalse(
+            CaisseMouvement::query()
+                ->where('revenue_id', $revenue->id)
+                ->where('type', CaisseMouvement::TYPE_CREDIT_RECETTE)
+                ->exists()
+        );
 
         $created = $service->backfillBanqueCredits($paroisse->id);
         $this->assertSame(1, $created);
+        $this->assertTrue(
+            CaisseMouvement::query()
+                ->where('revenue_id', $revenue->id)
+                ->where('type', CaisseMouvement::TYPE_CREDIT_RECETTE)
+                ->exists()
+        );
         $this->assertSame(150000.0, $service->getSolde($tresorerie->fresh()));
         $this->assertSame(0, $service->backfillBanqueCredits($paroisse->id));
     }

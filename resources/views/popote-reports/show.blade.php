@@ -9,8 +9,9 @@
 @endsection
 
 @section('btn-create')
-    <a target="_blank" href="{{ route('popote-reports.print', $report) }}" class="adventiste-btn-secondary">Imprimer</a>
-    <a href="{{ route('popote-reports.pdf', $report) }}" class="adventiste-btn-secondary">Exporter PDF</a>
+    <a href="{{ route('popote-reports.print', $report) }}" class="adventiste-btn-primary no-underline inline-flex items-center">
+        <i class="fas fa-print me-1.5" aria-hidden="true"></i>Imprimer
+    </a>
 @endsection
 
 @section('content')

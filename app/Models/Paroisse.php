@@ -17,8 +17,8 @@ class Paroisse extends Model
         'telephone',
         'email',
         'code_paroisse',
-        'curé_id',
-        'diocèse',
+        'cure_id',
+        'diocese',
         'description',
         'actif',
     ];
@@ -65,9 +65,9 @@ class Paroisse extends Model
     /**
      * Relation avec le curé (membre)
      */
-    public function curé(): BelongsTo
+    public function cure(): BelongsTo
     {
-        return $this->belongsTo(Member::class, 'curé_id');
+        return $this->belongsTo(Member::class, 'cure_id');
     }
 
     /** Lignes d'inventaire (biens / matériel) rattachées à cette paroisse. */

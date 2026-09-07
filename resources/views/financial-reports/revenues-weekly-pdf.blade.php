@@ -84,7 +84,7 @@
             color: #666;
             text-align: center;
         }
-        @page { margin: 12mm; size: A4 portrait; }
+        @page { margin: 16mm; size: A4 portrait; }
     </style>
 </head>
 <body>

@@ -17,15 +17,7 @@
         $totalCaisseDepenses = (float) $caisseSummary->sum('depenses');
         $totalCaisseSolde = (float) $caisseSummary->sum('solde');
         $fundingSourceLabel = static function ($source): string {
-            if ($source->caisse) {
-                return $source->caisse->nom;
-            }
-            $type = $source->revenueType;
-            if (! $type) {
-                return '—';
-            }
-
-            return $type->nom.' (historique)';
+            return $source->caisse?->nom ?? '—';
         };
         $brandColor = $headerConfig['header_bg_color'] ?? '#003366';
     @endphp
@@ -186,7 +178,7 @@
             color: #94a3b8;
             text-align: center;
         }
-        @page { margin: 14mm; }
+        @page { margin: 16mm; }
     </style>
 </head>
 <body>

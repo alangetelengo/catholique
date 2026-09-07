@@ -20,8 +20,8 @@ return new class extends Migration
             $table->string('telephone')->nullable();
             $table->string('email')->nullable();
             $table->string('code_paroisse')->unique()->nullable();
-            $table->unsignedBigInteger('curé_id')->nullable();
-            $table->string('diocèse')->nullable();
+            $table->unsignedBigInteger('cure_id')->nullable();
+            $table->string('diocese')->nullable();
             $table->text('description')->nullable();
             $table->boolean('actif')->default(true);
             $table->timestamps();

@@ -1,17 +1,16 @@
 @extends('layouts.app')
 
 @section('title', 'Historique des rapports — Catholique')
-@section('page-title', 'Historique des rapports mensuels')
-@section('page-title-info', 'Tous les rapports mensuels enregistrés avec leurs statistiques. Versions figées : recettes hors Procure, dépenses toutes catégories, solde. Filtrez par paroisse et année.')
+@section('page-title', 'Historique des rapports')
+@section('page-title-info', 'Rapports enregistrés (recettes, dépenses, popote). Les anciens rapports mensuels mixtes restent consultables en lecture seule.')
 
 @section('btn-create')
     <div class="flex flex-wrap items-center gap-2">
-        <a href="{{ route('financial-reports.statistics') }}" class="adventiste-btn-secondary text-sm">
-            <i class="fas fa-chart-bar me-1.5" aria-hidden="true"></i>Statistiques détaillées
+        <a href="{{ route('financial-reports.revenues-by-category') }}" class="adventiste-btn-secondary text-sm">
+            <i class="fas fa-layer-group me-1.5" aria-hidden="true"></i>Rapport recettes
         </a>
-        <a href="{{ route('financial-reports.list') }}" class="adventiste-btn-secondary text-sm">Rafraîchir</a>
-        <a href="{{ route('financial-reports.index') }}" class="adventiste-btn-primary">
-            <i class="fas fa-file-invoice-dollar me-2" aria-hidden="true"></i>Générer un rapport
+        <a href="{{ route('financial-reports.expenses') }}" class="adventiste-btn-primary">
+            <i class="fas fa-receipt me-2" aria-hidden="true"></i>Rapport dépenses
         </a>
     </div>
 @endsection
@@ -147,11 +146,12 @@
             </div>
             <h3 class="text-lg font-semibold text-slate-800 dark:text-slate-100">Aucun rapport enregistré</h3>
             <p class="mt-2 text-sm text-slate-600 dark:text-slate-400 max-w-md mx-auto">
-                Générez un rapport mensuel depuis le hub des rapports financiers pour l’enregistrer ici.
+                Enregistrez un rapport recettes ou dépenses pour le retrouver ici.
             </p>
-            <a href="{{ route('financial-reports.index') }}" class="adventiste-btn-primary mt-6 inline-flex">
-                <i class="fas fa-file-invoice-dollar me-2" aria-hidden="true"></i>Générer un rapport
-            </a>
+            <div class="mt-6 flex flex-wrap justify-center gap-2">
+                <a href="{{ route('financial-reports.revenues-by-category') }}" class="adventiste-btn-secondary inline-flex">Rapport recettes</a>
+                <a href="{{ route('financial-reports.expenses') }}" class="adventiste-btn-primary inline-flex">Rapport dépenses</a>
+            </div>
         </div>
     @endif
 @endsection

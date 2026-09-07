@@ -6,8 +6,8 @@ use App\Models\Paroisse;
 use App\Services\FinancialStatisticsService;
 use App\Traits\LogsErrors;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Http\Response;
 use Illuminate\View\View;
 use OpenSpout\Common\Entity\Row;
 use OpenSpout\Writer\XLSX\Writer;
@@ -57,7 +57,7 @@ class FinancialStatisticsController extends Controller
         }
     }
 
-    public function exportPdf(Request $request): Response
+    public function exportPdf(Request $request): View|RedirectResponse
     {
         try {
             $filters = $this->statisticsService->resolveFilters($request);
@@ -68,7 +68,13 @@ class FinancialStatisticsController extends Controller
 
             $filename = 'statistiques-financieres-'.now()->format('Y-m-d').'.pdf';
 
-            return $pdf->download($filename);
+            return view('financial-reports.viewer-pdf', [
+                'content' => $pdf->output(),
+                'titre' => 'Statistiques financières',
+                'sousTitre' => ($filters['date_from'] ?? '').' → '.($filters['date_to'] ?? ''),
+                'downloadName' => $filename,
+                'retourUrl' => route('financial-statistics.index', $request->query()),
+            ]);
         } catch (Throwable $e) {
             $this->logError($e, 'Erreur export PDF statistiques financières');
 

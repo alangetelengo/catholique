@@ -61,7 +61,9 @@
                 <button type="submit" class="adventiste-btn-primary">Actualiser</button>
                 <a href="{{ route('financial-statistics.index') }}" class="adventiste-btn-secondary">Réinitialiser</a>
                 <span class="text-slate-400 dark:text-slate-500">|</span>
-                <a href="{{ route('financial-statistics.pdf', $exportQuery) }}" class="adventiste-btn-secondary">Export PDF</a>
+                <a href="{{ route('financial-statistics.pdf', $exportQuery) }}" class="adventiste-btn-primary no-underline inline-flex items-center">
+                    <i class="fas fa-print me-1.5" aria-hidden="true"></i>Imprimer
+                </a>
                 <a href="{{ route('financial-statistics.excel', $exportQuery) }}" class="adventiste-btn-secondary">Export Excel</a>
             </div>
         </form>

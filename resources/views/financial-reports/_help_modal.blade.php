@@ -1,5 +1,5 @@
 {{-- Modal Aide rapports financiers (HTML dialog + Tailwind) --}}
-<dialog id="financialReportHelpModal" class="max-w-3xl w-[calc(100%-2rem)] rounded-2xl border border-slate-200/80 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-2xl p-0 backdrop:bg-slate-900/50">
+<dialog id="financialReportHelpModal" class="m-auto max-w-3xl w-[calc(100%-2rem)] rounded-2xl border border-slate-200/80 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-2xl p-0 backdrop:bg-slate-900/50">
     <div class="px-6 py-4 border-b border-slate-200 dark:border-slate-600 flex items-start justify-between gap-4">
         <h2 class="text-lg font-semibold text-slate-900 dark:text-white m-0 flex items-center gap-2" id="financialReportHelpModalLabel">
             <i class="fas fa-info-circle text-emerald-600 dark:text-emerald-400" aria-hidden="true"></i>

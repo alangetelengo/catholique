@@ -1,5 +1,5 @@
 @php
-    $navBase = 'flex items-center gap-3 px-5 py-3 rounded-xl text-white/85 hover:bg-[rgba(212,168,75,0.12)] hover:text-white transition-all border border-transparent hover:border-[rgba(212,168,75,0.15)]';
+    $navBase = 'flex items-center gap-3 px-5 py-3 rounded-lg text-white/80 hover:bg-[rgba(0,234,255,0.1)] hover:text-white transition-all';
     $isInventoryRoute = request()->routeIs('inventories.*', 'inventaire-magasin.*', 'inventaire-patrimoine.*');
     // Recettes : saisie uniquement
     $isRevenueRoute = request()->routeIs('revenues.*');
@@ -8,20 +8,16 @@
     
     // Rapports mensuels (tous les rapports exportables)
     $isMonthlyReportsRoute = request()->routeIs(
-        'financial-reports.index',
         'financial-reports.list',
         'financial-reports.show',
         'financial-reports.statistics',
         'financial-reports.download-pdf',
         'financial-reports.revenues-by-category*',
-        'financial-reports.expenses-by-category*',
-        'financial-reports.capital-usage*'
+        'financial-reports.expenses*'
     );
-    $isMonthlyReportsGeneration = request()->routeIs('financial-reports.index');
     $isMonthlyReportsHistory = request()->routeIs('financial-reports.list', 'financial-reports.show', 'financial-reports.statistics', 'financial-reports.download-pdf');
     $isMonthlyReportsRevenues = request()->routeIs('financial-reports.revenues-by-category*');
-    $isMonthlyReportsExpenses = request()->routeIs('financial-reports.expenses-by-category*');
-    $isMonthlyReportsCapital = request()->routeIs('financial-reports.capital-usage*');
+    $isMonthlyReportsExpenses = request()->routeIs('financial-reports.expenses*', 'financial-reports.capital-usage*');
     
     // Statistiques (vue d'ensemble uniquement)
     $isStatsRoute = request()->routeIs('financial-statistics.*');
@@ -125,16 +121,14 @@
                 <details class="group" @if($isMonthlyReportsRoute) open @endif>
                     <summary class="{{ $isMonthlyReportsRoute ? $navBase . ' nav-link-active' : $navBase }} cursor-pointer list-none">
                         <span>📋</span>
-                        <span class="nav-text">Rapports mensuels</span>
+                        <span class="nav-text">Rapports financiers</span>
                         <span class="sidebar-chevron" aria-hidden="true"></span>
                     </summary>
                     <ul class="sidebar-sub-menu mt-1">
                         @can('view_financial_reports')
-                        <li class="sidebar-sub-item"><a href="{{ route('financial-reports.index') }}" class="sidebar-sub-link {{ $isMonthlyReportsGeneration ? 'is-active' : '' }}">Génération mensuelle</a></li>
                         <li class="sidebar-sub-item"><a href="{{ route('financial-reports.list') }}" class="sidebar-sub-link {{ $isMonthlyReportsHistory ? 'is-active' : '' }}">Historique</a></li>
                         <li class="sidebar-sub-item"><a href="{{ route('financial-reports.revenues-by-category') }}" class="sidebar-sub-link {{ $isMonthlyReportsRevenues ? 'is-active' : '' }}">Recettes par catégorie</a></li>
-                        <li class="sidebar-sub-item"><a href="{{ route('financial-reports.expenses-by-category') }}" class="sidebar-sub-link {{ $isMonthlyReportsExpenses ? 'is-active' : '' }}">Dépenses par catégorie</a></li>
-                        <li class="sidebar-sub-item"><a href="{{ route('financial-reports.capital-usage') }}" class="sidebar-sub-link {{ $isMonthlyReportsCapital ? 'is-active' : '' }}">Capital → dépenses</a></li>
+                        <li class="sidebar-sub-item"><a href="{{ route('financial-reports.expenses') }}" class="sidebar-sub-link {{ $isMonthlyReportsExpenses ? 'is-active' : '' }}">Rapport dépenses</a></li>
                         @endcan
                     </ul>
                 </details>
@@ -166,7 +160,7 @@
                     </ul>
                 </details>
             </li>
-            <li class="pt-2 mt-1 border-t border-[rgba(212,168,75,0.28)]">
+            <li class="pt-2 mt-1 border-t border-white/10">
                 <form method="POST" action="{{ route('logout') }}" class="m-0">
                     @csrf
                     <button type="submit" class="{{ $navBase }} w-full text-left font-sans cursor-pointer appearance-none bg-transparent">
@@ -179,7 +173,7 @@
         </ul>
     </nav>
 
-    <div class="shrink-0 p-4 border-t border-[rgba(212,168,75,0.28)] bg-[rgba(0,0,0,0.22)]">
+    <div class="shrink-0 p-4 border-t border-white/10 bg-[rgba(0,0,0,0.22)]">
         <p class="px-2 text-center leading-snug nav-text">
             <span class="block text-xs font-bold uppercase tracking-wide text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]">{{ config('app.name') }}</span>
             @auth
@@ -210,10 +204,10 @@
     font-size: 0.95rem;
     line-height: 1;
     opacity: 0.95;
-    color: #f2c86b;
-    border: 1px solid rgba(212, 168, 75, 0.5);
+    color: #00ff88;
+    border: 1px solid rgba(0, 180, 100, 0.5);
     border-radius: 9999px;
-    background: rgba(212, 168, 75, 0.12);
+    background: rgba(0, 180, 100, 0.12);
     transition: background-color 0.2s ease, border-color 0.2s ease;
 }
 .sidebar .sidebar-chevron::before {
@@ -222,14 +216,14 @@
     transform: translateY(-0.5px);
 }
 .sidebar details[open] > summary .sidebar-chevron {
-    color: #fff3d1;
+    color: #fff;
 }
 .sidebar details[open] > summary .sidebar-chevron::before {
     content: '-';
 }
 .sidebar details > summary:hover .sidebar-chevron {
-    background: rgba(212, 168, 75, 0.2);
-    border-color: rgba(212, 168, 75, 0.7);
+    background: rgba(0, 180, 100, 0.2);
+    border-color: rgba(0, 255, 136, 0.7);
 }
 .sidebar .sidebar-sub-item + .sidebar-sub-item {
     margin-top: 0.125rem;
@@ -250,17 +244,17 @@
     width: 0.35rem;
     height: 0.35rem;
     border-radius: 9999px;
-    background: rgba(212, 168, 75, 0.7);
-    box-shadow: 0 0 0 1px rgba(212, 168, 75, 0.25);
+    background: rgba(0, 180, 100, 0.7);
+    box-shadow: 0 0 0 1px rgba(0, 180, 100, 0.25);
 }
 .sidebar .sidebar-sub-link:hover {
     color: #ffffff !important;
-    background: rgba(212, 168, 75, 0.12);
+    background: rgba(0, 234, 255, 0.1);
 }
 .sidebar .sidebar-sub-link.is-active {
     color: #ffffff !important;
-    background: linear-gradient(105deg, rgba(6, 162, 105, 0.55) 0%, rgba(28, 77, 59, 0.55) 100%) !important;
-    border: 1px solid rgba(212, 168, 75, 0.3);
+    background: linear-gradient(to right, #06a269, #1c4d3b) !important;
+    border: 1px solid transparent;
 }
 #main-wrapper.menu-toggle .sidebar details > ul {
     display: none !important;

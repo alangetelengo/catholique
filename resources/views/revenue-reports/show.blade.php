@@ -9,7 +9,9 @@
 @endsection
 
 @section('btn-create')
-    <a href="{{ route('revenue-reports.print', $report) }}" target="_blank" class="adventiste-btn-secondary">Imprimer</a>
+    <a href="{{ route('revenue-reports.print', $report) }}" class="adventiste-btn-primary no-underline inline-flex items-center">
+        <i class="fas fa-print me-1.5" aria-hidden="true"></i>Imprimer
+    </a>
     <a href="{{ route('revenue-reports.edit', $report) }}" class="adventiste-btn-secondary">Modifier</a>
 @endsection
 

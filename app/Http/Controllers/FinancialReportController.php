@@ -4,15 +4,13 @@ namespace App\Http\Controllers;
 
 use App\Helpers\FlashAlert;
 use App\Helpers\ParoisseConfig;
-use App\Models\Caisse;
-use App\Models\CaisseMouvement;
 use App\Models\Expense;
-use App\Models\ExpenseType;
 use App\Models\FinancialReport;
 use App\Models\Paroisse;
 use App\Models\Revenue;
 use App\Models\RevenueCategory;
 use App\Models\RevenueType;
+use App\Services\ExpenseReportService;
 use App\Support\FinancialReportSignatories;
 use App\Support\PaginationPerPage;
 use App\Support\SubventionMensuelle;
@@ -26,7 +24,6 @@ use Illuminate\Http\Response;
 use Illuminate\Routing\Controllers\HasMiddleware;
 use Illuminate\Routing\Controllers\Middleware;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
@@ -35,6 +32,10 @@ use Throwable;
 class FinancialReportController extends Controller implements HasMiddleware
 {
     use LogsErrors;
+
+    public function __construct(
+        private readonly ExpenseReportService $expenseReportService
+    ) {}
 
     /**
      * Recettes prises en compte dans le rapport hub mensuel
@@ -60,111 +61,16 @@ class FinancialReportController extends Controller implements HasMiddleware
     {
         return [
             new Middleware('permission:view_financial_reports', only: [
-                'index', 'list', 'show', 'statistics', 'revenuesWeekly', 'revenuesWeeklyPrint',
-                'revenuesByCategory',
+                'list', 'show', 'statistics', 'revenuesWeekly', 'revenuesWeeklyPrint',
+                'downloadRevenuesWeeklyPdf', 'printViewer', 'downloadPdf',
+                'revenuesByCategory', 'downloadRevenuesByCategoryPdf',
                 'revenueCategoriesForParoisse', 'revenueTypesForCategory', 'revenuesByCategoryCalculate',
-                'expensesByCategory', 'expensesByCategoryCalculate',
-                'capitalUsage',
             ]),
             new Middleware('permission:generate_financial_reports', only: [
-                'store', 'destroy', 'downloadPdf', 'downloadRevenuesWeeklyPdf',
-                'storeRevenuesByCategory', 'downloadRevenuesByCategoryPdf', 'downloadExpensesByCategoryPdf',
+                'destroy', 'downloadPdf', 'downloadRevenuesWeeklyPdf',
+                'storeRevenuesByCategory',
             ]),
         ];
-    }
-
-    public function index(Request $request): View
-    {
-        try {
-            $user = $request->user();
-
-            $paroisses = $user->hasRole('super_admin')
-                ? Paroisse::orderBy('nom')->get()
-                : Paroisse::whereKey($user->paroisse_id)->get();
-
-            $selectedParoisseId = $request->integer('paroisse_id', $user->hasRole('super_admin') ? null : $user->paroisse_id);
-            $selectedMonth = $request->integer('month', now()->month);
-            $selectedYear = $request->integer('year', now()->year);
-
-            $report = null;
-            if ($selectedParoisseId) {
-                $dateDebut = Carbon::create($selectedYear, $selectedMonth, 1)->startOfMonth();
-                $dateFin = $dateDebut->copy()->endOfMonth();
-
-                $report = $this->calculateReport($selectedParoisseId, $dateDebut, $dateFin);
-            }
-
-            return view('financial-reports.index', [
-                'paroisses' => $paroisses,
-                'selectedParoisseId' => $selectedParoisseId,
-                'selectedMonth' => $selectedMonth,
-                'selectedYear' => $selectedYear,
-                'report' => $report,
-            ]);
-        } catch (Throwable $e) {
-            $this->logError($e, 'Erreur lors du chargement des rapports financiers');
-            FlashAlert::error('Une erreur est survenue lors du chargement des rapports.');
-
-            return view('financial-reports.index', [
-                'paroisses' => collect(),
-                'selectedParoisseId' => null,
-                'selectedMonth' => now()->month,
-                'selectedYear' => now()->year,
-                'report' => null,
-            ]);
-        }
-    }
-
-    public function store(Request $request): RedirectResponse
-    {
-        try {
-            $user = $request->user();
-
-            $validated = $request->validate([
-                'paroisse_id' => ['required', 'exists:paroisses,id'],
-                'month' => ['required', 'integer', 'min:1', 'max:12'],
-                'year' => ['required', 'integer', 'min:2000', 'max:2100'],
-            ]);
-
-            if (! $user->hasRole('super_admin') && (int) $validated['paroisse_id'] !== (int) $user->paroisse_id) {
-                Log::channel('paroisse')->warning('Rapport financier refusé : paroisse non autorisée', [
-                    'user_id' => $user->id,
-                    'user_paroisse_id' => $user->paroisse_id,
-                    'request_paroisse_id' => $validated['paroisse_id'],
-                    'url' => $request->fullUrl(),
-                ]);
-                FlashAlert::error('Vous ne pouvez générer des rapports que pour votre paroisse.');
-
-                return redirect()->back();
-            }
-
-            $dateDebut = Carbon::create($validated['year'], $validated['month'], 1)->startOfMonth();
-            $dateFin = $dateDebut->copy()->endOfMonth();
-
-            $report = $this->calculateReport($validated['paroisse_id'], $dateDebut, $dateFin);
-
-            $financialReport = FinancialReport::create([
-                'paroisse_id' => $validated['paroisse_id'],
-                'periode_type' => 'total',
-                'date_debut' => $dateDebut,
-                'date_fin' => $dateFin,
-                'total_recettes' => $report['total_recettes'],
-                'total_depenses' => $report['total_depenses'],
-                'solde' => $report['solde'],
-                'details_recettes' => $report['details_recettes'],
-                'details_depenses' => $report['details_depenses'],
-                'created_by' => $user->id,
-            ]);
-
-            FlashAlert::success('Rapport financier enregistré avec succès.');
-
-            return redirect()->route('financial-reports.show', $financialReport);
-        } catch (Throwable $e) {
-            $this->logError($e, 'Erreur lors de l\'enregistrement du rapport financier', ['data' => $request->all()]);
-            FlashAlert::error('Une erreur est survenue lors de l\'enregistrement du rapport.');
-
-            return redirect()->back()->withInput();
-        }
     }
 
     public function destroy(Request $request, FinancialReport $financialReport): RedirectResponse
@@ -173,7 +79,7 @@ class FinancialReportController extends Controller implements HasMiddleware
             $user = $request->user();
 
             if (! $user->hasRole('super_admin') && (int) $financialReport->paroisse_id !== (int) $user->paroisse_id) {
-                FlashAlert::error('Vous n\'avez pas accès à ce rapport.');
+                FlashAlert::error('Vous n\'avez pas accès à  ce rapport.');
 
                 return redirect()->route('financial-reports.list');
             }
@@ -192,7 +98,7 @@ class FinancialReportController extends Controller implements HasMiddleware
     }
 
     /**
-     * Calcule un rapport financier pour une paroisse et une période donnée.
+     * Calcule un rapport financier legacy (hub mensuel) pour affichage des snapshots « total ».
      */
     private function calculateReport(int $paroisseId, Carbon $dateDebut, Carbon $dateFin): array
     {
@@ -412,7 +318,7 @@ class FinancialReportController extends Controller implements HasMiddleware
 
             // Vérifier l'accès
             if (! $user->hasRole('super_admin') && $financialReport->paroisse_id !== $user->paroisse_id) {
-                FlashAlert::error('Vous n\'avez pas accès à ce rapport.');
+                FlashAlert::error('Vous n\'avez pas accès à  ce rapport.');
 
                 return redirect()->route('financial-reports.list');
             }
@@ -437,6 +343,24 @@ class FinancialReportController extends Controller implements HasMiddleware
                 ]);
             }
 
+            if ($financialReport->periode_type === 'depenses') {
+                $details = is_array($financialReport->details_depenses) ? $financialReport->details_depenses : [];
+
+                return redirect()->route('financial-reports.expenses', array_filter([
+                    'tab' => 'synthese',
+                    'paroisse_id' => $financialReport->paroisse_id,
+                    'date_debut' => $financialReport->date_debut?->format('Y-m-d'),
+                    'date_fin' => $financialReport->date_fin?->format('Y-m-d'),
+                    'calculated' => 1,
+                    'caisse_id' => $details['caisse_id'] ?? null,
+                    'expense_type_id' => $details['expense_type_id'] ?? null,
+                ], fn ($value) => $value !== null && $value !== ''));
+            }
+
+            if ($financialReport->periode_type === 'popote_subvention') {
+                return redirect()->route('popote-reports.show', $financialReport);
+            }
+
             $report = $this->calculateReport($financialReport->paroisse_id, $dateDebut, $dateFin);
 
             return view('financial-reports.show', [
@@ -454,71 +378,194 @@ class FinancialReportController extends Controller implements HasMiddleware
     public function downloadPdf(FinancialReport $financialReport): Response|RedirectResponse
     {
         try {
-            $user = request()->user();
-
-            // Vérifier l'accès
-            if (! $user->hasRole('super_admin') && $financialReport->paroisse_id !== $user->paroisse_id) {
-                FlashAlert::error('Vous n\'avez pas accès à ce rapport.');
-
-                return redirect()->route('financial-reports.list');
+            $built = $this->buildStoredReportPdf($financialReport);
+            if ($built instanceof RedirectResponse) {
+                return $built;
             }
 
-            $dateDebut = $financialReport->date_debut;
-            $dateFin = $financialReport->date_fin;
-
-            if ($financialReport->periode_type === 'revenues_by_category') {
-                $details = $financialReport->details_recettes ?? [];
-                $categoryId = $details['revenue_category_id'] ?? null;
-                $typeId = isset($details['revenue_type_id']) ? (int) $details['revenue_type_id'] : null;
-                $report = $this->calculateRevenuesByCategoryReport($financialReport->paroisse_id, $dateDebut, $dateFin, $categoryId, $typeId);
-                $paroisse = $financialReport->paroisse;
-                $headerConfig = $this->getHeaderConfig($financialReport->paroisse_id);
-
-                $pdfCategoryNom = $categoryId ? RevenueCategory::query()->whereKey($categoryId)->value('nom') : null;
-                $pdfTypeNom = $typeId ? RevenueType::query()->whereKey($typeId)->value('nom') : null;
-                $layout = $this->revenuesByCategoryReportLayout($typeId, $categoryId);
-
-                $pdf = Pdf::loadView('financial-reports.revenues-by-category-pdf', [
-                    'report' => $report,
-                    'paroisse' => $paroisse,
-                    'headerConfig' => $headerConfig,
-                    'dateDebut' => $dateDebut,
-                    'dateFin' => $dateFin,
-                    'selectedCategoryId' => $categoryId,
-                    'selectedTypeId' => $typeId,
-                    'pdfCategoryNom' => $pdfCategoryNom,
-                    'pdfTypeNom' => $pdfTypeNom,
-                    ...$layout,
-                ])->setPaper('a4', 'portrait');
-
-                $filename = 'rapport-recettes-par-categorie-'.Str::slug($paroisse->nom).'-'.$dateDebut->format('Y-m-d').'-'.$dateFin->format('Y-m-d').'.pdf';
-
-                return $pdf->download($filename);
-            }
-
-            $report = $this->calculateReport($financialReport->paroisse_id, $dateDebut, $dateFin);
-
-            $paroisse = $financialReport->paroisse;
-            $headerConfig = $this->getHeaderConfig($financialReport->paroisse_id);
-
-            // Générer le PDF
-            $pdf = Pdf::loadView('financial-reports.pdf', [
-                'financialReport' => $financialReport,
-                'report' => $report,
-                'paroisse' => $paroisse,
-                'headerConfig' => $headerConfig,
-                'signataires' => FinancialReportSignatories::defaultPdfBlocks(),
-            ])->setPaper('a4', 'portrait');
-
-            $filename = 'rapport-financier-'.$financialReport->paroisse->nom.'-'.$dateDebut->format('Y-m').'.pdf';
-
-            return $pdf->download($filename);
+            return $built['pdf']->download($built['filename']);
         } catch (Throwable $e) {
             $this->logError($e, 'Erreur lors de la génération du PDF', ['report_id' => $financialReport->id]);
             FlashAlert::error('Une erreur est survenue lors de la génération du PDF.');
 
             return redirect()->route('financial-reports.show', $financialReport);
         }
+    }
+
+    /**
+     * Aperçu PDF dans l’application (iframe + téléchargement), style cosud.
+     */
+    public function printViewer(FinancialReport $financialReport): View|RedirectResponse
+    {
+        try {
+            $built = $this->buildStoredReportPdf($financialReport);
+            if ($built instanceof RedirectResponse) {
+                return $built;
+            }
+
+            return view('financial-reports.viewer-pdf', [
+                'content' => $built['pdf']->output(),
+                'titre' => $built['titre'],
+                'sousTitre' => $built['sousTitre'],
+                'downloadName' => $built['filename'],
+                'retourUrl' => route('financial-reports.show', $financialReport),
+            ]);
+        } catch (Throwable $e) {
+            $this->logError($e, 'Erreur lors de l\'aperçu PDF', ['report_id' => $financialReport->id]);
+            FlashAlert::error('Une erreur est survenue lors de la génération de l\'aperçu PDF.');
+
+            return redirect()->route('financial-reports.show', $financialReport);
+        }
+    }
+
+    /**
+     * @return array{pdf: \Barryvdh\DomPDF\PDF, filename: string, titre: string, sousTitre: string}|RedirectResponse
+     */
+    private function buildStoredReportPdf(FinancialReport $financialReport): array|RedirectResponse
+    {
+        $user = request()->user();
+
+        if (! $user->hasRole('super_admin') && $financialReport->paroisse_id !== $user->paroisse_id) {
+            FlashAlert::error('Vous n\'avez pas accès à ce rapport.');
+
+            return redirect()->route('financial-reports.list');
+        }
+
+        $dateDebut = $financialReport->date_debut;
+        $dateFin = $financialReport->date_fin;
+        $periodeLabel = $dateDebut->format('d/m/Y').' au '.$dateFin->format('d/m/Y');
+
+        if ($financialReport->periode_type === 'revenues_by_category') {
+            $details = $financialReport->details_recettes ?? [];
+            $categoryId = $details['revenue_category_id'] ?? null;
+            $typeId = isset($details['revenue_type_id']) ? (int) $details['revenue_type_id'] : null;
+            $report = $this->calculateRevenuesByCategoryReport($financialReport->paroisse_id, $dateDebut, $dateFin, $categoryId, $typeId);
+            $paroisse = $financialReport->paroisse;
+            $headerConfig = $this->getHeaderConfig($financialReport->paroisse_id);
+
+            $pdfCategoryNom = $categoryId ? RevenueCategory::query()->whereKey($categoryId)->value('nom') : null;
+            $pdfTypeNom = $typeId ? RevenueType::query()->whereKey($typeId)->value('nom') : null;
+            $layout = $this->revenuesByCategoryReportLayout($typeId, $categoryId);
+
+            $pdf = Pdf::loadView('financial-reports.revenues-by-category-pdf', [
+                'report' => $report,
+                'paroisse' => $paroisse,
+                'headerConfig' => $headerConfig,
+                'dateDebut' => $dateDebut,
+                'dateFin' => $dateFin,
+                'selectedCategoryId' => $categoryId,
+                'selectedTypeId' => $typeId,
+                'pdfCategoryNom' => $pdfCategoryNom,
+                'pdfTypeNom' => $pdfTypeNom,
+                ...$layout,
+            ])->setPaper('a4', 'portrait');
+
+            return [
+                'pdf' => $pdf,
+                'filename' => 'rapport-recettes-par-categorie-'.Str::slug($paroisse->nom).'-'.$dateDebut->format('Y-m-d').'-'.$dateFin->format('Y-m-d').'.pdf',
+                'titre' => 'Rapport recettes par catégorie',
+                'sousTitre' => $periodeLabel,
+            ];
+        }
+
+        if ($financialReport->periode_type === 'depenses') {
+            $details = is_array($financialReport->details_depenses) ? $financialReport->details_depenses : [];
+            $caisseId = isset($details['caisse_id']) ? (int) $details['caisse_id'] : null;
+            $expenseTypeId = isset($details['expense_type_id']) ? (int) $details['expense_type_id'] : null;
+            $dateDebutCarbon = Carbon::parse($dateDebut)->startOfDay();
+            $dateFinCarbon = Carbon::parse($dateFin)->endOfDay();
+
+            $report = $this->expenseReportService->calculateSummaryReport(
+                (int) $financialReport->paroisse_id,
+                $dateDebutCarbon,
+                $dateFinCarbon,
+                $caisseId,
+                $expenseTypeId
+            );
+
+            $paroisse = $financialReport->paroisse;
+            $headerConfig = $this->getHeaderConfig($financialReport->paroisse_id);
+
+            $pdf = Pdf::loadView('financial-reports.expenses-pdf', [
+                'report' => $report,
+                'paroisse' => $paroisse,
+                'headerConfig' => $headerConfig,
+                'dateDebut' => $dateDebutCarbon,
+                'dateFin' => $dateFinCarbon,
+                'selectedCaisseId' => $caisseId,
+                'selectedExpenseTypeId' => $expenseTypeId,
+                'signataires' => FinancialReportSignatories::defaultPdfBlocks(),
+            ])->setPaper('a4', 'portrait');
+
+            return [
+                'pdf' => $pdf,
+                'filename' => 'rapport-depenses-'.Str::slug($paroisse->nom).'-'.$dateDebutCarbon->format('Y-m-d').'-'.$dateFinCarbon->format('Y-m-d').'.pdf',
+                'titre' => 'Rapport dépenses',
+                'sousTitre' => $periodeLabel,
+            ];
+        }
+
+        if ($financialReport->periode_type === 'popote_subvention') {
+            $detailsRecettes = (array) ($financialReport->details_recettes ?? []);
+            $detailsDepenses = (array) ($financialReport->details_depenses ?? []);
+            $paroisse = $financialReport->paroisse;
+
+            $pdf = Pdf::loadView('popote-reports.pdf', [
+                'report' => $financialReport,
+                'detailsRecettes' => $detailsRecettes,
+                'detailsDepenses' => $detailsDepenses,
+                'rowsRecettes' => collect($detailsRecettes['revenues'] ?? []),
+                'rowsDepenses' => collect($detailsDepenses['expenses'] ?? []),
+                'paroisse' => $paroisse,
+            ])->setPaper('a4', 'portrait');
+
+            return [
+                'pdf' => $pdf,
+                'filename' => 'rapport-subvention-popote-'.optional($dateDebut)->format('Y-m-d').'.pdf',
+                'titre' => 'Rapport Caisse Popote',
+                'sousTitre' => $periodeLabel,
+            ];
+        }
+
+        $detailsRecettes = is_array($financialReport->details_recettes) ? $financialReport->details_recettes : [];
+        if ($financialReport->periode_type === 'total' && isset($detailsRecettes['report_target'])) {
+            $paroisse = $financialReport->paroisse;
+            $rows = collect($detailsRecettes['revenues'] ?? []);
+
+            $pdf = Pdf::loadView('revenue-reports.pdf', [
+                'report' => $financialReport,
+                'details' => $detailsRecettes,
+                'rows' => $rows,
+                'paroisse' => $paroisse,
+                'signataires' => FinancialReportSignatories::defaultPdfBlocks(),
+            ])->setPaper('a4', 'portrait');
+
+            return [
+                'pdf' => $pdf,
+                'filename' => 'rapport-recettes-'.Str::slug($paroisse->nom ?? 'paroisse').'-'.$dateDebut->format('Y-m-d').'.pdf',
+                'titre' => 'Rapport de recettes',
+                'sousTitre' => $periodeLabel,
+            ];
+        }
+
+        $report = $this->calculateReport($financialReport->paroisse_id, $dateDebut, $dateFin);
+        $paroisse = $financialReport->paroisse;
+        $headerConfig = $this->getHeaderConfig($financialReport->paroisse_id);
+
+        $pdf = Pdf::loadView('financial-reports.pdf', [
+            'financialReport' => $financialReport,
+            'report' => $report,
+            'paroisse' => $paroisse,
+            'headerConfig' => $headerConfig,
+            'signataires' => FinancialReportSignatories::defaultPdfBlocks(),
+        ])->setPaper('a4', 'portrait');
+
+        return [
+            'pdf' => $pdf,
+            'filename' => 'rapport-financier-'.Str::slug($paroisse->nom).'-'.$dateDebut->format('Y-m').'.pdf',
+            'titre' => 'Rapport financier mensuel',
+            'sousTitre' => $periodeLabel,
+        ];
     }
 
     /**
@@ -597,7 +644,7 @@ class FinancialReportController extends Controller implements HasMiddleware
     }
 
     /**
-     * Vue imprimable du rapport des revenus (Quête ordinaire) — une page, bouton Imprimer.
+     * Aperçu PDF du rapport des revenus (Quête ordinaire) — iframe + téléchargement.
      */
     public function revenuesWeeklyPrint(Request $request): View|RedirectResponse
     {
@@ -630,13 +677,34 @@ class FinancialReportController extends Controller implements HasMiddleware
             $paroisse = Paroisse::find($validated['paroisse_id']);
             $headerConfig = $this->getHeaderConfig($validated['paroisse_id']);
 
-            return view('financial-reports.revenues-weekly-print', [
+            $pdf = Pdf::loadView('financial-reports.revenues-weekly-pdf', [
                 'report' => $report,
                 'paroisse' => $paroisse,
                 'headerConfig' => $headerConfig,
                 'dateDebut' => $dateDebut,
                 'dateFin' => $dateFin,
                 'periodType' => $validated['period_type'],
+            ])->setPaper('a4', 'portrait');
+
+            $periodLabel = $validated['period_type'] === 'week'
+                ? 'Semaine du '.$dateDebut->format('d/m/Y')
+                : $dateDebut->copy()->locale(app()->getLocale())->translatedFormat('F Y');
+            $filenamePeriod = $validated['period_type'] === 'week'
+                ? 'semaine-'.$dateDebut->format('Y-m-d')
+                : $dateDebut->format('Y-m');
+
+            return view('financial-reports.viewer-pdf', [
+                'content' => $pdf->output(),
+                'titre' => 'Rapport des revenus — Quête ordinaire',
+                'sousTitre' => ($paroisse?->nom ?? 'Paroisse').' — '.$periodLabel,
+                'downloadName' => 'rapport-revenus-'.Str::slug($paroisse?->nom ?? 'paroisse').'-'.$filenamePeriod.'.pdf',
+                'retourUrl' => route('financial-reports.revenues-weekly', array_filter([
+                    'paroisse_id' => $validated['paroisse_id'],
+                    'period_type' => $validated['period_type'],
+                    'week_start' => $validated['week_start'] ?? null,
+                    'month' => $validated['month'] ?? null,
+                    'year' => $validated['year'] ?? null,
+                ], fn ($v) => $v !== null && $v !== '')),
             ]);
         } catch (ValidationException $e) {
             throw $e;
@@ -648,65 +716,9 @@ class FinancialReportController extends Controller implements HasMiddleware
         }
     }
 
-    public function downloadRevenuesWeeklyPdf(Request $request)
+    public function downloadRevenuesWeeklyPdf(Request $request): View|RedirectResponse
     {
-        try {
-            $user = $request->user();
-
-            $validated = $request->validate([
-                'paroisse_id' => ['required', 'exists:paroisses,id'],
-                'period_type' => ['required', 'in:week,month'],
-                'week_start' => ['required_if:period_type,week', 'date'],
-                'month' => ['required_if:period_type,month', 'integer', 'min:1', 'max:12'],
-                'year' => ['required_if:period_type,month', 'integer', 'min:2000', 'max:2100'],
-            ]);
-
-            if (! $user->hasRole('super_admin') && (int) $validated['paroisse_id'] !== (int) $user->paroisse_id) {
-                Log::channel('paroisse')->warning('Rapport revenus (Quête ordinaire) refusé : paroisse non autorisée', [
-                    'user_id' => $user->id,
-                    'user_paroisse_id' => $user->paroisse_id,
-                    'request_paroisse_id' => $validated['paroisse_id'],
-                    'url' => $request->fullUrl(),
-                ]);
-                FlashAlert::error('Vous ne pouvez générer des rapports que pour votre paroisse.');
-
-                return redirect()->back();
-            }
-
-            if ($validated['period_type'] === 'week') {
-                // Utiliser la date de début de semaine (lundi)
-                $dateDebut = Carbon::parse($validated['week_start'])->startOfWeek();
-                $dateFin = $dateDebut->copy()->endOfWeek();
-            } else {
-                $dateDebut = Carbon::create($validated['year'], $validated['month'], 1)->startOfMonth();
-                $dateFin = $dateDebut->copy()->endOfMonth();
-            }
-
-            $report = $this->calculateRevenuesWeeklyReport($validated['paroisse_id'], $dateDebut, $dateFin);
-            $paroisse = Paroisse::find($validated['paroisse_id']);
-            $headerConfig = $this->getHeaderConfig($validated['paroisse_id']);
-
-            $pdf = Pdf::loadView('financial-reports.revenues-weekly-pdf', [
-                'report' => $report,
-                'paroisse' => $paroisse,
-                'headerConfig' => $headerConfig,
-                'dateDebut' => $dateDebut,
-                'dateFin' => $dateFin,
-                'periodType' => $validated['period_type'],
-            ])->setPaper('a4', 'portrait');
-
-            $periodLabel = $validated['period_type'] === 'week'
-                ? 'semaine-'.$dateDebut->format('Y-m-d')
-                : $dateDebut->format('Y-m');
-            $filename = 'rapport-revenus-'.$paroisse->nom.'-'.$periodLabel.'.pdf';
-
-            return $pdf->download($filename);
-        } catch (Throwable $e) {
-            $this->logError($e, 'Erreur lors de la génération du PDF des revenus', ['data' => $request->all()]);
-            FlashAlert::error('Une erreur est survenue lors de la génération du PDF.');
-
-            return redirect()->back();
-        }
+        return $this->revenuesWeeklyPrint($request);
     }
 
     /**
@@ -1054,7 +1066,7 @@ class FinancialReportController extends Controller implements HasMiddleware
         }
     }
 
-    public function downloadRevenuesByCategoryPdf(Request $request): Response|RedirectResponse
+    public function downloadRevenuesByCategoryPdf(Request $request): View|RedirectResponse
     {
         try {
             $user = $request->user();
@@ -1119,7 +1131,19 @@ class FinancialReportController extends Controller implements HasMiddleware
 
             $filename = 'rapport-recettes-par-categorie-'.Str::slug($paroisse->nom).'-'.$dateDebut->format('Y-m-d').'-'.$dateFin->format('Y-m-d').'.pdf';
 
-            return $pdf->download($filename);
+            return view('financial-reports.viewer-pdf', [
+                'content' => $pdf->output(),
+                'titre' => 'Rapport recettes par catégorie',
+                'sousTitre' => $dateDebut->format('d/m/Y').' au '.$dateFin->format('d/m/Y'),
+                'downloadName' => $filename,
+                'retourUrl' => route('financial-reports.revenues-by-category', array_filter([
+                    'paroisse_id' => (int) $validated['paroisse_id'],
+                    'date_debut' => $validated['date_debut'],
+                    'date_fin' => $validated['date_fin'],
+                    'revenue_category_id' => $selectedCategoryId,
+                    'revenue_type_id' => $selectedTypeId,
+                ], fn ($v) => $v !== null && $v !== '')),
+            ]);
         } catch (Throwable $e) {
             $this->logError($e, 'Erreur génération PDF rapport recettes par catégorie', ['data' => $request->all()]);
             FlashAlert::error('Une erreur est survenue lors de la génération du PDF.');
@@ -1301,590 +1325,6 @@ class FinancialReportController extends Controller implements HasMiddleware
             'date_debut' => $dateDebut,
             'date_fin' => $dateFin,
             'weekly' => $weekly,
-        ];
-    }
-
-    /**
-     * @return list<string>
-     */
-    /**
-     * Rapport par catégories de dépenses — page initiale ; calcul via AJAX.
-     */
-    public function expensesByCategory(Request $request): View
-    {
-        try {
-            $user = $request->user();
-
-            $paroisses = $user->hasRole('super_admin')
-                ? Paroisse::orderBy('nom')->get()
-                : Paroisse::whereKey($user->paroisse_id)->get();
-
-            $selectedParoisseId = $user->hasRole('super_admin')
-                ? null
-                : (int) $user->paroisse_id;
-
-            $now = now();
-            $dateDebut = $now->copy()->startOfMonth()->format('Y-m-d');
-            $dateFin = $now->copy()->endOfMonth()->format('Y-m-d');
-
-            // Caisses = sources de financement des dépenses
-            $caissesQuery = Caisse::query()
-                ->where('actif', true)
-                ->orderBy('ordre')
-                ->orderBy('nom');
-
-            if ($selectedParoisseId) {
-                $caissesQuery->where('paroisse_id', $selectedParoisseId);
-            } elseif ($user->hasRole('super_admin')) {
-                $caissesQuery->with('paroisse:id,nom');
-            } else {
-                $caissesQuery->whereRaw('1 = 0');
-            }
-
-            $caisses = $caissesQuery->get();
-
-            $expenseTypes = ExpenseType::query()
-                ->where('actif', true)
-                ->orderBy('ordre')
-                ->orderBy('nom')
-                ->get();
-
-            return view('financial-reports.expenses-by-category', [
-                'paroisses' => $paroisses,
-                'selectedParoisseId' => $selectedParoisseId,
-                'dateDebut' => $dateDebut,
-                'dateFin' => $dateFin,
-                'caisses' => $caisses,
-                'expenseTypes' => $expenseTypes,
-                'ajaxCalculateRoute' => route('financial-reports.expenses-by-category.calculate'),
-            ]);
-        } catch (Throwable $e) {
-            $this->logError($e, 'Erreur rapport par catégories de dépenses');
-            FlashAlert::error('Une erreur est survenue lors du chargement du rapport.');
-
-            return view('financial-reports.expenses-by-category', [
-                'paroisses' => collect(),
-                'selectedParoisseId' => null,
-                'dateDebut' => now()->startOfMonth()->format('Y-m-d'),
-                'dateFin' => now()->endOfMonth()->format('Y-m-d'),
-                'caisses' => collect(),
-                'expenseTypes' => collect(),
-                'ajaxCalculateRoute' => route('financial-reports.expenses-by-category.calculate'),
-            ]);
-        }
-    }
-
-    public function expensesByCategoryCalculate(Request $request): JsonResponse
-    {
-        try {
-            $user = $request->user();
-
-            $validated = $request->validate([
-                'paroisse_id' => ['required', 'integer', 'exists:paroisses,id'],
-                'date_debut' => ['required', 'date'],
-                'date_fin' => ['required', 'date', 'after_or_equal:date_debut'],
-                'caisse_id' => ['nullable', 'integer', 'exists:caisses,id'],
-                'expense_type_id' => ['nullable', 'integer', 'exists:expense_types,id'],
-            ]);
-
-            if (! $user->hasRole('super_admin') && (int) $validated['paroisse_id'] !== (int) $user->paroisse_id) {
-                return response()->json(['message' => 'Vous ne pouvez consulter que les rapports de votre paroisse.'], 403);
-            }
-
-            $caisseId = $validated['caisse_id'] ?? null;
-            $expenseTypeId = $validated['expense_type_id'] ?? null;
-
-            $dateDebut = Carbon::parse($validated['date_debut'])->startOfDay();
-            $dateFin = Carbon::parse($validated['date_fin'])->endOfDay();
-
-            $report = $this->calculateExpensesByCategoryReport(
-                (int) $validated['paroisse_id'],
-                $dateDebut,
-                $dateFin,
-                $caisseId,
-                $expenseTypeId
-            );
-
-            $html = view('financial-reports.partials.expenses-by-category-report-body', [
-                'report' => $report,
-                'dateDebut' => $validated['date_debut'],
-                'dateFin' => $validated['date_fin'],
-                'selectedCaisseId' => $caisseId,
-                'selectedExpenseTypeId' => $expenseTypeId,
-            ])->render();
-
-            $pdfUrl = route('financial-reports.expenses-by-category.pdf', array_filter([
-                'paroisse_id' => (int) $validated['paroisse_id'],
-                'date_debut' => $validated['date_debut'],
-                'date_fin' => $validated['date_fin'],
-                'caisse_id' => $caisseId,
-                'expense_type_id' => $expenseTypeId,
-            ]));
-
-            return response()->json([
-                'html' => $html,
-                'pdf_url' => $pdfUrl,
-                'period_label' => $dateDebut->format('d/m/Y').' - '.$dateFin->format('d/m/Y'),
-            ]);
-        } catch (Throwable $e) {
-            $this->logError($e, 'Erreur calcul rapport par catégories de dépenses', $request->all());
-
-            return response()->json([
-                'message' => 'Une erreur est survenue lors du calcul du rapport. '.$e->getMessage(),
-            ], 500);
-        }
-    }
-
-    public function downloadExpensesByCategoryPdf(Request $request): Response|RedirectResponse
-    {
-        try {
-            $user = $request->user();
-
-            $validated = $request->validate([
-                'paroisse_id' => ['required', 'exists:paroisses,id'],
-                'date_debut' => ['required', 'date'],
-                'date_fin' => ['required', 'date', 'after_or_equal:date_debut'],
-                'caisse_id' => ['nullable', 'integer', 'exists:caisses,id'],
-                'expense_type_id' => ['nullable', 'integer', 'exists:expense_types,id'],
-            ]);
-
-            if (! $user->hasRole('super_admin') && (int) $validated['paroisse_id'] !== (int) $user->paroisse_id) {
-                FlashAlert::error('Vous ne pouvez générer des rapports que pour votre paroisse.');
-
-                return redirect()->back();
-            }
-
-            $dateDebut = Carbon::parse($validated['date_debut'])->startOfDay();
-            $dateFin = Carbon::parse($validated['date_fin'])->endOfDay();
-            $caisseId = $validated['caisse_id'] ?? null;
-            $expenseTypeId = $validated['expense_type_id'] ?? null;
-
-            $report = $this->calculateExpensesByCategoryReport(
-                (int) $validated['paroisse_id'],
-                $dateDebut,
-                $dateFin,
-                $caisseId,
-                $expenseTypeId
-            );
-
-            $paroisse = Paroisse::find($validated['paroisse_id']);
-            $headerConfig = $this->getHeaderConfig($validated['paroisse_id']);
-
-            $pdf = Pdf::loadView('financial-reports.expenses-by-category-pdf', [
-                'report' => $report,
-                'paroisse' => $paroisse,
-                'headerConfig' => $headerConfig,
-                'dateDebut' => $dateDebut,
-                'dateFin' => $dateFin,
-                'selectedCaisseId' => $caisseId,
-                'selectedExpenseTypeId' => $expenseTypeId,
-                'signataires' => FinancialReportSignatories::defaultPdfBlocks(),
-            ])->setPaper('a4', 'portrait');
-
-            $filename = 'rapport-depenses-par-caisse-'.Str::slug($paroisse->nom).'-'.$dateDebut->format('Y-m-d').'-'.$dateFin->format('Y-m-d').'.pdf';
-
-            return $pdf->download($filename);
-        } catch (Throwable $e) {
-            $this->logError($e, 'Erreur génération PDF rapport dépenses par catégorie', ['data' => $request->all()]);
-            FlashAlert::error('Une erreur est survenue lors de la génération du PDF.');
-
-            return redirect()->back();
-        }
-    }
-
-    /**
-     * @return array{
-     *     expenses: Collection<int, Expense>,
-     *     by_category: array<string, array{id: int, nom: string, montant: float, count: int}>,
-     *     by_type: array<string, array{id: int, nom: string, montant: float, count: int, mois_subvention: string|null, mois_label: string|null}>,
-     *     by_expense_type: array<int|string, array{id: int|null, nom: string, montant: float, count: int}>,
-     *     subvention_envelopes: list<array{key: string, type_id: int, type_nom: string, mois_subvention: string|null, mois_label: string|null, label: string, subvention_recue: float|null, depenses: float, solde: float|null, count: int}>,
-     *     caisse_summary: list<array{key: string, caisse_id: int, nom: string, credits: float, depenses: float, solde: float, count: int}>,
-     *     total_general: float,
-     *     date_debut: Carbon,
-     *     date_fin: Carbon
-     * }
-     */
-    private function calculateExpensesByCategoryReport(
-        int $paroisseId,
-        Carbon $dateDebut,
-        Carbon $dateFin,
-        ?int $caisseId = null,
-        ?int $expenseTypeId = null
-    ): array {
-        $query = Expense::query()
-            ->with(['revenueCategory', 'expenseType', 'fundingSources.caisse', 'fundingSources.revenueType', 'fundingSources.revenue'])
-            ->where('paroisse_id', $paroisseId)
-            ->where('statut', 'valide')
-            ->whereDate('date_depense', '>=', $dateDebut)
-            ->whereDate('date_depense', '<=', $dateFin);
-
-        if ($expenseTypeId) {
-            $query->where('expense_type_id', $expenseTypeId);
-        }
-
-        if ($caisseId) {
-            $query->whereHas('fundingSources', function ($fundingQuery) use ($caisseId): void {
-                $fundingQuery->where('caisse_id', $caisseId);
-            });
-        }
-
-        $expenses = $query->orderBy('date_depense')->orderBy('id')->get();
-
-        $byCategory = [];
-        $byExpenseType = [];
-        foreach ($expenses->groupBy('expense_type_id') as $typeId => $items) {
-            $expenseType = $items->first()?->expenseType;
-            $key = $typeId ?: 'sans_type';
-            $byExpenseType[$key] = [
-                'id' => $typeId ? (int) $typeId : null,
-                'nom' => $expenseType?->nom ?? 'Sans type',
-                'montant' => (float) $items->sum('montant'),
-                'count' => $items->count(),
-            ];
-        }
-
-        uasort($byExpenseType, fn (array $a, array $b): int => $b['montant'] <=> $a['montant']);
-
-        $byType = [];
-        $caisseBuckets = [];
-        $totalGeneral = 0.0;
-
-        foreach ($expenses as $expense) {
-            foreach ($expense->fundingSources as $fundingSource) {
-                if ($caisseId && (int) $fundingSource->caisse_id !== (int) $caisseId) {
-                    continue;
-                }
-
-                $caisse = $fundingSource->caisse;
-                $type = $fundingSource->revenueType;
-                $allocated = (float) $fundingSource->montant_alloue;
-                $totalGeneral += $allocated;
-
-                if ($caisse) {
-                    $groupKey = 'caisse-'.$caisse->id;
-                    $groupLabel = $caisse->nom;
-
-                    if (! isset($byCategory[$groupKey])) {
-                        $byCategory[$groupKey] = [
-                            'id' => (int) $caisse->id,
-                            'nom' => $groupLabel,
-                            'montant' => 0.0,
-                            'count' => 0,
-                        ];
-                    }
-                    $byCategory[$groupKey]['montant'] += $allocated;
-                    $byCategory[$groupKey]['count']++;
-
-                    if (! isset($byType[$groupKey])) {
-                        $byType[$groupKey] = [
-                            'id' => (int) $caisse->id,
-                            'nom' => $groupLabel,
-                            'mois_capital' => null,
-                            'mois_label' => null,
-                            'montant' => 0.0,
-                            'count' => 0,
-                        ];
-                    }
-
-                    $byType[$groupKey]['montant'] += $allocated;
-                    $byType[$groupKey]['count']++;
-
-                    if (! isset($caisseBuckets[$caisse->id])) {
-                        $caisseBuckets[$caisse->id] = [
-                            'key' => $groupKey,
-                            'caisse_id' => (int) $caisse->id,
-                            'nom' => $caisse->nom,
-                            'depenses' => 0.0,
-                            'count' => 0,
-                        ];
-                    }
-                    $caisseBuckets[$caisse->id]['depenses'] += $allocated;
-                    $caisseBuckets[$caisse->id]['count']++;
-
-                    continue;
-                }
-
-                if (! $type) {
-                    continue;
-                }
-
-                $groupKey = 'legacy-'.$type->id;
-                if (! isset($byType[$groupKey])) {
-                    $byType[$groupKey] = [
-                        'id' => (int) $type->id,
-                        'nom' => $type->nom.' (historique)',
-                        'mois_capital' => null,
-                        'mois_label' => null,
-                        'montant' => 0.0,
-                        'count' => 0,
-                    ];
-                }
-                $byType[$groupKey]['montant'] += $allocated;
-                $byType[$groupKey]['count']++;
-
-                if (! isset($byCategory[$groupKey])) {
-                    $byCategory[$groupKey] = [
-                        'id' => (int) $type->id,
-                        'nom' => $type->nom.' (historique)',
-                        'montant' => 0.0,
-                        'count' => 0,
-                    ];
-                }
-                $byCategory[$groupKey]['montant'] += $allocated;
-                $byCategory[$groupKey]['count']++;
-            }
-        }
-
-        uasort($byCategory, fn (array $a, array $b): int => $b['montant'] <=> $a['montant']);
-        uasort($byType, fn (array $a, array $b): int => $b['montant'] <=> $a['montant']);
-
-        $caisseSummary = $this->finalizeCaisseSummary($paroisseId, $dateDebut, $dateFin, $caisseBuckets);
-
-        return [
-            'expenses' => $expenses,
-            'by_category' => $byCategory,
-            'by_type' => $byType,
-            'by_expense_type' => $byExpenseType,
-            'subvention_envelopes' => [],
-            'caisse_summary' => $caisseSummary,
-            'total_general' => round($totalGeneral, 2),
-            'date_debut' => $dateDebut,
-            'date_fin' => $dateFin,
-        ];
-    }
-
-    /**
-     * @param  array<int, array{key: string, caisse_id: int, nom: string, depenses: float, count: int}>  $buckets
-     * @return list<array{key: string, caisse_id: int, nom: string, credits: float, depenses: float, solde: float, count: int}>
-     */
-    private function finalizeCaisseSummary(int $paroisseId, Carbon $dateDebut, Carbon $dateFin, array $buckets): array
-    {
-        $summary = [];
-
-        foreach ($buckets as $bucket) {
-            $credits = (float) CaisseMouvement::query()
-                ->where('caisse_id', $bucket['caisse_id'])
-                ->where('paroisse_id', $paroisseId)
-                ->where('sens', CaisseMouvement::SENS_CREDIT)
-                ->whereDate('date_mouvement', '>=', $dateDebut)
-                ->whereDate('date_mouvement', '<=', $dateFin)
-                ->sum('montant');
-
-            $depenses = (float) $bucket['depenses'];
-
-            $summary[] = [
-                ...$bucket,
-                'credits' => $credits,
-                'solde' => $credits - $depenses,
-            ];
-        }
-
-        usort($summary, fn (array $a, array $b): int => strcmp($a['nom'], $b['nom']));
-
-        return $summary;
-    }
-
-    /**
-     * @deprecated Remplacé par finalizeCaisseSummary
-     *
-     * @param  array<string, array{key: string, type_id: int, type_nom: string, mois_subvention: string, mois_label: string, label: string, depenses: float, count: int}>  $buckets
-     * @return list<array{key: string, type_id: int, type_nom: string, mois_subvention: string, mois_label: string, label: string, subvention_recue: float, depenses: float, solde: float, count: int}>
-     */
-    private function finalizeSubventionEnvelopeSummary(int $paroisseId, array $buckets): array
-    {
-        return [];
-    }
-
-    public function capitalUsage(Request $request): View
-    {
-        try {
-            $user = $request->user();
-
-            $paroisses = $user->hasRole('super_admin')
-                ? Paroisse::orderBy('nom')->get()
-                : Paroisse::whereKey($user->paroisse_id)->get();
-
-            $selectedParoisseId = $user->hasRole('super_admin')
-                ? ($request->integer('paroisse_id') ?: null)
-                : (int) $user->paroisse_id;
-
-            $dateDebut = $request->input('date_debut', now()->startOfMonth()->format('Y-m-d'));
-            $dateFin = $request->input('date_fin', now()->endOfMonth()->format('Y-m-d'));
-
-            $report = null;
-            if ($selectedParoisseId) {
-                $report = $this->calculateCapitalUsageReport(
-                    (int) $selectedParoisseId,
-                    Carbon::parse($dateDebut)->startOfDay(),
-                    Carbon::parse($dateFin)->endOfDay()
-                );
-            }
-
-            return view('financial-reports.capital-usage', [
-                'paroisses' => $paroisses,
-                'selectedParoisseId' => $selectedParoisseId,
-                'dateDebut' => $dateDebut,
-                'dateFin' => $dateFin,
-                'report' => $report,
-            ]);
-        } catch (Throwable $e) {
-            $this->logError($e, 'Erreur rapport capital → dépenses');
-            FlashAlert::error('Une erreur est survenue lors du chargement du rapport capital.');
-
-            return view('financial-reports.capital-usage', [
-                'paroisses' => collect(),
-                'selectedParoisseId' => null,
-                'dateDebut' => now()->startOfMonth()->format('Y-m-d'),
-                'dateFin' => now()->endOfMonth()->format('Y-m-d'),
-                'report' => null,
-            ]);
-        }
-    }
-
-    /**
-     * @return array{
-     *     total_capital: float,
-     *     total_virements: float,
-     *     total_depenses: float,
-     *     reste_alloue: float,
-     *     capitals: Collection<int, Revenue>,
-     *     virements: Collection<int, CaisseMouvement>,
-     *     expenses: Collection<int, Expense>,
-     *     by_caisse: list<array{id: int, nom: string, alloue: float, depense: float, solde: float}>
-     * }
-     */
-    private function calculateCapitalUsageReport(int $paroisseId, Carbon $dateDebut, Carbon $dateFin): array
-    {
-        $capitals = Revenue::query()
-            ->with(['category', 'type'])
-            ->where('paroisse_id', $paroisseId)
-            ->where('statut', 'valide')
-            ->whereHas('category', fn ($q) => $q->where('code', 'banque'))
-            ->whereDate('date_recette', '>=', $dateDebut)
-            ->whereDate('date_recette', '<=', $dateFin)
-            ->orderBy('date_recette')
-            ->orderBy('id')
-            ->get();
-
-        $tresorerie = Caisse::query()
-            ->where('paroisse_id', $paroisseId)
-            ->where('code', Caisse::CODE_TRESORERIE)
-            ->first();
-
-        $virements = collect();
-        if ($tresorerie) {
-            $virements = CaisseMouvement::query()
-                ->with(['caisse', 'contrepartieCaisse'])
-                ->where('paroisse_id', $paroisseId)
-                ->where('caisse_id', $tresorerie->id)
-                ->where('type', CaisseMouvement::TYPE_VIREMENT)
-                ->where('sens', CaisseMouvement::SENS_DEBIT)
-                ->whereDate('date_mouvement', '>=', $dateDebut)
-                ->whereDate('date_mouvement', '<=', $dateFin)
-                ->orderBy('date_mouvement')
-                ->orderBy('id')
-                ->get();
-        }
-
-        $destinationCaisseIds = $virements
-            ->pluck('contrepartie_caisse_id')
-            ->filter()
-            ->unique()
-            ->values();
-
-        $expensesQuery = Expense::query()
-            ->with(['expenseType', 'fundingSources.caisse'])
-            ->where('paroisse_id', $paroisseId)
-            ->where('statut', 'valide')
-            ->whereDate('date_depense', '>=', $dateDebut)
-            ->whereDate('date_depense', '<=', $dateFin)
-            ->whereHas('fundingSources', function ($q) use ($destinationCaisseIds): void {
-                $q->whereNotNull('caisse_id');
-                if ($destinationCaisseIds->isNotEmpty()) {
-                    $q->whereIn('caisse_id', $destinationCaisseIds);
-                }
-            });
-
-        // Si aucun virement sur la période, montrer toutes les dépenses financées par caisses opérationnelles
-        // (hors trésorerie) pour ne pas masquer l’usage du capital déjà alloué.
-        if ($destinationCaisseIds->isEmpty()) {
-            $expensesQuery = Expense::query()
-                ->with(['expenseType', 'fundingSources.caisse'])
-                ->where('paroisse_id', $paroisseId)
-                ->where('statut', 'valide')
-                ->whereDate('date_depense', '>=', $dateDebut)
-                ->whereDate('date_depense', '<=', $dateFin)
-                ->whereHas('fundingSources', function ($q): void {
-                    $q->whereNotNull('caisse_id')
-                        ->whereHas('caisse', fn ($caisse) => $caisse->where('est_tresorerie', false));
-                });
-        }
-
-        $expenses = $expensesQuery->orderBy('date_depense')->orderBy('id')->get();
-
-        $byCaisse = [];
-        foreach ($virements as $virement) {
-            $caisseId = (int) $virement->contrepartie_caisse_id;
-            if ($caisseId < 1) {
-                continue;
-            }
-            if (! isset($byCaisse[$caisseId])) {
-                $byCaisse[$caisseId] = [
-                    'id' => $caisseId,
-                    'nom' => $virement->contrepartieCaisse?->nom ?? 'Caisse #'.$caisseId,
-                    'alloue' => 0.0,
-                    'depense' => 0.0,
-                    'solde' => 0.0,
-                ];
-            }
-            $byCaisse[$caisseId]['alloue'] += (float) $virement->montant;
-        }
-
-        $totalDepenses = 0.0;
-        foreach ($expenses as $expense) {
-            foreach ($expense->fundingSources as $source) {
-                if (! $source->caisse_id) {
-                    continue;
-                }
-                if ($destinationCaisseIds->isNotEmpty() && ! $destinationCaisseIds->contains((int) $source->caisse_id)) {
-                    continue;
-                }
-                $allocated = (float) $source->montant_alloue;
-                $totalDepenses += $allocated;
-                $caisseId = (int) $source->caisse_id;
-                if (! isset($byCaisse[$caisseId])) {
-                    $byCaisse[$caisseId] = [
-                        'id' => $caisseId,
-                        'nom' => $source->caisse?->nom ?? 'Caisse #'.$caisseId,
-                        'alloue' => 0.0,
-                        'depense' => 0.0,
-                        'solde' => 0.0,
-                    ];
-                }
-                $byCaisse[$caisseId]['depense'] += $allocated;
-            }
-        }
-
-        foreach ($byCaisse as &$row) {
-            $row['solde'] = round($row['alloue'] - $row['depense'], 2);
-        }
-        unset($row);
-
-        usort($byCaisse, fn (array $a, array $b): int => strcmp($a['nom'], $b['nom']));
-
-        $totalCapital = (float) $capitals->sum('montant');
-        $totalVirements = (float) $virements->sum('montant');
-
-        return [
-            'total_capital' => $totalCapital,
-            'total_virements' => $totalVirements,
-            'total_depenses' => $totalDepenses,
-            'reste_alloue' => round($totalVirements - $totalDepenses, 2),
-            'capitals' => $capitals,
-            'virements' => $virements,
-            'expenses' => $expenses,
-            'by_caisse' => array_values($byCaisse),
         ];
     }
 }

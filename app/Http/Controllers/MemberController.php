@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Helpers\FlashAlert;
+use App\Http\Requests\QuickStoreMemberRequest;
 use App\Http\Requests\StoreMemberRequest;
 use App\Http\Requests\UpdateMemberRequest;
 use App\Models\Member;
@@ -10,6 +11,7 @@ use App\Models\Paroisse;
 use App\Support\PaginationPerPage;
 use App\Traits\LogsErrors;
 use Exception;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controllers\HasMiddleware;
 use Illuminate\Routing\Controllers\Middleware;
@@ -114,6 +116,42 @@ class MemberController extends Controller implements HasMiddleware
             FlashAlert::error('Une erreur est survenue lors de la création du membre.');
 
             return back()->withInput();
+        }
+    }
+
+    /**
+     * Création rapide d’un membre (curé) depuis le formulaire paroisse — JSON, sans rechargement.
+     */
+    public function quickStore(QuickStoreMemberRequest $request): JsonResponse
+    {
+        try {
+            $validated = $request->validated();
+            $validated['statut'] = 'actif';
+
+            if (! Auth::user()->hasRole('super_admin')) {
+                $validated['paroisse_id'] = Auth::user()->paroisse_id;
+            } elseif (! array_key_exists('paroisse_id', $validated) || $validated['paroisse_id'] === null) {
+                $validated['paroisse_id'] = null;
+            }
+
+            $member = Member::create($validated);
+
+            $this->logInfo('Membre créé (quick)', ['member_id' => $member->id]);
+
+            $label = trim($member->prenom.' '.$member->nom);
+
+            return response()->json([
+                'id' => $member->id,
+                'prenom' => $member->prenom,
+                'nom' => $member->nom,
+                'label' => $label,
+            ], 201);
+        } catch (Exception $e) {
+            $this->logError('Erreur création rapide membre', $e, ['data' => $request->all()]);
+
+            return response()->json([
+                'message' => 'Impossible de créer le membre.',
+            ], 500);
         }
     }
 

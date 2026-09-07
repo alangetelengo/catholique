@@ -1,37 +1,35 @@
-<div id="mainHeader" class="header theme-header-bar fixed top-0 left-[250px] right-0 h-20 z-1099 flex items-center text-white transition-all duration-300"
+<div id="mainHeader" class="header theme-header-bar fixed top-0 left-[250px] right-0 h-20 z-1099 flex items-center text-white shadow-md transition-all duration-300"
      style="position: fixed; top: 0; left: 250px; right: 0; height: 80px; display: flex; z-index: 2147482000; background:
         radial-gradient(ellipse 80% 80% at 20% 80%, rgba(0, 180, 100, 0.25), rgba(0, 180, 100, 0.12) 25%, transparent 50%),
-        linear-gradient(135deg, #0a0f15 0%, #0d1a1a 25%, #0f2520 50%, #0d1a1a 75%, #0a0f15 100%); border: 0 !important; border-bottom: 0 !important; box-shadow: none !important; outline: 0 !important;">
-    <button type="button" id="navControl" class="nav-control shrink-0 h-full w-14 flex items-center justify-center hover:bg-slate-100/80 dark:hover:bg-white/5 focus:bg-transparent focus:outline-none focus:ring-0 active:bg-slate-100/80 dark:active:bg-white/5 cursor-pointer transition-all duration-300" title="Afficher / masquer le menu">
+        linear-gradient(135deg, #0a0f15 0%, #0d1a1a 25%, #0f2520 50%, #0d1a1a 75%, #0a0f15 100%); border: 0 !important; box-shadow: none !important; outline: 0 !important;">
+    <button type="button" id="navControl" class="nav-control shrink-0 h-full w-14 flex items-center justify-center border-r border-white/10 hover:bg-white/5 focus:bg-transparent focus:outline-none focus:ring-0 active:bg-white/5 cursor-pointer transition-all duration-300" title="Afficher / masquer le menu">
         <div class="hamburger flex flex-col gap-1.5 w-6 items-center justify-center">
-            <span class="line block w-full h-0.5 rounded bg-linear-to-r from-church-gold via-[#00c978] to-[#8b6cb8] transition-all duration-300"></span>
-            <span class="line block w-full h-0.5 rounded bg-linear-to-r from-church-gold via-[#00c978] to-[#8b6cb8] transition-all duration-300"></span>
-            <span class="line block w-full h-0.5 rounded bg-linear-to-r from-church-gold via-[#00c978] to-[#8b6cb8] transition-all duration-300"></span>
+            <span class="line block w-full h-0.5 rounded bg-linear-to-r from-[#00b464] to-[#00ff88] transition-all duration-300"></span>
+            <span class="line block w-full h-0.5 rounded bg-linear-to-r from-[#00b464] to-[#00ff88] transition-all duration-300"></span>
+            <span class="line block w-full h-0.5 rounded bg-linear-to-r from-[#00b464] to-[#00ff88] transition-all duration-300"></span>
         </div>
     </button>
     <div class="flex-1 flex justify-between items-center px-6 min-w-0">
-        <span class="text-sm font-semibold system-label truncate text-white/90">
-            <span class="text-emerald-100/90">
-                @auth
-                    @php
-                        $headerUser = auth()->user();
-                        $headerParoisseNom = $headerUser->paroisse?->nom;
-                        if ($headerParoisseNom === null && $headerUser->hasRole('super_admin')) {
-                            $headerParoisseNom = 'Toutes les paroisses';
-                        }
-                    @endphp
-                    {{ config('app.name') }}@if($headerParoisseNom)<span class="text-white/60 font-normal"> — </span>{{ $headerParoisseNom }}@endif
-                @else
-                    {{ config('app.name') }}
-                @endauth
-            </span>
+        <span class="text-sm font-semibold system-label truncate text-slate-300">
+            @auth
+                @php
+                    $headerUser = auth()->user();
+                    $headerParoisseNom = $headerUser->paroisse?->nom;
+                    if ($headerParoisseNom === null && $headerUser->hasRole('super_admin')) {
+                        $headerParoisseNom = 'Toutes les paroisses';
+                    }
+                @endphp
+                {{ config('app.name') }}@if($headerParoisseNom)<span class="text-white/60 font-normal"> — </span>{{ $headerParoisseNom }}@endif
+            @else
+                {{ config('app.name') }}
+            @endauth
         </span>
         <ul class="header-right flex items-center gap-1 shrink-0">
             <li class="mr-2">
                 <button id="themeToggle" type="button" class="px-3 py-1.5 rounded bg-white/10 text-lg hover:bg-white/20 transition-colors" title="Mode clair / mode sombre">🌙</button>
             </li>
             <li class="flex items-center user-box">
-                <img src="https://ui-avatars.com/api/?name={{ urlencode(auth()->user()->name ?? 'Admin') }}&background=4a3570&color=f0c85c" alt="Avatar" class="w-10 h-10 rounded-full avatar ring-2 ring-church-gold/40" width="40" height="40">
+                <img src="https://ui-avatars.com/api/?name={{ urlencode(auth()->user()->name ?? 'Admin') }}&background=00b464&color=ffffff" alt="Avatar" class="w-10 h-10 rounded-full avatar ring-2 ring-[#00b464]/40" width="40" height="40">
                 <div class="user-details ml-2">
                     <p class="user-name text-sm font-semibold text-white">{{ auth()->user()->name ?? 'administrateur' }}</p>
                 </div>

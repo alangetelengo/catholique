@@ -22,7 +22,7 @@ class ParoisseSeeder extends Seeder
                 'pays' => 'République du Congo',
                 'telephone' => '+242 06 XXX XX XX',
                 'email' => 'contact@saint-esprit-moungali.cg',
-                'diocèse' => 'Archidiocèse de Brazzaville',
+                'diocese' => 'Archidiocèse de Brazzaville',
                 'description' => 'Paroisse de référence pour les tests',
                 'actif' => true,
             ]

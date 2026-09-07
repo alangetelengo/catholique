@@ -1,75 +1,36 @@
-{{-- Nav header : logo église + déclinaison violet / or / vert --}}
+{{-- Nav header : logo (style cosud / vert GED) --}}
 <style>
 .nav-header {
-    width: 250px;
-    height: 80px;
-    position: fixed;
-    top: 0;
-    left: 0;
-    z-index: 1100;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0 16px;
+    width: 250px; height: 80px; position: fixed; top: 0; left: 0; z-index: 1100;
+    background: linear-gradient(135deg, #0a1410 0%, #0d1f18 50%, #0f2820 100%);
+    display: flex; align-items: center; justify-content: center; padding: 0 20px;
+    border-right: 2px solid rgba(0, 180, 100, 0.2);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4), 0 0 40px rgba(0, 180, 100, 0.1);
     transition: width 0.3s ease;
 }
 .nav-header .brand-logo {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    font-size: 1.25rem;
-    font-weight: 700;
-    color: #fff;
-    text-decoration: none;
-    letter-spacing: 0.04em;
-    transition: all 0.3s ease;
-    max-width: 100%;
+    display: flex; align-items: center; gap: 12px; font-size: 1.4rem; font-weight: 700;
+    color: #fff; text-decoration: none; letter-spacing: 1px; transition: all 0.3s ease;
 }
-.nav-header .brand-logo:hover {
-    color: #d4a84b;
-    transform: translateX(2px);
-}
+.nav-header .brand-logo:hover { color: #00ff88; transform: translateX(3px); }
 .nav-header .brand-logo img {
-    height: 48px;
-    width: 48px;
-    flex-shrink: 0;
-    border-radius: 50%;
-    border: 2px solid color-mix(in srgb, #d4a84b 55%, #00a86b 45%);
-    padding: 4px;
-    background: #ffffff;
-    box-shadow:
-        0 10px 20px rgba(0, 0, 0, 0.25),
-        0 0 0 1px rgba(255, 255, 255, 0.55) inset;
-    transition: all 0.3s ease;
-    object-fit: cover;
-    object-position: center;
+    height: 45px; width: 45px; flex-shrink: 0; border-radius: 50%;
+    border: 2px solid rgba(0, 180, 100, 0.4); padding: 3px;
+    background: #fff; box-shadow: 0 0 15px rgba(0, 180, 100, 0.4);
+    transition: all 0.3s ease; object-fit: cover;
 }
 .nav-header .brand-logo img:hover {
-    transform: scale(1.05);
-    box-shadow:
-        0 0 26px rgba(240, 200, 92, 0.35),
-        0 0 20px rgba(0, 168, 107, 0.3);
+    transform: scale(1.1) rotate(5deg);
+    box-shadow: 0 0 25px rgba(0, 180, 100, 0.6);
 }
-.nav-header .brand-logo .sidebar-label {
-    background: linear-gradient(90deg, #f0e6ff, #f0c85c);
-    -webkit-background-clip: text;
-    background-clip: text;
-    color: transparent;
-}
-#main-wrapper.menu-toggle .nav-header {
-    width: 80px;
-}
-#main-wrapper.menu-toggle .nav-header .brand-logo span {
-    display: none;
-}
-#main-wrapper.menu-toggle .nav-header .brand-logo {
-    justify-content: center;
-}
+#main-wrapper.menu-toggle .nav-header { width: 80px; }
+#main-wrapper.menu-toggle .nav-header .brand-logo span { display: none; }
+#main-wrapper.menu-toggle .nav-header .brand-logo { justify-content: center; }
 </style>
 
 <div id="navHeader" class="nav-header theme-nav-header">
-    <a href="/" class="brand-logo">
-        <img src="{{ asset('images/logo-catholique.png') }}" alt="Logo Paroisse Saint-Esprit" width="48" height="48">
-        <span class="sidebar-label">Catholique</span>
+    <a href="{{ url('/') }}" class="brand-logo">
+        <img src="{{ asset('images/logo-catholique.png') }}" alt="Logo {{ config('app.name') }}" width="45" height="45">
+        <span class="sidebar-label">{{ config('app.name', 'Catholique') }}</span>
     </a>
 </div>

@@ -10,14 +10,14 @@
 
 @section('btn-create')
     <div class="flex flex-wrap items-center gap-2">
-        <a id="rbc-pdf-link" href="#" target="_blank" rel="noopener noreferrer" class="hidden inline-flex items-center gap-2 rounded-lg border border-rose-200 dark:border-rose-800/60 bg-rose-50 dark:bg-rose-950/40 px-3 py-2 text-sm font-semibold text-rose-800 dark:text-rose-200 hover:bg-rose-100 dark:hover:bg-rose-900/50 transition-colors no-underline">
-            <i class="fas fa-file-pdf" aria-hidden="true"></i>Exporter PDF
+        <a id="rbc-pdf-link" href="#" class="hidden adventiste-btn-primary text-sm no-underline inline-flex items-center">
+            <i class="fas fa-print me-1.5" aria-hidden="true"></i>Imprimer
         </a>
-        <a href="{{ route('financial-reports.expenses-by-category') }}" class="adventiste-btn-secondary text-sm no-underline">
+        <a href="{{ route('financial-reports.expenses') }}" class="adventiste-btn-secondary text-sm no-underline">
             <i class="fas fa-receipt me-1.5" aria-hidden="true"></i>Dépenses par catégorie
         </a>
-        <a href="{{ route('financial-reports.index') }}" class="adventiste-btn-secondary text-sm no-underline">
-            <i class="fas fa-chart-pie me-1.5" aria-hidden="true"></i>Hub rapports
+        <a href="{{ route('financial-reports.list') }}" class="adventiste-btn-secondary text-sm no-underline">
+            <i class="fas fa-folder-open me-1.5" aria-hidden="true"></i>Historique
         </a>
         <a href="{{ route('financial-reports.list') }}" class="adventiste-btn-secondary text-sm no-underline">Rapports enregistrés</a>
     </div>

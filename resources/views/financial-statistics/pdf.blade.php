@@ -21,6 +21,7 @@
         .kpi-val { font-size: 14px; font-weight: bold; margin-top: 4px; }
         h2 { font-size: 13px; color: #0f766e; margin: 14px 0 6px; border-bottom: 1px solid #d1d5db; padding-bottom: 4px; }
         .footer { text-align: center; color: #6b7280; margin-top: 16px; font-size: 9px; }
+        @page { margin: 16mm; size: A4 portrait; }
     </style>
 </head>
 <body>

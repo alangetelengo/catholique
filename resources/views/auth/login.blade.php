@@ -13,7 +13,7 @@
         .hero { background: radial-gradient(circle at 20% 80%, rgba(0,180,100,.35), transparent 45%), linear-gradient(135deg, #0a0f15, #111b24, #0a0f15); padding: 42px; position: relative; }
         .hero h1 { margin-top: 18px; font-size: 2.2rem; color: #f3f4f6; }
         .hero p { margin-top: 10px; color: #cbd5e1; line-height: 1.5; }
-        .logo { width: 108px; height: 108px; border-radius: 50%; object-fit: cover; background: #fff; padding: 6px; border: 2px solid rgba(212,168,75,.7); }
+        .logo { width: 108px; height: 108px; border-radius: 50%; object-fit: cover; background: #fff; padding: 6px; border: 2px solid rgba(0,180,100,.5); }
         .form { padding: 36px 30px; }
         .form h2 { font-size: 1.7rem; margin-bottom: 6px; }
         .muted { color: #64748b; margin-bottom: 18px; font-size: .95rem; }
@@ -37,6 +37,7 @@
         <section class="hero">
             <img src="{{ asset('images/logo-catholique.png') }}" alt="Logo Catholique" class="logo" width="108" height="108">
             <h1>{{ config('app.name', 'Catholique') }}</h1>
+            <p style="margin-top: 6px; font-size: 0.8rem; color: #94a3b8;">v{{ config('catholique.version') }}</p>
             <p>Connectez-vous pour accéder au tableau de bord et gérer les modules de la paroisse.</p>
         </section>
         <section class="form">

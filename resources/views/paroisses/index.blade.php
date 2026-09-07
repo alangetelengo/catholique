@@ -55,8 +55,8 @@
                             <td class="px-4 py-3">{{ $p->ville ?? '—' }}</td>
                             <td class="px-4 py-3 font-mono text-xs">{{ $p->code_paroisse ?? '—' }}</td>
                             <td class="px-4 py-3">
-                                @if($p->curé)
-                                    {{ $p->curé->prenom }} {{ $p->curé->nom }}
+                                @if($p->cure)
+                                    {{ $p->cure->prenom }} {{ $p->cure->nom }}
                                 @else
                                     —
                                 @endif

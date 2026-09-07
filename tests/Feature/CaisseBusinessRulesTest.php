@@ -435,14 +435,26 @@ class CaisseBusinessRulesTest extends TestCase
         $user->givePermissionTo('view_financial_reports');
 
         $this->actingAs($user);
-        $response = $this->get(route('financial-reports.capital-usage', [
+        $this->get(route('financial-reports.capital-usage', [
+            'paroisse_id' => $paroisse->id,
+            'date_debut' => '2026-08-01',
+            'date_fin' => '2026-08-31',
+        ]))->assertRedirect(route('financial-reports.expenses', [
+            'tab' => 'capital',
+            'paroisse_id' => $paroisse->id,
+            'date_debut' => '2026-08-01',
+            'date_fin' => '2026-08-31',
+        ]));
+
+        $response = $this->get(route('financial-reports.expenses', [
+            'tab' => 'capital',
             'paroisse_id' => $paroisse->id,
             'date_debut' => '2026-08-01',
             'date_fin' => '2026-08-31',
         ]));
 
         $response->assertOk();
-        $response->assertSee('Capital reçu → dépenses', false);
+        $response->assertSee('Rapport dépenses', false);
         $response->assertSee('Capital Banque reçu', false);
         $response->assertSee('Caisse alimentation', false);
     }

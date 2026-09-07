@@ -115,7 +115,7 @@ class ApplicationConfigurationController extends Controller
         $perPage = PaginationPerPage::resolve($request);
 
         $query = Paroisse::query()
-            ->with('curé')
+            ->with('cure')
             ->orderBy('nom');
 
         if (! $request->user()?->hasRole('super_admin')) {

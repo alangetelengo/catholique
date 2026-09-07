@@ -2,7 +2,7 @@
     <div class="preloader-bubble-wrapper">
         <div class="bubble-glow"></div>
         <div class="bubble-ring"></div>
-        <img src="{{ asset('images/logo-catholique.png') }}" class="logo-in-bubble" alt="Logo Paroisse Saint-Esprit" width="100" height="100">
+        <img src="{{ asset('images/logo-catholique.png') }}" class="logo-in-bubble" alt="Logo {{ config('app.name') }}" width="100" height="100">
     </div>
 </div>
 
@@ -10,6 +10,7 @@
 #preloader {
     position: fixed;
     inset: 0;
+    background: linear-gradient(135deg, #0a1410, #0d1f18, #0f2820);
     display: flex;
     align-items: center;
     justify-content: center;

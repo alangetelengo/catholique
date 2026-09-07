@@ -9,10 +9,12 @@ use App\Models\RevenueCategory;
 use App\Support\FinancialReportSignatories;
 use App\Support\PaginationPerPage;
 use App\Traits\LogsErrors;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
@@ -136,21 +138,38 @@ class RevenueReportController extends Controller
         ]);
     }
 
-    public function print(FinancialReport $revenueReport): View
+    public function print(FinancialReport $revenueReport): View|RedirectResponse
     {
-        $this->authorizeAccess($revenueReport, request()->user()?->id, request()->user()?->paroisse_id, (bool) request()->user()?->hasRole('super_admin'));
+        try {
+            $this->authorizeAccess($revenueReport, request()->user()?->id, request()->user()?->paroisse_id, (bool) request()->user()?->hasRole('super_admin'));
 
-        $details = (array) ($revenueReport->details_recettes ?? []);
-        $rows = collect($details['revenues'] ?? []);
-        $paroisse = $revenueReport->paroisse;
+            $details = (array) ($revenueReport->details_recettes ?? []);
+            $rows = collect($details['revenues'] ?? []);
+            $paroisse = $revenueReport->paroisse;
 
-        return view('revenue-reports.print', [
-            'report' => $revenueReport,
-            'details' => $details,
-            'rows' => $rows,
-            'paroisse' => $paroisse,
-            'signataires' => FinancialReportSignatories::defaultPdfBlocks(),
-        ]);
+            $pdf = Pdf::loadView('revenue-reports.pdf', [
+                'report' => $revenueReport,
+                'details' => $details,
+                'rows' => $rows,
+                'paroisse' => $paroisse,
+                'signataires' => FinancialReportSignatories::defaultPdfBlocks(),
+            ])->setPaper('a4', 'portrait');
+
+            $periodeLabel = $revenueReport->date_debut?->format('d/m/Y').' au '.$revenueReport->date_fin?->format('d/m/Y');
+
+            return view('financial-reports.viewer-pdf', [
+                'content' => $pdf->output(),
+                'titre' => 'Rapport de recettes',
+                'sousTitre' => ($paroisse?->nom ?? 'Paroisse').' — '.$periodeLabel,
+                'downloadName' => 'rapport-recettes-'.Str::slug($paroisse?->nom ?? 'paroisse').'-'.optional($revenueReport->date_debut)->format('Y-m-d').'.pdf',
+                'retourUrl' => route('revenue-reports.show', $revenueReport),
+            ]);
+        } catch (Throwable $e) {
+            $this->logError($e, 'Erreur aperçu PDF rapport recettes', ['report_id' => $revenueReport->id]);
+
+            return redirect()->route('revenue-reports.show', $revenueReport)
+                ->with('error', 'Impossible de générer l\'aperçu PDF.');
+        }
     }
 
     public function edit(FinancialReport $revenueReport, Request $request): View

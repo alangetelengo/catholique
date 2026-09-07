@@ -7,7 +7,7 @@
 @section('btn-create')
     <div class="flex flex-wrap items-center gap-2">
         <a href="{{ route('financial-reports.list') }}" class="adventiste-btn-secondary text-sm">Rapports enregistrés</a>
-        <a href="{{ route('financial-reports.index') }}" class="adventiste-btn-primary text-sm">Générer un rapport</a>
+        <a href="{{ route('financial-reports.expenses') }}" class="adventiste-btn-primary text-sm">Rapport dépenses</a>
     </div>
 @endsection
 

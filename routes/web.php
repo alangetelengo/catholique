@@ -7,6 +7,7 @@ use App\Http\Controllers\ConfigurationController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\EventController;
 use App\Http\Controllers\ExpenseController;
+use App\Http\Controllers\ExpenseReportController;
 use App\Http\Controllers\ExpenseTypeController;
 use App\Http\Controllers\FinancialReportController;
 use App\Http\Controllers\FinancialStatisticsController;
@@ -41,6 +42,7 @@ Route::middleware('auth')->group(function (): void {
     Route::put('profile/password', [ProfileController::class, 'updatePassword'])->name('profile.password');
 
     Route::resource('users', UserController::class)->except(['show']);
+    Route::post('members/quick-store', [MemberController::class, 'quickStore'])->name('members.quick-store');
     Route::resource('members', MemberController::class);
     Route::resource('sacraments', SacramentController::class);
     Route::resource('paroisses', ParoisseController::class)
@@ -69,7 +71,8 @@ Route::middleware('auth')->group(function (): void {
     Route::get('reports/quete-ordinaire', [QueteOrdinaireReportController::class, 'legacyRedirectIndex'])->name('reports.quete.index');
     Route::get('reports/quete-ordinaire/print', [QueteOrdinaireReportController::class, 'legacyRedirectPrint'])->name('reports.quete.print');
     Route::get('reports/quete-ordinaire/pdf', [QueteOrdinaireReportController::class, 'legacyRedirectPdf'])->name('reports.quete.pdf');
-    Route::resource('popote-reports', PopoteSubventionReportController::class)->parameters(['popote-reports' => 'popoteReport']);
+    Route::resource('popote-reports', PopoteSubventionReportController::class)->parameters(['popote-reports' => 'popoteReport'])->except(['index']);
+    Route::redirect('popote-reports', '/financial-reports/list')->name('popote-reports.index');
     Route::get('popote-reports/{popoteReport}/print', [PopoteSubventionReportController::class, 'print'])->name('popote-reports.print');
     Route::get('popote-reports/{popoteReport}/pdf', [PopoteSubventionReportController::class, 'exportPdf'])->name('popote-reports.pdf');
     Route::resource('revenue-categories', RevenueCategoryController::class)->except(['show']);
@@ -80,16 +83,21 @@ Route::middleware('auth')->group(function (): void {
     Route::get('financial-statistics/pdf', [FinancialStatisticsController::class, 'exportPdf'])->name('financial-statistics.pdf');
     Route::get('financial-statistics/excel', [FinancialStatisticsController::class, 'exportExcel'])->name('financial-statistics.excel');
 
-    Route::get('financial-reports', [FinancialReportController::class, 'index'])->name('financial-reports.index');
+    Route::redirect('financial-reports', '/financial-reports/list')->name('financial-reports.index');
     Route::get('financial-reports/list', [FinancialReportController::class, 'list'])->name('financial-reports.list');
+    Route::get('financial-reports/expenses', [ExpenseReportController::class, 'index'])->name('financial-reports.expenses');
+    Route::post('financial-reports/expenses/calculate', [ExpenseReportController::class, 'calculate'])->name('financial-reports.expenses.calculate');
+    Route::post('financial-reports/expenses/store', [ExpenseReportController::class, 'store'])->name('financial-reports.expenses.store');
+    Route::post('financial-reports/expenses/store-popote', [ExpenseReportController::class, 'storePopote'])->name('financial-reports.expenses.store-popote');
+    Route::get('financial-reports/expenses/print', [ExpenseReportController::class, 'printPdf'])->name('financial-reports.expenses.print');
+    Route::get('financial-reports/expenses/pdf', [ExpenseReportController::class, 'downloadPdf'])->name('financial-reports.expenses.pdf');
+    Route::redirect('financial-reports/expenses-by-category', '/financial-reports/expenses')->name('financial-reports.expenses-by-category');
+    Route::get('financial-reports/capital-usage', [ExpenseReportController::class, 'capitalUsage'])->name('financial-reports.capital-usage');
+    Route::get('financial-reports/capital-usage/print', [ExpenseReportController::class, 'capitalUsagePrint'])->name('financial-reports.capital-usage.print');
     Route::get('financial-reports/statistics', [FinancialReportController::class, 'statistics'])->name('financial-reports.statistics');
     Route::get('financial-reports/revenues-weekly', [FinancialReportController::class, 'revenuesWeekly'])->name('financial-reports.revenues-weekly');
     Route::get('financial-reports/revenues-weekly/print', [FinancialReportController::class, 'revenuesWeeklyPrint'])->name('financial-reports.revenues-weekly-print');
     Route::match(['get', 'post'], 'financial-reports/revenues-weekly/pdf', [FinancialReportController::class, 'downloadRevenuesWeeklyPdf'])->name('financial-reports.revenues-weekly-pdf');
-    Route::post('financial-reports/expenses-by-category/calculate', [FinancialReportController::class, 'expensesByCategoryCalculate'])->name('financial-reports.expenses-by-category.calculate');
-    Route::get('financial-reports/expenses-by-category/pdf', [FinancialReportController::class, 'downloadExpensesByCategoryPdf'])->name('financial-reports.expenses-by-category.pdf');
-    Route::get('financial-reports/expenses-by-category', [FinancialReportController::class, 'expensesByCategory'])->name('financial-reports.expenses-by-category');
-    Route::get('financial-reports/capital-usage', [FinancialReportController::class, 'capitalUsage'])->name('financial-reports.capital-usage');
     Route::get('financial-reports/revenues-by-category/revenue-categories', [FinancialReportController::class, 'revenueCategoriesForParoisse'])->name('financial-reports.revenues-by-category.revenue-categories');
     Route::get('financial-reports/revenues-by-category/revenue-types', [FinancialReportController::class, 'revenueTypesForCategory'])->name('financial-reports.revenues-by-category.revenue-types');
     Route::post('financial-reports/revenues-by-category/calculate', [FinancialReportController::class, 'revenuesByCategoryCalculate'])->name('financial-reports.revenues-by-category.calculate');
@@ -97,9 +105,9 @@ Route::middleware('auth')->group(function (): void {
     Route::post('financial-reports/revenues-by-category/store', [FinancialReportController::class, 'storeRevenuesByCategory'])->name('financial-reports.revenues-by-category.store');
     Route::get('financial-reports/revenues-by-category/pdf', [FinancialReportController::class, 'downloadRevenuesByCategoryPdf'])->name('financial-reports.revenues-by-category.pdf');
     Route::get('financial-reports/{financialReport}/pdf', [FinancialReportController::class, 'downloadPdf'])->name('financial-reports.download-pdf');
+    Route::get('financial-reports/{financialReport}/print', [FinancialReportController::class, 'printViewer'])->name('financial-reports.print');
     Route::delete('financial-reports/{financialReport}', [FinancialReportController::class, 'destroy'])->name('financial-reports.destroy');
     Route::get('financial-reports/{financialReport}', [FinancialReportController::class, 'show'])->name('financial-reports.show');
-    Route::post('financial-reports', [FinancialReportController::class, 'store'])->name('financial-reports.store');
 
     Route::get('application-configuration', [ApplicationConfigurationController::class, 'index'])
         ->name('application-configuration.index');

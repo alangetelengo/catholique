@@ -198,7 +198,7 @@
             vertical-align: top;
         }
         @page {
-            margin: 20mm;
+            margin: 16mm;
         }
     </style>
 </head>

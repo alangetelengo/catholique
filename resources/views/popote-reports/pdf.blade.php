@@ -23,6 +23,7 @@
         .signataires { margin-top: 30px; display: table; width: 100%; table-layout: fixed; border-spacing: 16px 0; }
         .s { display: table-cell; text-align: center; } .line { border-top: 1px solid #6b7280; margin-bottom: 7px; }
         .t { font-weight: 700; font-size: 14px; } .n { font-size: 12px; color: #6b7280; }
+        @page { margin: 16mm; size: A4 portrait; }
     </style>
 </head>
 <body>

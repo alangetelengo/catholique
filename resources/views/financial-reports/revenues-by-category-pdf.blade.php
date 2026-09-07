@@ -126,7 +126,7 @@
             color: #94a3b8;
             text-align: center;
         }
-        @page { margin: 14mm; }
+        @page { margin: 16mm; }
     </style>
 </head>
 <body>

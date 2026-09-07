@@ -11,6 +11,7 @@ use App\Models\Paroisse;
 use App\Support\PaginationPerPage;
 use App\Support\SubventionMensuelle;
 use App\Traits\LogsErrors;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -158,41 +159,44 @@ class PopoteSubventionReportController extends Controller
         return redirect()->route('popote-reports.index')->with('success', 'Rapport supprimé.');
     }
 
-    public function print(FinancialReport $popoteReport): View
+    public function print(FinancialReport $popoteReport): View|RedirectResponse
     {
-        $this->authorizeAccess($popoteReport, request()->user()?->paroisse_id, (bool) request()->user()?->hasRole('super_admin'));
+        try {
+            $this->authorizeAccess($popoteReport, request()->user()?->paroisse_id, (bool) request()->user()?->hasRole('super_admin'));
 
-        $detailsRecettes = (array) ($popoteReport->details_recettes ?? []);
-        $detailsDepenses = (array) ($popoteReport->details_depenses ?? []);
+            $detailsRecettes = (array) ($popoteReport->details_recettes ?? []);
+            $detailsDepenses = (array) ($popoteReport->details_depenses ?? []);
+            $paroisse = $popoteReport->paroisse;
 
-        return view('popote-reports.print', [
-            'report' => $popoteReport,
-            'detailsRecettes' => $detailsRecettes,
-            'detailsDepenses' => $detailsDepenses,
-            'rowsRecettes' => collect($detailsRecettes['revenues'] ?? []),
-            'rowsDepenses' => collect($detailsDepenses['expenses'] ?? []),
-            'paroisse' => $popoteReport->paroisse,
-        ]);
+            $pdf = Pdf::loadView('popote-reports.pdf', [
+                'report' => $popoteReport,
+                'detailsRecettes' => $detailsRecettes,
+                'detailsDepenses' => $detailsDepenses,
+                'rowsRecettes' => collect($detailsRecettes['revenues'] ?? []),
+                'rowsDepenses' => collect($detailsDepenses['expenses'] ?? []),
+                'paroisse' => $paroisse,
+            ])->setPaper('a4', 'portrait');
+
+            $periodeLabel = optional($popoteReport->date_debut)->format('d/m/Y').' au '.optional($popoteReport->date_fin)->format('d/m/Y');
+
+            return view('financial-reports.viewer-pdf', [
+                'content' => $pdf->output(),
+                'titre' => 'Rapport Caisse Popote',
+                'sousTitre' => ($paroisse?->nom ?? 'Paroisse').' — '.$periodeLabel,
+                'downloadName' => 'rapport-subvention-popote-'.optional($popoteReport->date_debut)->format('Y-m-d').'.pdf',
+                'retourUrl' => route('popote-reports.show', $popoteReport),
+            ]);
+        } catch (Throwable $e) {
+            $this->logError($e, 'Erreur aperçu PDF rapport popote', ['report_id' => $popoteReport->id]);
+
+            return redirect()->route('popote-reports.show', $popoteReport)
+                ->with('error', 'Impossible de générer l\'aperçu PDF.');
+        }
     }
 
-    public function exportPdf(FinancialReport $popoteReport)
+    public function exportPdf(FinancialReport $popoteReport): View|RedirectResponse
     {
-        $this->authorizeAccess($popoteReport, request()->user()?->paroisse_id, (bool) request()->user()?->hasRole('super_admin'));
-
-        $detailsRecettes = (array) ($popoteReport->details_recettes ?? []);
-        $detailsDepenses = (array) ($popoteReport->details_depenses ?? []);
-
-        // Utilisation du wrapper dompdf via container pour éviter l'erreur de facade introuvable.
-        $pdf = app('dompdf.wrapper')->loadView('popote-reports.pdf', [
-            'report' => $popoteReport,
-            'detailsRecettes' => $detailsRecettes,
-            'detailsDepenses' => $detailsDepenses,
-            'rowsRecettes' => collect($detailsRecettes['revenues'] ?? []),
-            'rowsDepenses' => collect($detailsDepenses['expenses'] ?? []),
-            'paroisse' => $popoteReport->paroisse,
-        ])->setPaper('a4', 'portrait');
-
-        return $pdf->download('rapport-subvention-popote-'.optional($popoteReport->date_debut)->format('Y-m-d').'.pdf');
+        return $this->print($popoteReport);
     }
 
     private function validatePayload(Request $request): array

@@ -87,4 +87,9 @@ class SubventionMensuelle
     {
         return array_key_exists($value, self::moisOptions());
     }
+
+    public static function moisSubventionFromParts(int $year, int $month): string
+    {
+        return sprintf('%04d-%02d', $year, $month);
+    }
 }

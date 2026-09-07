@@ -6,31 +6,16 @@
 
 @section('btn-create')
     @if($report ?? null)
-        <div class="flex flex-wrap items-center gap-2">
-            <button type="button"
-                    id="btnOpenPrintModal"
-                    class="adventiste-btn-secondary"
-                    data-print-url="{{ route('financial-reports.revenues-weekly-print', [
-                        'paroisse_id' => $selectedParoisseId,
-                        'period_type' => $periodType,
-                        'week_start' => $selectedWeekStart,
-                        'month' => $selectedMonth,
-                        'year' => $selectedYear,
-                    ]) }}">
-                <i class="fas fa-print me-2" aria-hidden="true"></i>Imprimer
-            </button>
-            <form action="{{ route('financial-reports.revenues-weekly-pdf') }}" method="POST" class="inline-flex">
-                @csrf
-                <input type="hidden" name="paroisse_id" value="{{ $selectedParoisseId }}">
-                <input type="hidden" name="period_type" value="{{ $periodType }}">
-                <input type="hidden" name="week_start" value="{{ $selectedWeekStart }}">
-                <input type="hidden" name="month" value="{{ $selectedMonth }}">
-                <input type="hidden" name="year" value="{{ $selectedYear }}">
-                <button type="submit" class="adventiste-btn-primary">
-                    <i class="fas fa-download me-2" aria-hidden="true"></i>Télécharger PDF
-                </button>
-            </form>
-        </div>
+        <a href="{{ route('financial-reports.revenues-weekly-print', [
+                'paroisse_id' => $selectedParoisseId,
+                'period_type' => $periodType,
+                'week_start' => $selectedWeekStart,
+                'month' => $selectedMonth,
+                'year' => $selectedYear,
+            ]) }}"
+           class="adventiste-btn-primary no-underline inline-flex items-center">
+            <i class="fas fa-print me-2" aria-hidden="true"></i>Imprimer
+        </a>
     @endif
 @endsection
 
@@ -273,31 +258,6 @@
             </p>
         </div>
     @endif
-
-    @if($report ?? false)
-        <dialog id="modalPrintReport" class="max-w-[min(96vw,72rem)] w-full rounded-2xl border border-slate-200/80 dark:border-slate-600 bg-white dark:bg-slate-800 shadow-2xl p-0 backdrop:bg-slate-900/60">
-            <div class="flex max-h-[min(92vh,900px)] flex-col">
-                <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 dark:border-slate-600 px-4 py-3 sm:px-5">
-                    <h2 class="text-base font-semibold text-slate-900 dark:text-white m-0 flex items-center gap-2" id="modalPrintReportLabel">
-                        <i class="fas fa-print text-emerald-600 dark:text-emerald-400" aria-hidden="true"></i>
-                        Rapport des revenus — Quête ordinaire
-                    </h2>
-                    <button type="button" class="rounded-lg p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700" data-print-dialog-close aria-label="Fermer">
-                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
-                    </button>
-                </div>
-                <div class="min-h-0 flex-1 overflow-hidden bg-slate-50 dark:bg-slate-900/50">
-                    <iframe id="printReportIframe" title="Document à imprimer" class="h-[min(75vh,640px)] w-full border-0"></iframe>
-                </div>
-                <div class="flex flex-wrap justify-end gap-2 border-t border-slate-200 dark:border-slate-600 px-4 py-3 sm:px-5">
-                    <button type="button" class="adventiste-btn-secondary" data-print-dialog-close>Fermer</button>
-                    <button type="button" class="adventiste-btn-primary" id="btnPrintFromModal">
-                        <i class="fas fa-print me-2" aria-hidden="true"></i>Imprimer
-                    </button>
-                </div>
-            </div>
-        </dialog>
-    @endif
 @endsection
 
 @push('scripts')
@@ -342,42 +302,6 @@
 
         periodType.addEventListener('change', updatePeriodFields);
         updatePeriodFields();
-
-        const btnOpenPrint = document.getElementById('btnOpenPrintModal');
-        const modalPrint = document.getElementById('modalPrintReport');
-        const printIframe = document.getElementById('printReportIframe');
-        const btnPrintFromModal = document.getElementById('btnPrintFromModal');
-
-        function closePrintDialog() {
-            if (modalPrint && typeof modalPrint.close === 'function') {
-                modalPrint.close();
-            }
-        }
-
-        if (modalPrint && printIframe && btnOpenPrint && typeof modalPrint.showModal === 'function') {
-            btnOpenPrint.addEventListener('click', function() {
-                const url = btnOpenPrint.getAttribute('data-print-url');
-                if (url) printIframe.src = url;
-                modalPrint.showModal();
-            });
-            modalPrint.addEventListener('close', function() {
-                printIframe.src = 'about:blank';
-            });
-            modalPrint.querySelectorAll('[data-print-dialog-close]').forEach(function(btn) {
-                btn.addEventListener('click', closePrintDialog);
-            });
-        }
-        if (btnPrintFromModal && printIframe) {
-            btnPrintFromModal.addEventListener('click', function() {
-                try {
-                    if (printIframe.contentWindow && printIframe.contentWindow.print) {
-                        printIframe.contentWindow.print();
-                    }
-                } catch (e) {
-                    console.error(e);
-                }
-            });
-        }
     });
 </script>
 @endpush

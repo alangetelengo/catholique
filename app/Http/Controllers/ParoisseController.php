@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 use Throwable;
 
@@ -36,13 +37,15 @@ class ParoisseController extends Controller
     public function create(Request $request): View
     {
         $this->ensureSuperAdmin($request);
-        $members = $this->membersForSelect();
+        $members = $this->membersForSelect(null);
         $paroisse = new Paroisse([
             'pays' => 'République du Congo',
             'actif' => true,
         ]);
+        $canQuickCreateCure = $request->user()?->can('create_members')
+            || $request->user()?->hasRole('super_admin');
 
-        return view('paroisses.create', compact('paroisse', 'members'));
+        return view('paroisses.create', compact('paroisse', 'members', 'canQuickCreateCure'));
     }
 
     public function store(Request $request): RedirectResponse
@@ -51,10 +54,15 @@ class ParoisseController extends Controller
             $this->ensureSuperAdmin($request);
             $validated = $this->validatedParoisse($request, null);
             $paroisse = Paroisse::create($validated);
+            $this->attachCureToParoisse($paroisse, $validated['cure_id'] ?? null);
 
             $this->logInfo('Paroisse créée', ['paroisse_id' => $paroisse->id, 'nom' => $paroisse->nom]);
 
-            return redirect()->route('paroisses.index')->with('success', 'Paroisse créée avec succès.');
+            return redirect()
+                ->route('application-configuration.index', ['tab' => 'paroisses'])
+                ->with('success', 'Paroisse créée avec succès.');
+        } catch (ValidationException $e) {
+            throw $e;
         } catch (Throwable $e) {
             $this->logError($e, 'Erreur création paroisse', ['data' => $request->all()]);
 
@@ -65,9 +73,11 @@ class ParoisseController extends Controller
     public function edit(Request $request, Paroisse $paroisse): View
     {
         $this->ensureSuperAdmin($request);
-        $members = $this->membersForSelect();
+        $members = $this->membersForSelect($paroisse);
+        $canQuickCreateCure = $request->user()?->can('create_members')
+            || $request->user()?->hasRole('super_admin');
 
-        return view('paroisses.edit', compact('paroisse', 'members'));
+        return view('paroisses.edit', compact('paroisse', 'members', 'canQuickCreateCure'));
     }
 
     public function update(Request $request, Paroisse $paroisse): RedirectResponse
@@ -76,10 +86,15 @@ class ParoisseController extends Controller
             $this->ensureSuperAdmin($request);
             $validated = $this->validatedParoisse($request, $paroisse);
             $paroisse->update($validated);
+            $this->attachCureToParoisse($paroisse, $validated['cure_id'] ?? null);
 
             $this->logInfo('Paroisse mise à jour', ['paroisse_id' => $paroisse->id]);
 
-            return redirect()->route('paroisses.index')->with('success', 'Paroisse mise à jour.');
+            return redirect()
+                ->route('application-configuration.index', ['tab' => 'paroisses'])
+                ->with('success', 'Paroisse mise à jour.');
+        } catch (ValidationException $e) {
+            throw $e;
         } catch (Throwable $e) {
             $this->logError($e, 'Erreur mise à jour paroisse', ['paroisse_id' => $paroisse->id, 'data' => $request->all()]);
 
@@ -98,7 +113,9 @@ class ParoisseController extends Controller
 
             $this->logInfo('Paroisse désactivée', ['paroisse_id' => $paroisse->id, 'nom' => $paroisse->nom]);
 
-            return redirect()->route('paroisses.index')->with('success', 'Paroisse désactivée. Elle reste en base mais n’apparaît plus comme active.');
+            return redirect()
+                ->route('application-configuration.index', ['tab' => 'paroisses'])
+                ->with('success', 'Paroisse désactivée. Elle reste en base mais n’apparaît plus comme active.');
         } catch (Throwable $e) {
             $this->logError($e, 'Erreur désactivation paroisse', ['paroisse_id' => $paroisse->id]);
 
@@ -107,15 +124,48 @@ class ParoisseController extends Controller
     }
 
     /**
+     * Membres proposés comme curé : paroisse courante en édition ; liste vide en création
+     * (utiliser « + Nouveau curé »), plus le curé déjà rattaché s’il existe.
+     *
      * @return Collection<int, Member>
      */
-    private function membersForSelect()
+    private function membersForSelect(?Paroisse $paroisse): Collection
     {
-        return Member::query()
+        if ($paroisse === null || ! $paroisse->exists) {
+            return new Collection;
+        }
+
+        $query = Member::query()
             ->where('statut', 'actif')
+            ->where('paroisse_id', $paroisse->id)
             ->orderBy('nom')
-            ->orderBy('prenom')
-            ->get();
+            ->orderBy('prenom');
+
+        $members = $query->get();
+
+        if ($paroisse->cure_id) {
+            $current = Member::query()->find($paroisse->cure_id);
+            if ($current && ! $members->contains('id', $current->id)) {
+                $members->prepend($current);
+            }
+        }
+
+        return $members;
+    }
+
+    private function attachCureToParoisse(Paroisse $paroisse, mixed $cureId): void
+    {
+        if ($cureId === null || $cureId === '') {
+            return;
+        }
+
+        Member::query()
+            ->whereKey((int) $cureId)
+            ->where(function ($q) use ($paroisse): void {
+                $q->whereNull('paroisse_id')
+                    ->orWhere('paroisse_id', $paroisse->id);
+            })
+            ->update(['paroisse_id' => $paroisse->id]);
     }
 
     /**
@@ -136,8 +186,8 @@ class ParoisseController extends Controller
                 'max:100',
                 Rule::unique('paroisses', 'code_paroisse')->ignore($paroisse?->id),
             ],
-            'curé_id' => ['nullable', 'exists:members,id'],
-            'diocèse' => ['nullable', 'string', 'max:255'],
+            'cure_id' => ['nullable', 'exists:members,id'],
+            'diocese' => ['nullable', 'string', 'max:255'],
             'description' => ['nullable', 'string', 'max:5000'],
         ];
 
