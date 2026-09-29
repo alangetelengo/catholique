@@ -35,6 +35,11 @@ class ShellLayoutStyleTest extends TestCase
         $response->assertOk();
         $response->assertSee('id="navHeader"', false);
         $response->assertSee('id="mainHeader"', false);
+        $response->assertSee('id="sidebarBackdrop"', false);
+        $response->assertSee('closeMobileSidebar()', false);
+        $response->assertSee('header-toolbar', false);
+        $response->assertSee('text-xl sm:text-2xl', false);
+        $response->assertSee('catholique-cards', false);
         $response->assertSee('class="sidebar', false);
         $response->assertSee('from-[#00b464]', false);
         $response->assertSee('to-[#00ff88]', false);

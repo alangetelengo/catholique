@@ -29,7 +29,7 @@
             <div>
                 <h2 class="text-sm font-semibold text-slate-800 dark:text-slate-200 mb-3">Enveloppes mensuelles</h2>
                 <div class="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700">
-                    <table class="min-w-full text-sm">
+                    <table class="catholique-cards min-w-full text-sm">
                         <thead class="bg-slate-50 dark:bg-slate-800/60 text-left">
                             <tr>
                                 <th class="px-4 py-3 font-semibold">Mois</th>
@@ -41,10 +41,10 @@
                         <tbody>
                             @foreach ($envelopesCapital as $envelope)
                                 <tr class="border-t border-slate-200 dark:border-slate-700">
-                                    <td class="px-4 py-3">{{ $envelope['label'] }}</td>
-                                    <td class="px-4 py-3 text-right tabular-nums">{{ number_format($envelope['recu'], 0, ',', ' ') }}</td>
-                                    <td class="px-4 py-3 text-right tabular-nums">{{ number_format($envelope['alloue'], 0, ',', ' ') }}</td>
-                                    <td class="px-4 py-3 text-right tabular-nums font-medium">{{ number_format($envelope['disponible'], 0, ',', ' ') }}</td>
+                                    <td class="px-4 py-3" data-label="Mois">{{ $envelope['label'] }}</td>
+                                    <td class="px-4 py-3 text-right tabular-nums" data-label="Reçu">{{ number_format($envelope['recu'], 0, ',', ' ') }}</td>
+                                    <td class="px-4 py-3 text-right tabular-nums" data-label="Alloué">{{ number_format($envelope['alloue'], 0, ',', ' ') }}</td>
+                                    <td class="px-4 py-3 text-right tabular-nums font-medium" data-label="Disponible">{{ number_format($envelope['disponible'], 0, ',', ' ') }}</td>
                                 </tr>
                             @endforeach
                         </tbody>
@@ -54,7 +54,7 @@
         @endif
 
         <div class="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700">
-            <table class="min-w-full text-sm">
+            <table class="catholique-cards min-w-full text-sm">
                 <thead class="bg-slate-50 dark:bg-slate-800/60 text-left">
                     <tr>
                         <th class="px-4 py-3 font-semibold">Date</th>
@@ -68,16 +68,16 @@
                 <tbody>
                     @forelse ($mouvements as $mouvement)
                         <tr class="border-t border-slate-200 dark:border-slate-700">
-                            <td class="px-4 py-3">{{ $mouvement->date_mouvement?->format('d/m/Y') }}</td>
-                            <td class="px-4 py-3">{{ str_replace('_', ' ', $mouvement->type) }}</td>
-                            <td class="px-4 py-3">{{ $mouvement->libelle }}</td>
-                            <td class="px-4 py-3 text-right tabular-nums text-emerald-700 dark:text-emerald-400">
+                            <td class="px-4 py-3" data-label="Date">{{ $mouvement->date_mouvement?->format('d/m/Y') }}</td>
+                            <td class="px-4 py-3" data-label="Type">{{ str_replace('_', ' ', $mouvement->type) }}</td>
+                            <td class="px-4 py-3" data-label="Libellé">{{ $mouvement->libelle }}</td>
+                            <td class="px-4 py-3 text-right tabular-nums text-emerald-700 dark:text-emerald-400" data-label="Crédit">
                                 {{ $mouvement->sens === 'credit' ? number_format($mouvement->montant, 0, ',', ' ') : '—' }}
                             </td>
-                            <td class="px-4 py-3 text-right tabular-nums text-red-600 dark:text-red-400">
+                            <td class="px-4 py-3 text-right tabular-nums text-red-600 dark:text-red-400" data-label="Débit">
                                 {{ $mouvement->sens === 'debit' ? number_format($mouvement->montant, 0, ',', ' ') : '—' }}
                             </td>
-                            <td class="px-4 py-3">
+                            <td class="px-4 py-3" data-label="Actions">
                                 @if ($mouvement->can_edit_alimentation)
                                     <div class="flex flex-wrap justify-end gap-2">
                                         <x-action-button

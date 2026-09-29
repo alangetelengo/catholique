@@ -22,7 +22,7 @@
 
 @section('content')
 <div class="rounded-2xl border border-slate-200/80 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-sm overflow-hidden mb-6">
-    <form method="GET" action="{{ route('events.index') }}" class="px-6 py-4 flex flex-wrap items-end gap-4 border-b border-slate-200/80 dark:border-slate-600/60 bg-slate-50/80 dark:bg-slate-900/40">
+    <form method="GET" action="{{ route('events.index') }}" class="px-4 py-4 sm:px-6 flex flex-wrap items-end gap-4 border-b border-slate-200/80 dark:border-slate-600/60 bg-slate-50/80 dark:bg-slate-900/40">
         <div class="min-w-36">
             <label for="ev_type" class="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">Type</label>
             <select name="type" id="ev_type" class="w-full rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/35">
@@ -65,7 +65,7 @@
 
     @if($events->count() > 0)
     <div class="overflow-x-auto">
-        <table id="events-table" class="w-full text-sm">
+        <table id="events-table" class="catholique-cards w-full text-sm">
             <thead>
                 <tr class="bg-linear-to-r from-slate-50 to-slate-100/80 dark:from-slate-700/80 dark:to-slate-800/80 border-b-2 border-slate-200 dark:border-slate-600">
                     <th class="px-6 py-4 text-left text-xs font-bold text-slate-600 dark:text-slate-300 uppercase tracking-widest">Date</th>
@@ -78,16 +78,16 @@
             <tbody class="divide-y divide-slate-100 dark:divide-slate-700/80 text-slate-800 dark:text-slate-100">
                 @foreach($events as $event)
                 <tr class="hover:bg-emerald-50/50 dark:hover:bg-slate-700/40 transition-colors duration-200">
-                    <td class="px-6 py-4">
+                    <td class="px-6 py-4" data-label="Date">
                         <span class="block font-semibold">{{ $event->date_evenement?->format('d/m/Y') ?? '—' }}</span>
                         <span class="text-xs text-slate-500 dark:text-slate-400">{{ optional($event->heure_evenement)->format('H:i') }}</span>
                     </td>
-                    <td class="px-6 py-4 font-medium">{{ $event->titre }}</td>
-                    <td class="px-6 py-4">
+                    <td class="px-6 py-4 font-medium" data-label="Titre">{{ $event->titre }}</td>
+                    <td class="px-6 py-4" data-label="Type">
                         <span class="inline-flex rounded-lg bg-emerald-500/10 text-emerald-800 dark:text-emerald-200 px-2 py-0.5 text-xs font-medium">{{ ucfirst($event->type) }}</span>
                     </td>
-                    <td class="px-6 py-4 text-slate-600 dark:text-slate-400">{{ optional($event->celebrePar)->prenom }} {{ optional($event->celebrePar)->nom }}</td>
-                    <td class="px-6 py-4 text-right">
+                    <td class="px-6 py-4 text-slate-600 dark:text-slate-400" data-label="Célébré par">{{ optional($event->celebrePar)->prenom }} {{ optional($event->celebrePar)->nom }}</td>
+                    <td class="px-6 py-4 text-right" data-label="Actions">
                         <div class="inline-flex flex-wrap items-center justify-end gap-1.5" role="group" aria-label="Actions">
                             <x-action-button variant="view" href="{{ route('events.show', $event) }}" />
                             @can('edit_events')

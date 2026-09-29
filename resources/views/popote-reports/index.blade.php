@@ -30,7 +30,7 @@
 
     <div class="adventiste-table-shell">
         <div class="overflow-x-auto">
-            <table class="min-w-full text-sm">
+            <table class="catholique-cards min-w-full text-sm">
                 <thead><tr><th class="px-4 py-3 font-semibold">Période</th><th class="px-4 py-3 font-semibold">Paroisse</th><th class="px-4 py-3 font-semibold">Crédits caisse</th><th class="px-4 py-3 font-semibold">Dépenses alimentation</th><th class="px-4 py-3 font-semibold">Solde</th><th class="px-4 py-3 font-semibold text-right">Actions</th></tr></thead>
                 <tbody class="divide-y divide-slate-200/70 dark:divide-slate-700/70">
                     @forelse($reports as $report)
@@ -41,12 +41,12 @@
                                 : sprintf('%02d/%s', (int) ($details['month'] ?? optional($report->date_debut)->format('m')), $details['year'] ?? optional($report->date_debut)->format('Y'));
                         @endphp
                         <tr>
-                            <td class="px-4 py-3">{{ $period }}</td>
-                            <td class="px-4 py-3">{{ $report->paroisse?->nom ?? '-' }}</td>
-                            <td class="px-4 py-3 font-semibold">{{ $fcfa((float) $report->total_recettes) }}</td>
-                            <td class="px-4 py-3 font-semibold">{{ $fcfa((float) $report->total_depenses) }}</td>
-                            <td class="px-4 py-3 font-semibold">{{ $fcfa((float) $report->solde) }}</td>
-                            <td class="px-4 py-3">
+                            <td class="px-4 py-3" data-label="Période">{{ $period }}</td>
+                            <td class="px-4 py-3" data-label="Paroisse">{{ $report->paroisse?->nom ?? '-' }}</td>
+                            <td class="px-4 py-3 font-semibold" data-label="Crédits caisse">{{ $fcfa((float) $report->total_recettes) }}</td>
+                            <td class="px-4 py-3 font-semibold" data-label="Dépenses alimentation">{{ $fcfa((float) $report->total_depenses) }}</td>
+                            <td class="px-4 py-3 font-semibold" data-label="Solde">{{ $fcfa((float) $report->solde) }}</td>
+                            <td class="px-4 py-3" data-label="Actions">
                                 <div class="flex items-center justify-end gap-2">
                                     <x-action-button variant="view" href="{{ route('popote-reports.show', $report) }}" />
                                     <x-action-button variant="edit" href="{{ route('popote-reports.edit', $report) }}" />

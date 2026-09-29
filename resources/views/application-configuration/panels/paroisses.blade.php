@@ -33,7 +33,7 @@
 
     <div class="adventiste-table-shell">
         <div class="overflow-x-auto">
-            <table class="min-w-full text-sm">
+            <table class="catholique-cards min-w-full text-sm">
                 <thead>
                     <tr class="text-left text-slate-700 dark:text-slate-200">
                         <th class="px-4 py-3 font-semibold">Nom</th>
@@ -49,17 +49,17 @@
                 <tbody class="divide-y divide-slate-200/70 dark:divide-slate-700/70">
                     @forelse ($paroisses as $p)
                         <tr class="text-slate-700 dark:text-slate-200">
-                            <td class="px-4 py-3 font-medium">{{ $p->nom }}</td>
-                            <td class="px-4 py-3">{{ $p->ville ?? '—' }}</td>
-                            <td class="px-4 py-3 font-mono text-xs">{{ $p->code_paroisse ?? '—' }}</td>
-                            <td class="px-4 py-3">
+                            <td class="px-4 py-3 font-medium" data-label="Nom">{{ $p->nom }}</td>
+                            <td class="px-4 py-3" data-label="Ville">{{ $p->ville ?? '—' }}</td>
+                            <td class="px-4 py-3 font-mono text-xs" data-label="Code">{{ $p->code_paroisse ?? '—' }}</td>
+                            <td class="px-4 py-3" data-label="Curé">
                                 @if ($p->cure)
                                     {{ $p->cure->prenom }} {{ $p->cure->nom }}
                                 @else
                                     —
                                 @endif
                             </td>
-                            <td class="px-4 py-3">
+                            <td class="px-4 py-3" data-label="Statut">
                                 @if ($p->actif)
                                     <span class="inline-flex rounded-full bg-emerald-100 dark:bg-emerald-900/40 px-2.5 py-1 text-xs font-semibold text-emerald-800 dark:text-emerald-200">Active</span>
                                 @else
@@ -67,7 +67,7 @@
                                 @endif
                             </td>
                             @if ($canManage)
-                                <td class="px-4 py-3">
+                                <td class="px-4 py-3" data-label="Actions">
                                     <div class="flex items-center justify-end gap-2">
                                         <x-action-button
                                             variant="edit"

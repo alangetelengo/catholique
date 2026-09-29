@@ -42,7 +42,7 @@
 
     <div class="adventiste-table-shell">
         <div class="overflow-x-auto">
-            <table class="min-w-full text-sm">
+            <table class="catholique-cards min-w-full text-sm">
                 <thead>
                     <tr class="text-left text-slate-700 dark:text-slate-200">
                         <th class="px-4 py-3 font-semibold">Code</th>
@@ -57,19 +57,19 @@
                 <tbody class="divide-y divide-slate-200/70 dark:divide-slate-700/70">
                     @forelse ($types as $type)
                         <tr>
-                            <td class="px-4 py-3 font-mono text-xs">{{ $type->code }}</td>
-                            <td class="px-4 py-3">{{ $type->nom }}</td>
-                            <td class="px-4 py-3">{{ $type->paroisse?->nom ?? '—' }}</td>
-                            <td class="px-4 py-3">{{ $type->category?->nom }}</td>
-                            <td class="px-4 py-3">{{ $type->ordre }}</td>
-                            <td class="px-4 py-3">
+                            <td class="px-4 py-3 font-mono text-xs" data-label="Code">{{ $type->code }}</td>
+                            <td class="px-4 py-3" data-label="Nom">{{ $type->nom }}</td>
+                            <td class="px-4 py-3" data-label="Paroisse">{{ $type->paroisse?->nom ?? '—' }}</td>
+                            <td class="px-4 py-3" data-label="Catégorie">{{ $type->category?->nom }}</td>
+                            <td class="px-4 py-3" data-label="Ordre">{{ $type->ordre }}</td>
+                            <td class="px-4 py-3" data-label="Actif">
                                 @if ($type->actif)
                                     <span class="inline-flex items-center rounded-full bg-emerald-50 dark:bg-emerald-900/30 px-2.5 py-1 text-xs font-semibold text-emerald-700 dark:text-emerald-300">Oui</span>
                                 @else
                                     <span class="inline-flex items-center rounded-full bg-slate-100 dark:bg-slate-700 px-2.5 py-1 text-xs font-semibold text-slate-700 dark:text-slate-300">Non</span>
                                 @endif
                             </td>
-                            <td class="px-4 py-3">
+                            <td class="px-4 py-3" data-label="Actions">
                                 <div class="flex justify-end gap-2">
                                     <x-action-button
                                         variant="edit"

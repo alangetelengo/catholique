@@ -26,7 +26,7 @@
 
     <div class="adventiste-table-shell">
         <div class="overflow-x-auto">
-            <table class="min-w-full text-sm">
+            <table class="catholique-cards min-w-full text-sm">
                 <thead>
                     <tr class="text-left text-slate-700 dark:text-slate-200">
                         <th class="px-4 py-3 font-semibold">Code</th>
@@ -39,17 +39,17 @@
                 <tbody class="divide-y divide-slate-200/70 dark:divide-slate-700/70">
                     @forelse ($categories as $category)
                         <tr>
-                            <td class="px-4 py-3 font-mono text-xs">{{ $category->code }}</td>
-                            <td class="px-4 py-3">{{ $category->nom }}</td>
-                            <td class="px-4 py-3">{{ $category->ordre }}</td>
-                            <td class="px-4 py-3">
+                            <td class="px-4 py-3 font-mono text-xs" data-label="Code">{{ $category->code }}</td>
+                            <td class="px-4 py-3" data-label="Nom">{{ $category->nom }}</td>
+                            <td class="px-4 py-3" data-label="Ordre">{{ $category->ordre }}</td>
+                            <td class="px-4 py-3" data-label="Actif">
                                 @if ($category->actif)
                                     <span class="inline-flex items-center rounded-full bg-emerald-50 dark:bg-emerald-900/30 px-2.5 py-1 text-xs font-semibold text-emerald-700 dark:text-emerald-300">Oui</span>
                                 @else
                                     <span class="inline-flex items-center rounded-full bg-slate-100 dark:bg-slate-700 px-2.5 py-1 text-xs font-semibold text-slate-700 dark:text-slate-300">Non</span>
                                 @endif
                             </td>
-                            <td class="px-4 py-3">
+                            <td class="px-4 py-3" data-label="Actions">
                                 <div class="flex justify-end gap-2">
                                     <x-action-button
                                         variant="edit"

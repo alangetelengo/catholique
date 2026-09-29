@@ -79,7 +79,7 @@
 
     <div class="adventiste-table-shell">
         <div class="overflow-x-auto">
-            <table class="min-w-full text-sm">
+            <table class="catholique-cards min-w-full text-sm">
                 <thead>
                     <tr class="text-left text-slate-700 dark:text-slate-200">
                         @if(auth()->user()?->hasRole('super_admin'))
@@ -99,20 +99,20 @@
                     @forelse ($inventories as $row)
                         <tr class="text-slate-700 dark:text-slate-200">
                             @if(auth()->user()?->hasRole('super_admin'))
-                                <td class="px-4 py-3">{{ $row->paroisse?->nom ?? '—' }}</td>
+                                <td class="px-4 py-3" data-label="Paroisse">{{ $row->paroisse?->nom ?? '—' }}</td>
                             @endif
-                            <td class="px-4 py-3 font-medium">{{ $row->designation }}</td>
-                            <td class="px-4 py-3 font-mono text-xs">{{ $row->reference_inventaire ?? '—' }}</td>
-                            <td class="px-4 py-3">{{ $categories[$row->categorie] ?? $row->categorie }}</td>
-                            <td class="px-4 py-3">{{ number_format((float) $row->quantite, 2, ',', ' ') }} {{ $row->unite }}</td>
-                            <td class="px-4 py-3">{{ $row->emplacement ?? '—' }}</td>
-                            <td class="px-4 py-3">
+                            <td class="px-4 py-3 font-medium" data-label="Désignation">{{ $row->designation }}</td>
+                            <td class="px-4 py-3 font-mono text-xs" data-label="Réf.">{{ $row->reference_inventaire ?? '—' }}</td>
+                            <td class="px-4 py-3" data-label="Catégorie">{{ $categories[$row->categorie] ?? $row->categorie }}</td>
+                            <td class="px-4 py-3" data-label="Qté">{{ number_format((float) $row->quantite, 2, ',', ' ') }} {{ $row->unite }}</td>
+                            <td class="px-4 py-3" data-label="Emplacement">{{ $row->emplacement ?? '—' }}</td>
+                            <td class="px-4 py-3" data-label="État">
                                 <span class="inline-flex items-center rounded-full bg-slate-100 dark:bg-slate-700 px-2.5 py-1 text-xs font-semibold text-slate-700 dark:text-slate-200">
                                     {{ $etats[$row->etat] ?? $row->etat }}
                                 </span>
                             </td>
-                            <td class="px-4 py-3">{{ $formatFcfa($row->valeur_estimee !== null ? (float) $row->valeur_estimee : null) }}</td>
-                            <td class="px-4 py-3">
+                            <td class="px-4 py-3" data-label="Valeur est.">{{ $formatFcfa($row->valeur_estimee !== null ? (float) $row->valeur_estimee : null) }}</td>
+                            <td class="px-4 py-3" data-label="Actions">
                                 <div class="flex items-center justify-end gap-2">
                                     <x-action-button
                                         variant="edit"

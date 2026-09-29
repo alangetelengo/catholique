@@ -18,7 +18,7 @@
                 <h2 class="text-sm font-semibold text-slate-800 dark:text-slate-200 mb-3">Trésorerie par mois de capital (revenu principal)</h2>
                 <p class="text-xs text-slate-600 dark:text-slate-400 mb-3">Chaque mois est une enveloppe indépendante. Alimentez les caisses depuis le mois concerné.</p>
                 <div class="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700">
-                    <table class="min-w-full text-sm">
+                    <table class="catholique-cards min-w-full text-sm">
                         <thead class="bg-slate-50 dark:bg-slate-800/60 text-left">
                             <tr>
                                 <th class="px-4 py-3 font-semibold">Mois</th>
@@ -30,10 +30,10 @@
                         <tbody>
                             @foreach ($envelopesCapital as $envelope)
                                 <tr class="border-t border-slate-200 dark:border-slate-700">
-                                    <td class="px-4 py-3 font-medium">{{ $envelope['label'] }}</td>
-                                    <td class="px-4 py-3 text-right tabular-nums">{{ number_format($envelope['recu'], 0, ',', ' ') }}</td>
-                                    <td class="px-4 py-3 text-right tabular-nums">{{ number_format($envelope['alloue'], 0, ',', ' ') }}</td>
-                                    <td class="px-4 py-3 text-right font-semibold tabular-nums text-emerald-700 dark:text-emerald-400">{{ number_format($envelope['disponible'], 0, ',', ' ') }}</td>
+                                    <td class="px-4 py-3 font-medium" data-label="Mois">{{ $envelope['label'] }}</td>
+                                    <td class="px-4 py-3 text-right tabular-nums" data-label="Reçu">{{ number_format($envelope['recu'], 0, ',', ' ') }}</td>
+                                    <td class="px-4 py-3 text-right tabular-nums" data-label="Alloué">{{ number_format($envelope['alloue'], 0, ',', ' ') }}</td>
+                                    <td class="px-4 py-3 text-right font-semibold tabular-nums text-emerald-700 dark:text-emerald-400" data-label="Disponible">{{ number_format($envelope['disponible'], 0, ',', ' ') }}</td>
                                 </tr>
                             @endforeach
                         </tbody>
@@ -43,7 +43,7 @@
         @endif
 
         <div class="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700">
-            <table class="min-w-full text-sm">
+            <table class="catholique-cards min-w-full text-sm">
                 <thead class="bg-slate-50 dark:bg-slate-800/60 text-left">
                     <tr>
                         <th class="px-4 py-3 font-semibold">Caisse</th>
@@ -55,15 +55,15 @@
                 <tbody>
                     @forelse ($caisses as $caisse)
                         <tr class="border-t border-slate-200 dark:border-slate-700">
-                            <td class="px-4 py-3 font-medium">
+                            <td class="px-4 py-3 font-medium" data-label="Caisse">
                                 {{ $caisse->nom }}
                                 @if ($caisse->est_tresorerie)
                                     <span class="ml-2 text-xs text-amber-700 dark:text-amber-300">(trésorerie)</span>
                                 @endif
                             </td>
-                            <td class="px-4 py-3 text-slate-600 dark:text-slate-400">{{ $caisse->description }}</td>
-                            <td class="px-4 py-3 text-right font-semibold tabular-nums">{{ number_format($caisse->solde_disponible ?? 0, 0, ',', ' ') }}</td>
-                            <td class="px-4 py-3 text-right">
+                            <td class="px-4 py-3 text-slate-600 dark:text-slate-400" data-label="Description">{{ $caisse->description }}</td>
+                            <td class="px-4 py-3 text-right font-semibold tabular-nums" data-label="Solde">{{ number_format($caisse->solde_disponible ?? 0, 0, ',', ' ') }}</td>
+                            <td class="px-4 py-3 text-right" data-label="">
                                 <a href="{{ route('caisses.show', $caisse) }}" class="text-emerald-700 dark:text-emerald-400 hover:underline">Mouvements</a>
                             </td>
                         </tr>

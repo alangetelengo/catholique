@@ -224,7 +224,7 @@
 
     <div class="adventiste-table-shell">
         <div class="overflow-x-auto">
-            <table class="min-w-full text-sm">
+            <table class="catholique-cards min-w-full text-sm">
                 <thead>
                     <tr class="text-left text-slate-700 dark:text-slate-200">
                         <th class="px-4 py-3 font-semibold">Date</th>
@@ -239,10 +239,10 @@
                 <tbody class="divide-y divide-slate-200/70 dark:divide-slate-700/70">
                     @forelse ($revenues as $revenue)
                         <tr class="text-slate-700 dark:text-slate-200">
-                            <td class="px-4 py-3">{{ optional($revenue->date_recette)->format('d/m/Y') }}</td>
-                            <td class="px-4 py-3">{{ $revenue->category?->nom ?? '-' }}</td>
-                            <td class="px-4 py-3">{{ $revenue->type?->nom ?? '-' }}</td>
-                            <td class="px-4 py-3">
+                            <td class="px-4 py-3" data-label="Date">{{ optional($revenue->date_recette)->format('d/m/Y') }}</td>
+                            <td class="px-4 py-3" data-label="Catégorie">{{ $revenue->category?->nom ?? '-' }}</td>
+                            <td class="px-4 py-3" data-label="Type">{{ $revenue->type?->nom ?? '-' }}</td>
+                            <td class="px-4 py-3" data-label="Mois concerné">
                                 @if ($revenue->mois_capital)
                                     {{ \App\Support\SubventionMensuelle::formatMoisCapital($revenue->mois_capital) }}
                                 @elseif ($revenue->mois_location)
@@ -251,8 +251,8 @@
                                     <span class="text-slate-400">—</span>
                                 @endif
                             </td>
-                            <td class="px-4 py-3 font-semibold">{{ $formatFcfa((float) $revenue->montant) }}</td>
-                            <td class="px-4 py-3">
+                            <td class="px-4 py-3 font-semibold" data-label="Montant">{{ $formatFcfa((float) $revenue->montant) }}</td>
+                            <td class="px-4 py-3" data-label="Paiement">
                                 <span class="inline-flex items-center rounded-full bg-slate-100 dark:bg-slate-700 px-2.5 py-1 text-xs font-semibold text-slate-700 dark:text-slate-200">
                                     {{ [
                                         'especes' => 'Espèces',
@@ -263,7 +263,7 @@
                                     ][$revenue->methode_paiement] ?? ucfirst(str_replace('_', ' ', (string) $revenue->methode_paiement)) }}
                                 </span>
                             </td>
-                            <td class="px-4 py-3">
+                            <td class="px-4 py-3" data-label="Actions">
                                 <div class="flex items-center justify-end gap-2">
                                     <x-action-button
                                         variant="edit"

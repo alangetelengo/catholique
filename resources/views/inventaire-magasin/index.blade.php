@@ -64,7 +64,7 @@
     @if ($items->count() > 0)
         <div class="adventiste-table-shell">
             <div class="overflow-x-auto">
-                <table class="min-w-full text-sm">
+                <table class="catholique-cards min-w-full text-sm">
                     <thead>
                         <tr class="text-left text-slate-700 dark:text-slate-200">
                             <th class="px-4 py-3 font-semibold">Nom</th>
@@ -79,18 +79,18 @@
                     <tbody class="divide-y divide-slate-200/70 dark:divide-slate-700/70">
                         @foreach ($items as $item)
                             <tr class="text-slate-700 dark:text-slate-200 {{ $item->isAlerte() ? 'bg-amber-50/60 dark:bg-amber-950/25' : '' }}">
-                                <td class="px-4 py-3 font-medium">
+                                <td class="px-4 py-3 font-medium" data-label="Nom">
                                     {{ $item->nom }}
                                     @if ($item->isAlerte())
                                         <span class="ms-2 inline-flex items-center rounded-full bg-red-100 dark:bg-red-900/40 px-2 py-0.5 text-xs font-semibold text-red-800 dark:text-red-200">Alerte</span>
                                     @endif
                                 </td>
-                                <td class="px-4 py-3">{{ $item->categorie ?? '—' }}</td>
-                                <td class="px-4 py-3">{{ number_format((float) $item->quantite, 2, ',', ' ') }}</td>
-                                <td class="px-4 py-3">{{ $item->unite ?? '—' }}</td>
-                                <td class="px-4 py-3">{{ $item->date_peremption?->format('d/m/Y') ?? '—' }}</td>
-                                <td class="px-4 py-3">{{ $item->paroisse?->nom ?? '—' }}</td>
-                                <td class="px-4 py-3">
+                                <td class="px-4 py-3" data-label="Catégorie">{{ $item->categorie ?? '—' }}</td>
+                                <td class="px-4 py-3" data-label="Quantité">{{ number_format((float) $item->quantite, 2, ',', ' ') }}</td>
+                                <td class="px-4 py-3" data-label="Unité">{{ $item->unite ?? '—' }}</td>
+                                <td class="px-4 py-3" data-label="Péremption">{{ $item->date_peremption?->format('d/m/Y') ?? '—' }}</td>
+                                <td class="px-4 py-3" data-label="Paroisse">{{ $item->paroisse?->nom ?? '—' }}</td>
+                                <td class="px-4 py-3" data-label="Actions">
                                     <div class="flex items-center justify-end gap-2">
                                         <x-action-button
                                             variant="edit"

@@ -20,13 +20,13 @@
 @endphp
 
 <div class="rounded-2xl border border-slate-200/80 dark:border-slate-700 bg-linear-to-br from-slate-900 via-slate-800 to-slate-900 text-white shadow-lg overflow-hidden mb-6">
-    <div class="px-6 py-8 sm:px-8 flex flex-wrap items-center justify-between gap-6">
+    <div class="px-4 py-6 sm:px-8 sm:py-8 flex flex-wrap items-center justify-between gap-4 sm:gap-6">
         <div class="flex items-center gap-5 min-w-0">
             <div class="shrink-0 w-16 h-16 rounded-2xl bg-white/15 ring-2 ring-white/30 flex items-center justify-center text-2xl" aria-hidden="true">
                 <i class="fas fa-calendar-alt text-emerald-400"></i>
             </div>
             <div class="min-w-0">
-                <h2 class="text-xl sm:text-2xl font-bold m-0 truncate">{{ $event->titre }}</h2>
+                <h2 class="text-xl sm:text-2xl font-bold m-0 break-words">{{ $event->titre }}</h2>
                 <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-slate-300">
                     @if($subtitle !== '')
                         <span><span class="text-slate-400">Date</span> {{ $subtitle }}</span>

@@ -65,7 +65,7 @@
     @if ($reports->count() > 0)
         <div class="adventiste-table-shell">
             <div class="overflow-x-auto">
-                <table class="min-w-full text-sm">
+                <table class="catholique-cards min-w-full text-sm">
                     <thead>
                         <tr class="text-left text-slate-700 dark:text-slate-200">
                             <th class="px-4 py-3 font-semibold">Période</th>
@@ -83,7 +83,7 @@
                     <tbody class="divide-y divide-slate-200/70 dark:divide-slate-700/70">
                         @foreach ($reports as $report)
                             <tr class="text-slate-700 dark:text-slate-200">
-                                <td class="px-4 py-3">
+                                <td class="px-4 py-3" data-label="Période">
                                     <span class="font-medium text-slate-900 dark:text-slate-100">
                                         {{ $report->date_debut->copy()->locale(app()->getLocale())->translatedFormat('F Y') }}
                                     </span>
@@ -92,20 +92,20 @@
                                     </span>
                                 </td>
                                 @if (auth()->user()->hasRole('super_admin'))
-                                    <td class="px-4 py-3">{{ $report->paroisse->nom ?? '—' }}</td>
+                                    <td class="px-4 py-3" data-label="Paroisse">{{ $report->paroisse->nom ?? '—' }}</td>
                                 @endif
-                                <td class="px-4 py-3 text-right font-semibold text-emerald-700 dark:text-emerald-400">
+                                <td class="px-4 py-3 text-right font-semibold text-emerald-700 dark:text-emerald-400" data-label="Recettes">
                                     {{ \App\Helpers\ParoisseConfig::formatMontant($report->total_recettes) }}
                                 </td>
-                                <td class="px-4 py-3 text-right font-semibold text-rose-700 dark:text-rose-400">
+                                <td class="px-4 py-3 text-right font-semibold text-rose-700 dark:text-rose-400" data-label="Dépenses">
                                     {{ \App\Helpers\ParoisseConfig::formatMontant($report->total_depenses) }}
                                 </td>
-                                <td class="px-4 py-3 text-right font-bold {{ $report->solde >= 0 ? 'text-sky-700 dark:text-sky-300' : 'text-amber-700 dark:text-amber-400' }}">
+                                <td class="px-4 py-3 text-right font-bold {{ $report->solde >= 0 ? 'text-sky-700 dark:text-sky-300' : 'text-amber-700 dark:text-amber-400' }}" data-label="Solde">
                                     {{ \App\Helpers\ParoisseConfig::formatMontant($report->solde) }}
                                 </td>
-                                <td class="px-4 py-3 whitespace-nowrap">{{ $report->created_at->format('d/m/Y H:i') }}</td>
-                                <td class="px-4 py-3">{{ $report->createdBy->name ?? '—' }}</td>
-                                <td class="px-4 py-3 text-right">
+                                <td class="px-4 py-3 whitespace-nowrap" data-label="Créé le">{{ $report->created_at->format('d/m/Y H:i') }}</td>
+                                <td class="px-4 py-3" data-label="Créé par">{{ $report->createdBy->name ?? '—' }}</td>
+                                <td class="px-4 py-3 text-right" data-label="Actions">
                                     <div class="inline-flex flex-wrap items-center justify-end gap-2">
                                         <x-action-button
                                             variant="view"

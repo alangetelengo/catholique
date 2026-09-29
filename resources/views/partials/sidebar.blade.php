@@ -256,10 +256,12 @@
     background: linear-gradient(to right, #06a269, #1c4d3b) !important;
     border: 1px solid transparent;
 }
-#main-wrapper.menu-toggle .sidebar details > ul {
-    display: none !important;
-}
-#main-wrapper.menu-toggle .sidebar .sidebar-chevron {
-    display: none !important;
+@media (min-width: 1024px) {
+    #main-wrapper.menu-toggle .sidebar details > ul {
+        display: none !important;
+    }
+    #main-wrapper.menu-toggle .sidebar .sidebar-chevron {
+        display: none !important;
+    }
 }
 </style>

@@ -25,7 +25,7 @@
     $typeLabels = ['chorale' => 'Chorale', 'catéchisme' => 'Catéchisme', 'mouvement' => 'Mouvement', 'autre' => 'Autre'];
 @endphp
 <div class="rounded-2xl border border-slate-200/80 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-sm overflow-hidden mb-6">
-    <form method="GET" action="{{ route('groups.index') }}" class="px-6 py-4 flex flex-wrap items-end gap-4 border-b border-slate-200/80 dark:border-slate-600/60 bg-slate-50/80 dark:bg-slate-900/40">
+    <form method="GET" action="{{ route('groups.index') }}" class="px-4 py-4 sm:px-6 flex flex-wrap items-end gap-4 border-b border-slate-200/80 dark:border-slate-600/60 bg-slate-50/80 dark:bg-slate-900/40">
         <div class="min-w-40">
             <label for="g_type" class="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">Type</label>
             <select name="type" id="g_type" class="w-full rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/35">
@@ -61,7 +61,7 @@
 
     @if($groups->count() > 0)
     <div class="overflow-x-auto">
-        <table class="w-full text-sm">
+        <table class="catholique-cards w-full text-sm">
             <thead>
                 <tr class="bg-linear-to-r from-slate-50 to-slate-100/80 dark:from-slate-700/80 dark:to-slate-800/80 border-b-2 border-slate-200 dark:border-slate-600">
                     <th class="px-6 py-4 text-left text-xs font-bold text-slate-600 dark:text-slate-300 uppercase tracking-widest">Nom</th>
@@ -74,24 +74,23 @@
             <tbody class="divide-y divide-slate-100 dark:divide-slate-700/80 text-slate-800 dark:text-slate-100">
                 @foreach($groups as $group)
                 <tr class="hover:bg-emerald-50/50 dark:hover:bg-slate-700/40 transition-colors">
-                    <td class="px-6 py-4 font-medium">
+                    <td class="px-6 py-4 font-medium" data-label="Nom">
                         {{ $group->nom }}
-                        <span class="sm:hidden text-xs text-slate-500 dark:text-slate-400 mt-1 block">{{ $typeLabels[$group->type] ?? $group->type }}</span>
                     </td>
-                    <td class="px-6 py-4 hidden sm:table-cell">
+                    <td class="px-6 py-4 hidden sm:table-cell" data-label="Type">
                         <span class="inline-flex rounded-lg bg-violet-500/10 text-violet-800 dark:text-violet-200 px-2 py-0.5 text-xs font-medium">{{ $typeLabels[$group->type] ?? $group->type }}</span>
                     </td>
-                    <td class="px-6 py-4 text-slate-600 dark:text-slate-400 hidden md:table-cell">
+                    <td class="px-6 py-4 text-slate-600 dark:text-slate-400 hidden md:table-cell" data-label="Responsable">
                         @if($group->responsable)
                             {{ $group->responsable->prenom }} {{ $group->responsable->nom }}
                         @else
                             —
                         @endif
                     </td>
-                    <td class="px-6 py-4 hidden lg:table-cell">
+                    <td class="px-6 py-4 hidden lg:table-cell" data-label="Paroisse">
                         <span class="inline-flex rounded-lg bg-sky-500/10 text-sky-800 dark:text-sky-200 px-2 py-0.5 text-xs font-medium">{{ $group->paroisse?->nom ?? '—' }}</span>
                     </td>
-                    <td class="px-6 py-4 text-right">
+                    <td class="px-6 py-4 text-right" data-label="Actions">
                         <div class="inline-flex flex-wrap items-center justify-end gap-1.5" role="group">
                             @can('edit_groups')
                             <x-action-button variant="edit" href="{{ route('groups.edit', $group) }}" />

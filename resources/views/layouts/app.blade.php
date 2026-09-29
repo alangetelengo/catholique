@@ -22,8 +22,9 @@
         @include('partials.nav-header')
         @include('partials.header')
         @include('partials.sidebar')
+        <div id="sidebarBackdrop" class="sidebar-backdrop" onclick="closeMobileSidebar()"></div>
 
-        <div id="mainContent" class="main-content pt-20 flex-1 flex flex-col transition-all duration-300">
+        <div id="mainContent" class="main-content pt-20 flex-1 flex flex-col transition-all duration-300 min-w-0">
             @isset($header)
                 <header class="bg-white dark:bg-slate-800 shadow">
                     <div class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
@@ -33,10 +34,10 @@
             @else
                 @hasSection('page-title')
                 <header class="@yield('page-header-class', 'bg-white dark:bg-slate-800 shadow')">
-                    <div class="@yield('content-container-class', 'max-w-7xl mx-auto px-4 sm:px-6 lg:px-8') py-6 flex flex-wrap items-center justify-between gap-4">
+                    <div class="@yield('content-container-class', 'max-w-7xl mx-auto px-4 sm:px-6 lg:px-8') py-4 sm:py-6 flex flex-wrap items-center justify-between gap-3 sm:gap-4">
                         <div class="min-w-0 flex-1">
-                            <h1 class="@yield('page-title-class', 'text-2xl font-bold text-slate-800 dark:text-slate-100')">@yield('page-title')</h1>
-                            @hasSection('page-title-info')<div class="@yield('page-title-info-class', 'text-sm text-slate-500 dark:text-slate-400 mt-1')">@yield('page-title-info')</div>@endif
+                            <h1 class="@yield('page-title-class', 'text-xl sm:text-2xl font-bold text-slate-800 dark:text-slate-100 break-words')">@yield('page-title')</h1>
+                            @hasSection('page-title-info')<div class="@yield('page-title-info-class', 'text-sm text-slate-500 dark:text-slate-400 mt-1 break-words')">@yield('page-title-info')</div>@endif
                         </div>
                         <div class="flex w-full min-w-0 shrink-0 flex-wrap items-center justify-end gap-2 sm:w-auto">
                             @unless(request()->routeIs('home'))

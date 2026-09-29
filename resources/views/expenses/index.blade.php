@@ -106,7 +106,7 @@
     </div>
 
     <div class="adventiste-table-shell min-w-0 w-full">
-        <table class="w-full min-w-[48rem] text-sm">
+        <table class="catholique-cards w-full text-sm">
             <thead>
                 <tr class="text-left text-slate-700 dark:text-slate-200">
                     <th class="px-3 py-3 font-semibold whitespace-nowrap">Date</th>
@@ -120,14 +120,14 @@
             <tbody class="divide-y divide-slate-200/70 dark:divide-slate-700/70">
                 @forelse ($expenses as $expense)
                     <tr class="text-slate-700 dark:text-slate-200 group">
-                        <td class="px-3 py-3 whitespace-nowrap">{{ optional($expense->date_depense)->format('d/m/Y') }}</td>
-                        <td class="px-3 py-3 max-w-[14rem]">
+                        <td class="px-3 py-3 whitespace-nowrap" data-label="Date">{{ optional($expense->date_depense)->format('d/m/Y') }}</td>
+                        <td class="px-3 py-3 max-w-[14rem]" data-label="Libellé">
                             <span class="line-clamp-2" title="{{ $expense->libelle }}">{{ $expense->libelle ?: '—' }}</span>
                         </td>
-                        <td class="px-3 py-3 whitespace-nowrap">
+                        <td class="px-3 py-3 whitespace-nowrap" data-label="Type">
                             {{ $expense->expenseType?->nom ?? '—' }}
                         </td>
-                        <td class="px-3 py-3 text-xs min-w-[10rem] max-w-[16rem]">
+                        <td class="px-3 py-3 text-xs min-w-[10rem] max-w-[16rem]" data-label="Caisses">
                             @if($expense->fundingSources->isNotEmpty())
                                 <div class="flex flex-col gap-1">
                                     @foreach($expense->fundingSources as $source)
@@ -148,7 +148,7 @@
                                 <span class="text-slate-400">—</span>
                             @endif
                         </td>
-                        <td class="px-3 py-3 font-semibold whitespace-nowrap">{{ $formatFcfa((float) $expense->montant) }}</td>
+                        <td class="px-3 py-3 font-semibold whitespace-nowrap" data-label="Montant">{{ $formatFcfa((float) $expense->montant) }}</td>
                         {{-- <td class="px-3 py-3 hidden xl:table-cell">
                             <div class="flex items-center gap-1.5 text-xs">
                                 @if($expense->piece_facture_path)
@@ -187,7 +187,7 @@
                                 @endif
                             </div>
                         </td> --}}
-                        <td class="px-3 py-3 sticky right-0 z-10 bg-white dark:bg-slate-800 group-hover:bg-[rgb(240_253_244_/_0.45)] dark:group-hover:bg-[rgb(15_23_42_/_0.65)] shadow-[-6px_0_8px_-6px_rgba(15,23,42,0.18)]">
+                        <td class="px-3 py-3 lg:sticky lg:right-0 lg:z-10 bg-white dark:bg-slate-800 group-hover:bg-[rgb(240_253_244_/_0.45)] dark:group-hover:bg-[rgb(15_23_42_/_0.65)] lg:shadow-[-6px_0_8px_-6px_rgba(15,23,42,0.18)]" data-label="Actions">
                             <div class="flex items-center justify-end gap-1.5 whitespace-nowrap">
                                 <x-action-button
                                     variant="edit"

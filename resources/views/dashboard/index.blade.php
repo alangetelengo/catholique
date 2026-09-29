@@ -108,8 +108,10 @@
     <div class="adventiste-card-pro-static p-4 sm:p-5 mb-5">
         <h2 class="text-base font-semibold text-slate-900 dark:text-white mb-2">Projection indicative</h2>
         <p class="text-sm text-slate-600 dark:text-slate-400 mb-2">Moyenne journalière des recettes sur la période × 365 (non saisonnalisée).</p>
-        <p class="text-sm"><span class="text-slate-500 dark:text-slate-400">Moy. / jour</span> — <strong>{{ $fcfa($data['forecast']['daily_avg_revenue']) }}</strong>
-            &nbsp;·&nbsp; <span class="text-slate-500 dark:text-slate-400">Extrapol. 365 j.</span> — <strong>{{ $fcfa($data['forecast']['projected_365']) }}</strong></p>
+        <p class="text-sm flex flex-col gap-1 sm:flex-row sm:flex-wrap sm:items-baseline sm:gap-x-3">
+            <span><span class="text-slate-500 dark:text-slate-400">Moy. / jour</span> — <strong>{{ $fcfa($data['forecast']['daily_avg_revenue']) }}</strong></span>
+            <span><span class="text-slate-500 dark:text-slate-400">Extrapol. 365 j.</span> — <strong>{{ $fcfa($data['forecast']['projected_365']) }}</strong></span>
+        </p>
     </div>
 
     <div class="adventiste-card-pro-static p-4 sm:p-5 mb-5">
@@ -135,7 +137,7 @@
                 <a href="{{ route('revenues.index') }}" class="text-xs text-emerald-700 dark:text-emerald-400 hover:underline">Tout voir</a>
             </div>
             <div class="overflow-x-auto">
-                <table class="min-w-full text-sm">
+                <table class="catholique-cards min-w-full text-sm">
                     <thead>
                         <tr class="text-left text-slate-600 dark:text-slate-300 border-b border-slate-200 dark:border-slate-600">
                             <th class="py-2 pr-2">Date</th>
@@ -146,9 +148,9 @@
                     <tbody>
                         @forelse ($data['recent_revenues'] as $rev)
                             <tr class="border-b border-slate-100 dark:border-slate-700/80">
-                                <td class="py-2 pr-2">{{ optional($rev->date_recette)->format('d/m/Y') }}</td>
-                                <td class="py-2 pr-2">{{ $rev->category?->nom ?? '—' }}</td>
-                                <td class="py-2 text-right font-medium">{{ $fcfa((float) $rev->montant) }}</td>
+                                <td class="py-2 pr-2" data-label="Date">{{ optional($rev->date_recette)->format('d/m/Y') }}</td>
+                                <td class="py-2 pr-2" data-label="Catégorie">{{ $rev->category?->nom ?? '—' }}</td>
+                                <td class="py-2 text-right font-medium" data-label="Montant">{{ $fcfa((float) $rev->montant) }}</td>
                             </tr>
                         @empty
                             <tr><td colspan="3" class="py-4 text-slate-500">Aucune recette.</td></tr>
@@ -163,7 +165,7 @@
                 <a href="{{ route('expenses.index') }}" class="text-xs text-emerald-700 dark:text-emerald-400 hover:underline">Tout voir</a>
             </div>
             <div class="overflow-x-auto">
-                <table class="min-w-full text-sm">
+                <table class="catholique-cards min-w-full text-sm">
                     <thead>
                         <tr class="text-left text-slate-600 dark:text-slate-300 border-b border-slate-200 dark:border-slate-600">
                             <th class="py-2 pr-2">Date</th>
@@ -174,11 +176,11 @@
                     <tbody>
                         @forelse ($data['recent_expenses'] as $ex)
                             <tr class="border-b border-slate-100 dark:border-slate-700/80">
-                                <td class="py-2 pr-2">{{ optional($ex->date_depense)->format('d/m/Y') }}</td>
-                                <td class="py-2 pr-2">
+                                <td class="py-2 pr-2" data-label="Date">{{ optional($ex->date_depense)->format('d/m/Y') }}</td>
+                                <td class="py-2 pr-2" data-label="Libellé">
                                     <span class="line-clamp-2">{{ $ex->libelle ?: ($expenseCats[$ex->categorie_charge] ?? $ex->categorie_charge) }}</span>
                                 </td>
-                                <td class="py-2 text-right font-medium">{{ $fcfa((float) $ex->montant) }}</td>
+                                <td class="py-2 text-right font-medium" data-label="Montant">{{ $fcfa((float) $ex->montant) }}</td>
                             </tr>
                         @empty
                             <tr><td colspan="3" class="py-4 text-slate-500">Aucune dépense.</td></tr>

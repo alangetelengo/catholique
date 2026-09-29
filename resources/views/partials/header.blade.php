@@ -9,7 +9,7 @@
             <span class="line block w-full h-0.5 rounded bg-linear-to-r from-[#00b464] to-[#00ff88] transition-all duration-300"></span>
         </div>
     </button>
-    <div class="flex-1 flex justify-between items-center px-6 min-w-0">
+    <div class="header-toolbar flex-1 flex justify-between items-center px-6 min-w-0 gap-2">
         <span class="text-sm font-semibold system-label truncate text-slate-300">
             @auth
                 @php

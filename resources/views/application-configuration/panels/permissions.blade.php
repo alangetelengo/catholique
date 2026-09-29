@@ -15,7 +15,7 @@
                 <input type="search" id="perm-search-hub" placeholder="Filtrer les permissions…" class="w-full max-w-sm rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/35">
             </div>
             <div class="overflow-x-auto">
-                <table id="permissions-table-hub" class="w-full text-sm">
+                <table id="permissions-table-hub" class="catholique-cards w-full text-sm">
                     <thead>
                         <tr class="bg-gradient-to-r from-slate-50 to-slate-100/80 dark:from-slate-700/80 dark:to-slate-800/80 border-b-2 border-slate-200 dark:border-slate-600">
                             <th class="px-6 py-4 text-left text-xs font-bold text-slate-600 dark:text-slate-300 uppercase tracking-widest">Libellé</th>
@@ -27,12 +27,12 @@
                     <tbody class="divide-y divide-slate-100 dark:divide-slate-700/80 text-slate-800 dark:text-slate-100">
                         @foreach ($permissions as $permission)
                             <tr class="perm-row-hub hover:bg-emerald-50/50 dark:hover:bg-slate-700/40 transition-colors">
-                                <td class="px-6 py-4 font-medium">{{ $permission->libelle_permission ?? ucfirst(str_replace('_', ' ', $permission->name)) }}</td>
-                                <td class="px-6 py-4"><code class="text-xs rounded-md bg-slate-100 dark:bg-slate-900 px-2 py-1">{{ $permission->name }}</code></td>
-                                <td class="px-6 py-4">
+                                <td class="px-6 py-4 font-medium" data-label="Libellé">{{ $permission->libelle_permission ?? ucfirst(str_replace('_', ' ', $permission->name)) }}</td>
+                                <td class="px-6 py-4" data-label="Nom technique"><code class="text-xs rounded-md bg-slate-100 dark:bg-slate-900 px-2 py-1">{{ $permission->name }}</code></td>
+                                <td class="px-6 py-4" data-label="Guard">
                                     <span class="inline-flex rounded-lg bg-sky-500/10 text-sky-800 dark:text-sky-200 px-2 py-0.5 text-xs font-medium">{{ $permission->guard_name }}</span>
                                 </td>
-                                <td class="px-6 py-4 text-right">
+                                <td class="px-6 py-4 text-right" data-label="Actions">
                                     @can('manage_permissions')
                                         <div class="inline-flex flex-wrap items-center justify-end gap-1.5">
                                             <x-action-button variant="edit" href="{{ route('permissions.edit', $permission) }}" />

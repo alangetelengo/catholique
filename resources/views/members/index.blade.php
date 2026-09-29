@@ -22,7 +22,7 @@
 
 @section('content')
 <div class="rounded-2xl border border-slate-200/80 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-sm overflow-hidden mb-6">
-    <form method="GET" action="{{ route('members.index') }}" class="px-6 py-4 flex flex-wrap items-end gap-4 border-b border-slate-200/80 dark:border-slate-600/60 bg-slate-50/80 dark:bg-slate-900/40">
+    <form method="GET" action="{{ route('members.index') }}" class="px-4 py-4 sm:px-6 flex flex-wrap items-end gap-4 border-b border-slate-200/80 dark:border-slate-600/60 bg-slate-50/80 dark:bg-slate-900/40">
         <div class="min-w-40">
             <label for="f_statut" class="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">Statut</label>
             <select name="statut" id="f_statut" class="w-full rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/35">
@@ -68,7 +68,7 @@
 
     @if($members->count() > 0)
     <div class="overflow-x-auto">
-        <table id="members-table" class="w-full text-sm">
+        <table id="members-table" class="catholique-cards w-full text-sm">
             <thead>
                 <tr class="bg-linear-to-r from-slate-50 to-slate-100/80 dark:from-slate-700/80 dark:to-slate-800/80 border-b-2 border-slate-200 dark:border-slate-600">
                     <th class="px-6 py-4 text-left text-xs font-bold text-slate-600 dark:text-slate-300 uppercase tracking-widest">Nom</th>
@@ -83,17 +83,16 @@
             <tbody class="divide-y divide-slate-100 dark:divide-slate-700/80 text-slate-800 dark:text-slate-100">
                 @foreach($members as $member)
                 <tr class="group hover:bg-emerald-50/50 dark:hover:bg-slate-700/40 transition-colors duration-200">
-                    <td class="px-6 py-4 font-medium">
+                    <td class="px-6 py-4 font-medium" data-label="Nom">
                         <div class="flex items-center gap-3">
                             <span class="shrink-0 w-10 h-10 rounded-full bg-emerald-500/15 dark:bg-emerald-500/25 text-emerald-700 dark:text-emerald-300 flex items-center justify-center text-sm font-bold">{{ strtoupper(substr($member->prenom, 0, 1)) }}</span>
                             <span>{{ $member->prenom }} {{ $member->nom }}</span>
                         </div>
-                        <span class="sm:hidden text-xs text-slate-500 dark:text-slate-400 mt-1 block">{{ $member->sexe === 'F' ? 'Féminin' : 'Masculin' }} · {{ $member->telephone ?? '—' }}</span>
                     </td>
-                    <td class="px-6 py-4 text-slate-600 dark:text-slate-400 hidden sm:table-cell">{{ $member->sexe === 'F' ? 'Féminin' : 'Masculin' }}</td>
-                    <td class="px-6 py-4 text-slate-600 dark:text-slate-400 hidden md:table-cell">{{ $member->telephone ?? '—' }}</td>
-                    <td class="px-6 py-4 text-slate-600 dark:text-slate-400 hidden lg:table-cell">{{ $member->email ?? '—' }}</td>
-                    <td class="px-6 py-4">
+                    <td class="px-6 py-4 text-slate-600 dark:text-slate-400 hidden sm:table-cell" data-label="Sexe">{{ $member->sexe === 'F' ? 'Féminin' : 'Masculin' }}</td>
+                    <td class="px-6 py-4 text-slate-600 dark:text-slate-400 hidden md:table-cell" data-label="Téléphone">{{ $member->telephone ?? '—' }}</td>
+                    <td class="px-6 py-4 text-slate-600 dark:text-slate-400 hidden lg:table-cell" data-label="Email">{{ $member->email ?? '—' }}</td>
+                    <td class="px-6 py-4" data-label="Statut">
                         @php
                             $badgeRing = match ($member->statut) {
                                 'actif' => 'bg-emerald-500/15 text-emerald-800 dark:text-emerald-200 ring-emerald-500/25',
@@ -103,10 +102,10 @@
                         @endphp
                         <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 ring-inset {{ $badgeRing }}">{{ ucfirst($member->statut) }}</span>
                     </td>
-                    <td class="px-6 py-4 hidden md:table-cell">
+                    <td class="px-6 py-4 hidden md:table-cell" data-label="Paroisse">
                         <span class="inline-flex rounded-lg bg-sky-500/10 text-sky-800 dark:text-sky-200 px-2 py-0.5 text-xs font-medium">{{ $member->paroisse?->nom ?? 'N/A' }}</span>
                     </td>
-                    <td class="px-6 py-4 text-right">
+                    <td class="px-6 py-4 text-right" data-label="Actions">
                         <div class="inline-flex flex-wrap items-center justify-end gap-1.5" role="group" aria-label="Actions">
                             <x-action-button variant="view" href="{{ route('members.show', $member) }}" />
                             @can('edit_members')

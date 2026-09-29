@@ -33,7 +33,7 @@
 @endphp
 
 <div class="rounded-2xl border border-slate-200/80 dark:border-slate-700 bg-linear-to-br from-slate-900 via-slate-800 to-slate-900 text-white shadow-lg overflow-hidden mb-6">
-    <div class="px-6 py-8 sm:px-8 flex flex-wrap items-center justify-between gap-6">
+    <div class="px-4 py-6 sm:px-8 sm:py-8 flex flex-wrap items-center justify-between gap-4 sm:gap-6">
         <div class="flex items-center gap-5 min-w-0">
             <div class="shrink-0 w-20 h-20 rounded-2xl bg-white/15 ring-2 ring-white/30 flex items-center justify-center text-2xl font-bold tracking-tight" aria-hidden="true">
                 {{ $initials !== '' ? $initials : 'M' }}
@@ -41,7 +41,7 @@
             <div class="min-w-0">
                 <h2 class="text-xl sm:text-2xl font-bold flex items-center gap-2 m-0">
                     <i class="fas fa-user text-emerald-400 shrink-0" aria-hidden="true"></i>
-                    <span class="truncate">{{ $fullName !== '' ? $fullName : 'Membre sans nom' }}</span>
+                    <span class="break-words">{{ $fullName !== '' ? $fullName : 'Membre sans nom' }}</span>
                 </h2>
                 <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-slate-300">
                     <span><span class="text-slate-400">Paroisse</span> {{ $member->paroisse?->nom ?? 'N/A' }}</span>

@@ -232,6 +232,221 @@ body {
     width: var(--shell-sidebar-width-collapsed) !important;
 }
 
+/* Téléphone et tablette : menu en tiroir, contenu pleine largeur */
+@media (max-width: 1023px) {
+    .nav-header,
+    #navHeader {
+        display: none !important;
+    }
+
+    .header,
+    #mainHeader,
+    #main-wrapper.menu-toggle .header,
+    #main-wrapper.menu-toggle #mainHeader {
+        left: 0 !important;
+    }
+
+    .main-content,
+    #main-wrapper.menu-toggle .main-content {
+        margin-left: 0 !important;
+    }
+
+    .footer,
+    #main-wrapper.menu-toggle .footer {
+        padding-left: 0 !important;
+    }
+
+    .sidebar,
+    #main-wrapper.menu-toggle .sidebar {
+        top: var(--shell-header-height) !important;
+        height: calc(100vh - var(--shell-header-height)) !important;
+        height: calc(100dvh - var(--shell-header-height)) !important;
+        width: min(18rem, 86vw) !important;
+        min-width: 0 !important;
+        transform: translateX(-110%);
+        transition: transform 0.25s ease;
+        z-index: 2147481500 !important;
+    }
+
+    #main-wrapper.sidebar-open .sidebar {
+        transform: translateX(0);
+    }
+
+    #main-wrapper.menu-toggle .nav-text {
+        position: static;
+        width: auto;
+        height: auto;
+        padding: 0;
+        margin: 0;
+        overflow: visible;
+        clip: auto;
+        white-space: nowrap;
+        border-width: 0;
+    }
+
+    #main-wrapper.menu-toggle .sidebar details > ul {
+        display: block !important;
+    }
+
+    #main-wrapper.menu-toggle .sidebar .sidebar-chevron {
+        display: inline-flex !important;
+    }
+
+    .sidebar-backdrop {
+        display: none;
+        position: fixed;
+        top: var(--shell-header-height);
+        right: 0;
+        bottom: 0;
+        left: 0;
+        background: rgba(15, 23, 42, 0.45);
+        z-index: 2147481000;
+    }
+
+    #main-wrapper.sidebar-open .sidebar-backdrop {
+        display: block;
+    }
+
+    .system-label,
+    .user-details {
+        display: none !important;
+    }
+
+    .header-toolbar {
+        padding-left: 0.75rem !important;
+        padding-right: 0.5rem !important;
+    }
+
+    .user-box {
+        padding: 4px !important;
+        background: transparent !important;
+    }
+}
+
+/* Bureau : sous-menus masqués quand le menu est replié */
+@media (min-width: 1024px) {
+    #main-wrapper.menu-toggle .sidebar details > ul {
+        display: none !important;
+    }
+
+    #main-wrapper.menu-toggle .sidebar .sidebar-chevron {
+        display: none !important;
+    }
+}
+
+/* Listes : cartes empilées sous 768 px */
+@media (max-width: 767px) {
+    table.catholique-cards {
+        min-width: 0 !important;
+    }
+
+    table.catholique-cards thead {
+        display: none;
+    }
+
+    table.catholique-cards,
+    table.catholique-cards tbody,
+    table.catholique-cards tbody tr,
+    table.catholique-cards td {
+        display: block;
+        width: 100%;
+    }
+
+    table.catholique-cards tbody {
+        padding: 0.75rem;
+    }
+
+    table.catholique-cards tbody tr {
+        margin-bottom: 0.75rem;
+        border: 1px solid #e2e8f0;
+        border-radius: 1rem;
+        overflow: hidden;
+        background: #fff;
+    }
+
+    .dark table.catholique-cards tbody tr,
+    html.dark table.catholique-cards tbody tr,
+    body.dark-mode table.catholique-cards tbody tr {
+        border-color: #334155;
+        background: #1e293b;
+    }
+
+    table.catholique-cards td,
+    table.catholique-cards th {
+        position: static !important;
+        box-shadow: none !important;
+    }
+
+    table.catholique-cards td {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 0.75rem;
+        padding: 0.65rem 0.9rem;
+        max-width: none !important;
+        min-width: 0 !important;
+        white-space: normal;
+        text-align: right;
+    }
+
+    table.catholique-cards td::before {
+        content: attr(data-label);
+        flex: 0 0 38%;
+        font-size: 0.68rem;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        color: #64748b;
+        padding-top: 0.15rem;
+        text-align: left;
+    }
+
+    table.catholique-cards td[data-label=""]::before,
+    table.catholique-cards td[colspan]::before {
+        content: none;
+        flex: none;
+    }
+
+    table.catholique-cards td.hidden {
+        display: flex !important;
+    }
+
+    table.catholique-cards td:last-child {
+        justify-content: flex-end;
+        background: rgba(248, 250, 252, 0.8);
+    }
+
+    .dark table.catholique-cards td:last-child,
+    html.dark table.catholique-cards td:last-child,
+    body.dark-mode table.catholique-cards td:last-child {
+        background: rgba(15, 23, 42, 0.55);
+    }
+
+    table.catholique-cards td[colspan] {
+        display: block;
+        text-align: center;
+        background: transparent;
+    }
+
+    table.catholique-cards td > * {
+        min-width: 0;
+    }
+
+    .main-content form [class*="min-w-"] {
+        width: 100%;
+        min-width: 0 !important;
+    }
+
+    .main-content canvas {
+        max-width: 100%;
+    }
+
+    .main-content .overflow-x-auto {
+        -webkit-overflow-scrolling: touch;
+        max-width: 100%;
+    }
+}
+
 body.dark-mode {
     background: #121212;
     color: #ddd;

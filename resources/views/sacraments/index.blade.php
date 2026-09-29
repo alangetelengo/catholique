@@ -33,7 +33,7 @@
 </nav>
 
 <div class="rounded-2xl border border-slate-200/80 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-sm overflow-hidden mb-6">
-    <form method="GET" action="{{ route('sacraments.index') }}" class="px-6 py-4 flex flex-wrap items-end gap-4 border-b border-slate-200/80 dark:border-slate-600/60 bg-slate-50/80 dark:bg-slate-900/40">
+    <form method="GET" action="{{ route('sacraments.index') }}" class="px-4 py-4 sm:px-6 flex flex-wrap items-end gap-4 border-b border-slate-200/80 dark:border-slate-600/60 bg-slate-50/80 dark:bg-slate-900/40">
         <input type="hidden" name="type" value="{{ $type }}">
         @if(auth()->user()->hasRole('super_admin') && $paroisses->count() > 0)
         <div class="min-w-48">
@@ -61,7 +61,7 @@
 
     @if($sacraments->count() > 0)
     <div class="overflow-x-auto">
-        <table class="w-full text-sm">
+        <table class="catholique-cards w-full text-sm">
             <thead>
                 <tr class="bg-linear-to-r from-slate-50 to-slate-100/80 dark:from-slate-700/80 dark:to-slate-800/80 border-b-2 border-slate-200 dark:border-slate-600">
                     <th class="px-6 py-4 text-left text-xs font-bold text-slate-600 dark:text-slate-300 uppercase tracking-widest">Date</th>
@@ -74,11 +74,11 @@
             <tbody class="divide-y divide-slate-100 dark:divide-slate-700/80 text-slate-800 dark:text-slate-100">
                 @foreach($sacraments as $sacrament)
                 <tr class="hover:bg-emerald-50/50 dark:hover:bg-slate-700/40 transition-colors duration-200">
-                    <td class="px-6 py-4 whitespace-nowrap font-semibold">{{ $sacrament->date_celebration?->format('d/m/Y') }}</td>
-                    <td class="px-6 py-4 font-medium">{{ $sacrament->beneficiary_name ?: ($sacrament->beneficiary ? $sacrament->beneficiary->prenom . ' ' . $sacrament->beneficiary->nom : '—') }}</td>
-                    <td class="px-6 py-4 text-slate-600 dark:text-slate-400">{{ $sacrament->lieu ?? '—' }}</td>
-                    <td class="px-6 py-4 text-slate-600 dark:text-slate-400">{{ $sacrament->celebrant ? $sacrament->celebrant->prenom . ' ' . $sacrament->celebrant->nom : '—' }}</td>
-                    <td class="px-6 py-4 text-right">
+                    <td class="px-6 py-4 whitespace-nowrap font-semibold" data-label="Date">{{ $sacrament->date_celebration?->format('d/m/Y') }}</td>
+                    <td class="px-6 py-4 font-medium" data-label="Bénéficiaire">{{ $sacrament->beneficiary_name ?: ($sacrament->beneficiary ? $sacrament->beneficiary->prenom . ' ' . $sacrament->beneficiary->nom : '—') }}</td>
+                    <td class="px-6 py-4 text-slate-600 dark:text-slate-400" data-label="Lieu">{{ $sacrament->lieu ?? '—' }}</td>
+                    <td class="px-6 py-4 text-slate-600 dark:text-slate-400" data-label="Célébrant">{{ $sacrament->celebrant ? $sacrament->celebrant->prenom . ' ' . $sacrament->celebrant->nom : '—' }}</td>
+                    <td class="px-6 py-4 text-right" data-label="Actions">
                         <div class="inline-flex flex-wrap items-center justify-end gap-1.5" role="group" aria-label="Actions">
                             @can(\App\Http\Controllers\SacramentController::TYPE_PERMISSIONS[$type]['view'] ?? 'view_baptisms')
                             <x-action-button variant="view" href="{{ route('sacraments.show', $sacrament) }}" />

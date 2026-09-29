@@ -65,7 +65,7 @@
     @if ($items->count() > 0)
         <div class="adventiste-table-shell">
             <div class="overflow-x-auto">
-                <table class="min-w-full text-sm">
+                <table class="catholique-cards min-w-full text-sm">
                     <thead>
                         <tr class="text-left text-slate-700 dark:text-slate-200">
                             <th class="px-4 py-3 font-semibold">Nom</th>
@@ -80,13 +80,13 @@
                     <tbody class="divide-y divide-slate-200/70 dark:divide-slate-700/70">
                         @foreach ($items as $item)
                             <tr class="text-slate-700 dark:text-slate-200">
-                                <td class="px-4 py-3 font-medium">{{ $item->nom }}</td>
-                                <td class="px-4 py-3">{{ $item->categorie ?? '—' }}</td>
-                                <td class="px-4 py-3">{{ $item->reference ?? '—' }}</td>
-                                <td class="px-4 py-3">{{ $item->lieu ?? '—' }}</td>
-                                <td class="px-4 py-3 font-semibold">{{ \App\Helpers\ParoisseConfig::formatMontant($item->valeur_estimee) }}</td>
-                                <td class="px-4 py-3">{{ $item->paroisse?->nom ?? '—' }}</td>
-                                <td class="px-4 py-3">
+                                <td class="px-4 py-3 font-medium" data-label="Nom">{{ $item->nom }}</td>
+                                <td class="px-4 py-3" data-label="Catégorie">{{ $item->categorie ?? '—' }}</td>
+                                <td class="px-4 py-3" data-label="Référence">{{ $item->reference ?? '—' }}</td>
+                                <td class="px-4 py-3" data-label="Lieu">{{ $item->lieu ?? '—' }}</td>
+                                <td class="px-4 py-3 font-semibold" data-label="Valeur estimée">{{ \App\Helpers\ParoisseConfig::formatMontant($item->valeur_estimee) }}</td>
+                                <td class="px-4 py-3" data-label="Paroisse">{{ $item->paroisse?->nom ?? '—' }}</td>
+                                <td class="px-4 py-3" data-label="Actions">
                                     <div class="flex items-center justify-end gap-2">
                                         <x-action-button
                                             variant="edit"

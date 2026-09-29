@@ -38,7 +38,7 @@
 
     <div class="adventiste-table-shell">
         <div class="overflow-x-auto">
-            <table class="min-w-full text-sm">
+            <table class="catholique-cards min-w-full text-sm">
                 <thead>
                     <tr class="text-left text-slate-700 dark:text-slate-200">
                         <th class="px-4 py-3 font-semibold">Période</th>
@@ -59,12 +59,12 @@
                                 : sprintf('%02d/%s', (int) ($details['month'] ?? optional($report->date_debut)->format('m')), $details['year'] ?? optional($report->date_debut)->format('Y'));
                         @endphp
                         <tr class="text-slate-700 dark:text-slate-200">
-                            <td class="px-4 py-3">{{ $periodLabel }}</td>
-                            <td class="px-4 py-3">{{ $target }}</td>
-                            <td class="px-4 py-3">{{ $report->paroisse?->nom ?? '-' }}</td>
-                            <td class="px-4 py-3 font-semibold">{{ $formatFcfa((float) $report->total_recettes) }}</td>
-                            <td class="px-4 py-3">{{ $report->createdBy?->name ?? '-' }}</td>
-                            <td class="px-4 py-3">
+                            <td class="px-4 py-3" data-label="Période">{{ $periodLabel }}</td>
+                            <td class="px-4 py-3" data-label="Type">{{ $target }}</td>
+                            <td class="px-4 py-3" data-label="Paroisse">{{ $report->paroisse?->nom ?? '-' }}</td>
+                            <td class="px-4 py-3 font-semibold" data-label="Total recettes">{{ $formatFcfa((float) $report->total_recettes) }}</td>
+                            <td class="px-4 py-3" data-label="Créé par">{{ $report->createdBy?->name ?? '-' }}</td>
+                            <td class="px-4 py-3" data-label="Actions">
                                 <div class="flex items-center justify-end gap-2">
                                     <x-action-button variant="view" href="{{ route('revenue-reports.show', $report) }}" />
                                     <x-action-button variant="edit" href="{{ route('revenue-reports.edit', $report) }}" />

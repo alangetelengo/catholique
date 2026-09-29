@@ -135,7 +135,7 @@
         <div class="adventiste-card-pro-static p-4 sm:p-5">
             <h2 class="text-base font-semibold text-slate-900 dark:text-white mb-3">Recettes par catégorie</h2>
             <div class="overflow-x-auto">
-                <table class="min-w-full text-sm">
+                <table class="catholique-cards min-w-full text-sm">
                     <thead>
                         <tr class="text-left text-slate-600 dark:text-slate-300 border-b border-slate-200 dark:border-slate-600">
                             <th class="py-2 pr-3">Catégorie</th>
@@ -145,8 +145,8 @@
                     <tbody>
                         @forelse ($c['revenue_by_category'] as $row)
                             <tr class="border-b border-slate-100 dark:border-slate-700/80">
-                                <td class="py-2 pr-3">{{ $row['label'] }}</td>
-                                <td class="py-2 text-right font-medium">{{ $fcfa($row['total']) }}</td>
+                                <td class="py-2 pr-3" data-label="Catégorie">{{ $row['label'] }}</td>
+                                <td class="py-2 text-right font-medium" data-label="Montant">{{ $fcfa($row['total']) }}</td>
                             </tr>
                         @empty
                             <tr><td colspan="2" class="py-4 text-slate-500">Aucune recette sur la période.</td></tr>
@@ -158,7 +158,7 @@
         <div class="adventiste-card-pro-static p-4 sm:p-5">
             <h2 class="text-base font-semibold text-slate-900 dark:text-white mb-3">Dépenses par catégorie</h2>
             <div class="overflow-x-auto">
-                <table class="min-w-full text-sm">
+                <table class="catholique-cards min-w-full text-sm">
                     <thead>
                         <tr class="text-left text-slate-600 dark:text-slate-300 border-b border-slate-200 dark:border-slate-600">
                             <th class="py-2 pr-3">Catégorie</th>
@@ -169,9 +169,9 @@
                     <tbody>
                         @forelse ($c['expense_by_category'] as $row)
                             <tr class="border-b border-slate-100 dark:border-slate-700/80">
-                                <td class="py-2 pr-3">{{ $row['label'] }}</td>
-                                <td class="py-2 text-right font-medium">{{ $fcfa($row['total']) }}</td>
-                                <td class="py-2 text-center text-xs">
+                                <td class="py-2 pr-3" data-label="Catégorie">{{ $row['label'] }}</td>
+                                <td class="py-2 text-right font-medium" data-label="Montant">{{ $fcfa($row['total']) }}</td>
+                                <td class="py-2 text-center text-xs" data-label="Solde">
                                     @if($row['deductible'])
                                         <span class="rounded-full bg-rose-100 dark:bg-rose-900/40 px-2 py-0.5 text-rose-800 dark:text-rose-200">Déduit</span>
                                     @else
