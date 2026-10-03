@@ -68,6 +68,57 @@ class SyncCaisseAlignmentTest extends TestCase
         ]);
     }
 
+    public function test_sync_rejects_revenue_category_from_another_paroisse(): void
+    {
+        $paroisse = Paroisse::query()->create([
+            'nom' => 'Saint Esprit',
+            'code_paroisse' => 'SE-SYNC-CROSS',
+        ]);
+        $autreParoisse = Paroisse::query()->create([
+            'nom' => 'Sainte Anne',
+            'code_paroisse' => 'SA-SYNC-CROSS',
+        ]);
+        $user = User::factory()->create(['paroisse_id' => $paroisse->id]);
+
+        $banqueAutre = RevenueCategory::query()->create([
+            'paroisse_id' => $autreParoisse->id,
+            'code' => 'banque',
+            'nom' => 'BANQUE',
+            'actif' => true,
+            'ordre' => 0,
+        ]);
+        $typeAutre = RevenueType::query()->create([
+            'paroisse_id' => $autreParoisse->id,
+            'revenue_category_id' => $banqueAutre->id,
+            'code' => 'revenu_principal',
+            'nom' => 'Revenu principal',
+            'actif' => true,
+            'ordre' => 1,
+        ]);
+
+        $this->actingAs($user);
+
+        $response = $this->postJson(route('api.sync'), [
+            'revenues' => [[
+                'action' => 'create',
+                'data' => [
+                    'revenue_category_id' => $banqueAutre->id,
+                    'revenue_type_id' => $typeAutre->id,
+                    'date_recette' => '2026-08-10',
+                    'mois_capital' => '08',
+                    'montant' => 250000,
+                    'methode_paiement' => 'virement',
+                ],
+            ]],
+        ]);
+
+        $response->assertStatus(422)->assertJsonPath('success', false);
+        $this->assertDatabaseMissing('revenues', ['revenue_category_id' => $banqueAutre->id]);
+
+        $tresorerie = Caisse::query()->where('paroisse_id', $paroisse->id)->where('code', Caisse::CODE_TRESORERIE)->firstOrFail();
+        $this->assertSame(0.0, app(CaisseService::class)->getSolde($tresorerie));
+    }
+
     public function test_sync_expense_debits_caisse_with_funding_sources(): void
     {
         $paroisse = Paroisse::query()->create([

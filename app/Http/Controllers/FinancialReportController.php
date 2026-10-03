@@ -128,16 +128,21 @@ class FinancialReportController extends Controller implements HasMiddleware
 
         $totalDepenses = (float) $expenses->sum('montant');
 
-        // Regroupement des dépenses par caisse de financement
         $detailsDepenses = [];
         foreach ($expenses as $expense) {
             foreach ($expense->fundingSources as $source) {
                 $code = $source->caisse?->code
                     ?? $source->revenueType?->code
                     ?? 'autre';
-                $detailsDepenses[$code] = ($detailsDepenses[$code] ?? 0.0) + (float) $source->montant_alloue;
+                $nom = $source->caisse?->nom
+                    ?? $source->revenueType?->nom
+                    ?? 'Autre';
+                $detailsDepenses[$code] ??= ['code' => $code, 'nom' => $nom, 'montant' => 0.0];
+                $detailsDepenses[$code]['montant'] += (float) $source->montant_alloue;
             }
         }
+        uasort($detailsDepenses, fn (array $a, array $b): int => $b['montant'] <=> $a['montant']);
+        $detailsDepenses = array_values($detailsDepenses);
 
         $detailsRecettes = [];
         foreach (self::REVENUE_CATEGORY_CODES_HUB as $code) {

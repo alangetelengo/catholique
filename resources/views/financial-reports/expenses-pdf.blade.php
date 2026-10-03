@@ -15,7 +15,9 @@
         $caisseSummary = collect($report['caisse_summary'] ?? []);
         $totalCaisseCredits = (float) $caisseSummary->sum('credits');
         $totalCaisseDepenses = (float) $caisseSummary->sum('depenses');
+        $totalCaisseDepensesToutes = (float) $caisseSummary->sum(fn (array $row): float => (float) ($row['depenses_caisse'] ?? $row['depenses']));
         $totalCaisseSolde = (float) $caisseSummary->sum('solde');
+        $isTypeFiltered = (bool) ($report['is_type_filtered'] ?? ! empty($selectedExpenseTypeId));
         $fundingSourceLabel = static function ($source): string {
             return $source->caisse?->nom ?? '—';
         };
@@ -200,6 +202,13 @@
 
     @if ($byExpenseType->isNotEmpty() && empty($selectedExpenseTypeId))
         <div class="section-title">Répartition par type de dépense</div>
+        <p style="font-size: 10px; color: #64748b; margin-bottom: 6px;">
+            @if ($selectedCaisse)
+                Part payée par {{ $selectedCaisse->nom }} pour chaque type de dépense.
+            @else
+                Montant total des dépenses de chaque type, quelle que soit la caisse qui les a payées.
+            @endif
+        </p>
         <table class="simple-table">
             <thead>
                 <tr>
@@ -235,14 +244,25 @@
                     <div class="kpi-sub">{{ $caisseSummary->count() }} caisse(s)</div>
                 </td>
                 <td class="kpi-spent">
-                    <div class="kpi-label">Dépensé (période)</div>
+                    <div class="kpi-label">
+                        @if ($isTypeFiltered && $selectedExpenseType)
+                            Dépensé — {{ $selectedExpenseType->nom }}
+                        @else
+                            Dépensé (période)
+                        @endif
+                    </div>
                     <div class="kpi-value">{{ $fmt($totalCaisseDepenses) }}</div>
-                    <div class="kpi-sub">{{ $report['expenses']->count() }} opération(s)</div>
+                    <div class="kpi-sub">
+                        {{ $report['expenses']->count() }} opération(s)
+                        @if ($isTypeFiltered)
+                            · tous types : {{ $fmt($totalCaisseDepensesToutes) }}
+                        @endif
+                    </div>
                 </td>
                 <td class="kpi-balance">
-                    <div class="kpi-label">Solde période</div>
+                    <div class="kpi-label">Solde réel caisse (période)</div>
                     <div class="kpi-value">{{ $fmt($totalCaisseSolde) }}</div>
-                    <div class="kpi-sub">crédits − dépenses</div>
+                    <div class="kpi-sub">crédits − toutes les dépenses de la caisse</div>
                 </td>
             </tr>
         </table>
@@ -253,8 +273,11 @@
                 <tr>
                     <th>Caisse</th>
                     <th class="text-right">Crédits</th>
-                    <th class="text-right">Dépensé</th>
-                    <th class="text-right">Solde période</th>
+                    @if ($isTypeFiltered && $selectedExpenseType)
+                        <th class="text-right">Dépensé ({{ $selectedExpenseType->nom }})</th>
+                    @endif
+                    <th class="text-right">Dépensé (tous types)</th>
+                    <th class="text-right">Solde réel</th>
                 </tr>
             </thead>
             <tbody>
@@ -262,7 +285,10 @@
                     <tr>
                         <td>{{ $row['nom'] }}</td>
                         <td class="text-right">{{ $fmt($row['credits']) }}</td>
-                        <td class="text-right">{{ $fmt($row['depenses']) }}</td>
+                        @if ($isTypeFiltered && $selectedExpenseType)
+                            <td class="text-right">{{ $fmt($row['depenses']) }}</td>
+                        @endif
+                        <td class="text-right">{{ $fmt($row['depenses_caisse'] ?? $row['depenses']) }}</td>
                         <td class="text-right">{{ $fmt($row['solde']) }}</td>
                     </tr>
                 @endforeach

@@ -149,22 +149,11 @@
                                     </tr>
                                 </thead>
                                 <tbody class="divide-y divide-slate-200/70 dark:divide-slate-700/70">
-                                    @php
-                                        $revenueCategories = \App\Models\RevenueCategory::where('paroisse_id', $financialReport->paroisse_id)
-                                            ->where('actif', 1)
-                                            ->orderBy('ordre')
-                                            ->get();
-                                    @endphp
-                                    @forelse ($revenueCategories as $category)
-                                        @php
-                                            $montant = $report['details_depenses'][$category->code] ?? 0;
-                                        @endphp
-                                        @if ($montant > 0)
+                                    @forelse ($report['details_depenses'] as $ligne)
                                         <tr class="text-slate-700 dark:text-slate-200">
-                                            <td class="px-4 py-3">{{ $category->nom }}</td>
-                                            <td class="px-4 py-3 text-right font-medium tabular-nums">{{ $fmt($montant) }}</td>
+                                            <td class="px-4 py-3">{{ $ligne['nom'] }}</td>
+                                            <td class="px-4 py-3 text-right font-medium tabular-nums">{{ $fmt($ligne['montant']) }}</td>
                                         </tr>
-                                        @endif
                                     @empty
                                         <tr class="text-slate-700 dark:text-slate-200">
                                             <td colspan="2" class="px-4 py-3 text-center text-slate-500 italic">Aucune dépense enregistrée</td>

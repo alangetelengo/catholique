@@ -15,10 +15,11 @@ class ExpenseReportService
 {
     /**
      * @return array{
+     *     is_type_filtered: bool,
      *     expenses: Collection<int, Expense>,
      *     by_category: array<string, array{id: int, nom: string, montant: float, count: int}>,
      *     by_expense_type: array<int|string, array{id: int|null, nom: string, montant: float, count: int}>,
-     *     caisse_summary: list<array{key: string, caisse_id: int, nom: string, credits: float, depenses: float, solde: float, count: int}>,
+     *     caisse_summary: list<array{key: string, caisse_id: int, nom: string, credits: float, depenses: float, depenses_caisse: float, solde: float, count: int}>,
      *     total_general: float,
      *     date_debut: Carbon,
      *     date_fin: Carbon
@@ -58,7 +59,7 @@ class ExpenseReportService
             $byExpenseType[$key] = [
                 'id' => $typeId ? (int) $typeId : null,
                 'nom' => $expenseType?->nom ?? 'Sans type',
-                'montant' => (float) $items->sum('montant'),
+                'montant' => (float) $items->sum(fn (Expense $expense): float => $this->montantImpute($expense, $caisseId)),
                 'count' => $items->count(),
             ];
         }
@@ -114,6 +115,7 @@ class ExpenseReportService
         $caisseSummary = $this->finalizeCaisseSummary($paroisseId, $dateDebut, $dateFin, $caisseBuckets);
 
         return [
+            'is_type_filtered' => $expenseTypeId !== null,
             'expenses' => $expenses,
             'by_category' => $byCategory,
             'by_expense_type' => $byExpenseType,
@@ -350,6 +352,17 @@ class ExpenseReportService
      * @param  array<int, array{key: string, caisse_id: int, nom: string, depenses: float, count: int}>  $buckets
      * @return list<array{key: string, caisse_id: int, nom: string, credits: float, depenses: float, solde: float, count: int}>
      */
+    private function montantImpute(Expense $expense, ?int $caisseId): float
+    {
+        if (! $caisseId) {
+            return (float) $expense->montant;
+        }
+
+        return (float) $expense->fundingSources
+            ->where('caisse_id', $caisseId)
+            ->sum('montant_alloue');
+    }
+
     private function finalizeCaisseSummary(int $paroisseId, Carbon $dateDebut, Carbon $dateFin, array $buckets): array
     {
         $summary = [];
@@ -363,12 +376,21 @@ class ExpenseReportService
                 ->whereDate('date_mouvement', '<=', $dateFin)
                 ->sum('montant');
 
-            $depenses = (float) $bucket['depenses'];
+            $depensesCaisse = (float) ExpenseFundingSource::query()
+                ->where('caisse_id', $bucket['caisse_id'])
+                ->whereHas('expense', function ($q) use ($paroisseId, $dateDebut, $dateFin): void {
+                    $q->where('paroisse_id', $paroisseId)
+                        ->where('statut', 'valide')
+                        ->whereDate('date_depense', '>=', $dateDebut)
+                        ->whereDate('date_depense', '<=', $dateFin);
+                })
+                ->sum('montant_alloue');
 
             $summary[] = [
                 ...$bucket,
                 'credits' => $credits,
-                'solde' => $credits - $depenses,
+                'depenses_caisse' => round($depensesCaisse, 2),
+                'solde' => round($credits - $depensesCaisse, 2),
             ];
         }
 

@@ -238,29 +238,34 @@ class AlignLegacyFinancesToCaissesCommand extends Command
 
     private function normalizeBanqueTypes(bool $dryRun): int
     {
-        $banqueCategoryIds = RevenueCategory::query()->where('code', 'banque')->pluck('id');
+        $banqueCategoryIdsByParoisse = RevenueCategory::query()
+            ->where('code', 'banque')
+            ->pluck('id', 'paroisse_id');
+
         $types = RevenueType::query()
-            ->whereIn('revenue_category_id', $banqueCategoryIds)
-            ->orWhereIn('code', ['rev-principal', 'rev_principal', 'revenu_principal'])
+            ->whereIn('paroisse_id', $banqueCategoryIdsByParoisse->keys())
+            ->where(function ($query) use ($banqueCategoryIdsByParoisse): void {
+                $query->whereIn('revenue_category_id', $banqueCategoryIdsByParoisse->values())
+                    ->orWhereIn('code', ['rev-principal', 'rev_principal', 'revenu_principal']);
+            })
             ->get();
 
         $count = 0;
         foreach ($types as $type) {
+            $categoryId = $banqueCategoryIdsByParoisse->get($type->paroisse_id);
+            if (! $categoryId) {
+                continue;
+            }
+
             $count++;
             if ($dryRun) {
                 continue;
             }
 
-            $categoryId = RevenueCategory::query()
-                ->where('paroisse_id', $type->paroisse_id)
-                ->where('code', 'banque')
-                ->value('id')
-                ?? $banqueCategoryIds->first();
-
             $type->update([
                 'code' => 'revenu_principal',
                 'nom' => 'Revenu principal',
-                'revenue_category_id' => $categoryId ?: $type->revenue_category_id,
+                'revenue_category_id' => $categoryId,
                 'actif' => true,
             ]);
         }

@@ -13,6 +13,7 @@ use App\Models\User;
 use App\Services\CaisseService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Spatie\Permission\Models\Permission;
+use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
 class CaisseBusinessRulesTest extends TestCase
@@ -771,5 +772,46 @@ class CaisseBusinessRulesTest extends TestCase
         $this->assertNotNull($septembre);
         $this->assertTrue($septembre['has_caisse_solde']);
         $this->assertSame(0.0, $septembre['disponible']);
+    }
+
+    public function test_super_admin_can_view_caisse_of_another_paroisse(): void
+    {
+        $paroisse = Paroisse::query()->create([
+            'nom' => 'Saint Esprit',
+            'code_paroisse' => 'SE-SUPER-CAISSE',
+        ]);
+        $autreParoisse = Paroisse::query()->create([
+            'nom' => 'Sainte Anne',
+            'code_paroisse' => 'SA-SUPER-CAISSE',
+        ]);
+
+        Role::findOrCreate('super_admin', 'web');
+        $superAdmin = User::factory()->create(['paroisse_id' => $paroisse->id]);
+        $superAdmin->assignRole('super_admin');
+
+        $liturgieAutre = Caisse::query()->where('paroisse_id', $autreParoisse->id)->where('code', 'liturgie')->firstOrFail();
+
+        $this->actingAs($superAdmin)
+            ->get(route('caisses.show', $liturgieAutre))
+            ->assertOk();
+    }
+
+    public function test_user_cannot_view_caisse_of_another_paroisse(): void
+    {
+        $paroisse = Paroisse::query()->create([
+            'nom' => 'Saint Esprit',
+            'code_paroisse' => 'SE-FORBID-CAISSE',
+        ]);
+        $autreParoisse = Paroisse::query()->create([
+            'nom' => 'Sainte Anne',
+            'code_paroisse' => 'SA-FORBID-CAISSE',
+        ]);
+        $user = User::factory()->create(['paroisse_id' => $paroisse->id]);
+
+        $liturgieAutre = Caisse::query()->where('paroisse_id', $autreParoisse->id)->where('code', 'liturgie')->firstOrFail();
+
+        $this->actingAs($user)
+            ->get(route('caisses.show', $liturgieAutre))
+            ->assertForbidden();
     }
 }

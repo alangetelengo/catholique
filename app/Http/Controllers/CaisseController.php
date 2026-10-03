@@ -270,9 +270,9 @@ class CaisseController extends Controller
                 }
 
                 $revenueType = RevenueType::query()->findOrFail($validated['revenue_type_id']);
-                if ((int) $revenueType->paroisse_id !== (int) $request->user()?->paroisse_id) {
+                if ((int) $revenueType->paroisse_id !== (int) $caisse->paroisse_id) {
                     throw ValidationException::withMessages([
-                        'revenue_type_id' => 'Type de recette invalide pour votre paroisse.',
+                        'revenue_type_id' => 'Type de recette invalide pour la paroisse de cette caisse.',
                     ]);
                 }
 
@@ -301,14 +301,23 @@ class CaisseController extends Controller
 
     private function authorizeCaisse(Request $request, Caisse $caisse): void
     {
-        if ((int) $caisse->paroisse_id !== (int) $request->user()?->paroisse_id) {
-            abort(403);
-        }
+        $this->authorizeParoisse($request, (int) $caisse->paroisse_id);
     }
 
     private function authorizeMouvement(Request $request, CaisseMouvement $mouvement): void
     {
-        if ((int) $mouvement->paroisse_id !== (int) $request->user()?->paroisse_id) {
+        $this->authorizeParoisse($request, (int) $mouvement->paroisse_id);
+    }
+
+    private function authorizeParoisse(Request $request, int $paroisseId): void
+    {
+        $user = $request->user();
+
+        if ($user?->hasRole('super_admin')) {
+            return;
+        }
+
+        if ($paroisseId !== (int) $user?->paroisse_id) {
             abort(403);
         }
     }

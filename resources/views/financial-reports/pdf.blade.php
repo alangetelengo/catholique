@@ -353,22 +353,11 @@
                         </tr>
                     </thead>
                     <tbody>
-                        @php
-                            $revenueCategories = \App\Models\RevenueCategory::where('paroisse_id', $report['paroisse_id'])
-                                ->where('actif', 1)
-                                ->orderBy('ordre')
-                                ->get();
-                        @endphp
-                        @foreach ($revenueCategories as $category)
-                            @php
-                                $montant = $report['details_depenses'][$category->code] ?? 0;
-                            @endphp
-                            @if ($montant > 0)
+                        @foreach ($report['details_depenses'] as $ligne)
                             <tr>
-                                <td>{{ $category->nom }}</td>
-                                <td class="text-right">{{ \App\Helpers\ParoisseConfig::formatMontant($montant) }}</td>
+                                <td>{{ $ligne['nom'] }}</td>
+                                <td class="text-right">{{ \App\Helpers\ParoisseConfig::formatMontant($ligne['montant']) }}</td>
                             </tr>
-                            @endif
                         @endforeach
                         <tr class="total-row">
                             <td>TOTAL</td>

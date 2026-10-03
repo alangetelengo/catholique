@@ -304,6 +304,115 @@ class ExpenseReportTest extends TestCase
         $response->assertHeader('content-type', 'application/pdf');
     }
 
+    public function test_summary_keeps_real_caisse_balance_when_filtered_by_expense_type(): void
+    {
+        [$user, $paroisse] = $this->userWithFinancialReportPermissions();
+        $popote = Caisse::query()->where('paroisse_id', $paroisse->id)->where('code', 'alimentation_popote')->firstOrFail();
+        $liturgie = Caisse::query()->where('paroisse_id', $paroisse->id)->where('code', 'liturgie')->firstOrFail();
+        $typePopote = ExpenseType::query()->where('code', 'alimentation_popote')->firstOrFail();
+        $typeCarburant = ExpenseType::query()->where('code', 'carburant')->firstOrFail();
+
+        $caisseService = app(CaisseService::class);
+        $caisseService->creditDirect($popote, 700000, '2026-08-01', 'Crédit popote', null, $user->id);
+        $caisseService->creditDirect($liturgie, 50000, '2026-08-01', 'Crédit liturgie', null, $user->id);
+
+        $createExpense = function (ExpenseType $type, Caisse $caisse, float $montant) use ($paroisse, $user): void {
+            Expense::query()->create([
+                'paroisse_id' => $paroisse->id,
+                'expense_type_id' => $type->id,
+                'date_depense' => '2026-08-15',
+                'montant' => $montant,
+                'libelle' => 'Dépense '.$type->code,
+                'statut' => 'valide',
+                'methode_paiement' => 'especes',
+                'created_by' => $user->id,
+            ])->fundingSources()->create([
+                'caisse_id' => $caisse->id,
+                'montant_alloue' => $montant,
+            ]);
+        };
+
+        $createExpense($typePopote, $popote, 100000);
+        $createExpense($typeCarburant, $popote, 30000);
+        $createExpense($typePopote, $liturgie, 7000);
+
+        $service = app(ExpenseReportService::class);
+        $debut = Carbon::parse('2026-08-01')->startOfDay();
+        $fin = Carbon::parse('2026-08-31')->endOfDay();
+
+        $global = $service->calculateSummaryReport($paroisse->id, $debut, $fin);
+        $this->assertSame(107000.0, $global['by_expense_type'][$typePopote->id]['montant']);
+        $popoteGlobal = collect($global['caisse_summary'])->firstWhere('caisse_id', $popote->id);
+        $this->assertSame(130000.0, $popoteGlobal['depenses']);
+        $this->assertSame(570000.0, $popoteGlobal['solde']);
+
+        $parCaisse = $service->calculateSummaryReport($paroisse->id, $debut, $fin, $popote->id);
+        $this->assertSame(100000.0, $parCaisse['by_expense_type'][$typePopote->id]['montant']);
+        $this->assertSame(30000.0, $parCaisse['by_expense_type'][$typeCarburant->id]['montant']);
+
+        $filtre = $service->calculateSummaryReport($paroisse->id, $debut, $fin, $popote->id, $typePopote->id);
+        $popoteFiltre = collect($filtre['caisse_summary'])->firstWhere('caisse_id', $popote->id);
+        $this->assertTrue($filtre['is_type_filtered']);
+        $this->assertSame(100000.0, $filtre['total_general']);
+        $this->assertSame(100000.0, $popoteFiltre['depenses']);
+        $this->assertSame(130000.0, $popoteFiltre['depenses_caisse']);
+        $this->assertSame(570000.0, $popoteFiltre['solde']);
+
+        $response = $this->actingAs($user)->postJson(route('financial-reports.expenses.calculate'), [
+            'paroisse_id' => $paroisse->id,
+            'date_debut' => '2026-08-01',
+            'date_fin' => '2026-08-31',
+            'caisse_id' => $popote->id,
+            'expense_type_id' => $typePopote->id,
+        ]);
+
+        $response->assertOk();
+        $this->assertStringContainsString('Solde réel caisse', $response->json('html'));
+        $this->assertStringContainsString('Dépensé (tous types)', $response->json('html'));
+    }
+
+    public function test_legacy_total_report_show_lists_expenses_by_caisse(): void
+    {
+        [$user, $paroisse] = $this->userWithFinancialReportPermissions();
+        $popote = Caisse::query()->where('paroisse_id', $paroisse->id)->where('code', 'alimentation_popote')->firstOrFail();
+        $expenseType = ExpenseType::query()->where('code', 'alimentation_popote')->firstOrFail();
+
+        app(CaisseService::class)->creditDirect($popote, 500000, '2026-06-01', 'Crédit popote', null, $user->id);
+
+        Expense::query()->create([
+            'paroisse_id' => $paroisse->id,
+            'expense_type_id' => $expenseType->id,
+            'date_depense' => '2026-06-15',
+            'montant' => 123000,
+            'libelle' => 'Courses popote',
+            'statut' => 'valide',
+            'methode_paiement' => 'especes',
+            'created_by' => $user->id,
+        ])->fundingSources()->create([
+            'caisse_id' => $popote->id,
+            'montant_alloue' => 123000,
+        ]);
+
+        $report = FinancialReport::query()->create([
+            'paroisse_id' => $paroisse->id,
+            'periode_type' => 'total',
+            'date_debut' => '2026-06-01',
+            'date_fin' => '2026-06-30',
+            'total_recettes' => 0,
+            'total_depenses' => 123000,
+            'solde' => -123000,
+            'details_recettes' => [],
+            'details_depenses' => [],
+            'created_by' => $user->id,
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('financial-reports.show', $report))
+            ->assertOk()
+            ->assertSee($popote->nom, false)
+            ->assertDontSee('Aucune dépense enregistrée', false);
+    }
+
     /**
      * @return array{0: User, 1: Paroisse}
      */

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Expense;
 use App\Models\Revenue;
 use App\Models\RevenueCategory;
+use App\Models\RevenueType;
 use App\Services\CaisseService;
 use App\Support\CapitalMensuel;
 use App\Support\SubventionMensuelle;
@@ -170,8 +171,15 @@ class SyncController extends Controller
     {
         unset($data['_temp_id']);
 
-        if (! $user->hasRole('super_admin')) {
+        if (! $user->hasRole('super_admin') || empty($data['paroisse_id'])) {
             $data['paroisse_id'] = $user->paroisse_id;
+        }
+
+        $paroisseId = (int) ($data['paroisse_id'] ?? 0);
+        if ($paroisseId <= 0) {
+            throw ValidationException::withMessages([
+                'paroisse_id' => 'La paroisse de la recette est obligatoire.',
+            ]);
         }
 
         $data['created_by'] = $user->id;
@@ -179,7 +187,29 @@ class SyncController extends Controller
         $data['statut'] = $data['statut'] ?? 'valide';
 
         $category = RevenueCategory::find($data['revenue_category_id']);
-        if ($category && $category->code === 'procure') {
+        if (! $category || (int) $category->paroisse_id !== $paroisseId) {
+            throw ValidationException::withMessages([
+                'revenue_category_id' => 'La catégorie choisie n\'appartient pas à cette paroisse.',
+            ]);
+        }
+
+        if ($category->code === 'subvention') {
+            throw ValidationException::withMessages([
+                'revenue_category_id' => 'La catégorie Subvention est remplacée par les caisses (crédit direct ou virement).',
+            ]);
+        }
+
+        $revenueType = RevenueType::find($data['revenue_type_id']);
+        if (! $revenueType
+            || (int) $revenueType->paroisse_id !== $paroisseId
+            || (int) $revenueType->revenue_category_id !== (int) $category->id
+            || ! $revenueType->actif) {
+            throw ValidationException::withMessages([
+                'revenue_type_id' => 'Le type choisi n\'est pas valide pour cette catégorie et cette paroisse.',
+            ]);
+        }
+
+        if ($category->code === 'procure') {
             if (! empty($data['donateur_nom'])) {
                 $data['donateur_nom'] = mb_strtoupper($data['donateur_nom'], 'UTF-8');
             }
@@ -191,7 +221,7 @@ class SyncController extends Controller
             $data['donateur_telephone'] = null;
         }
 
-        if ($category && $category->code === 'banque') {
+        if ($category->code === 'banque') {
             if (empty($data['mois_capital']) || ! SubventionMensuelle::isValidMoisCapital((string) $data['mois_capital'])) {
                 throw ValidationException::withMessages([
                     'mois_capital' => 'Le mois du capital est obligatoire pour une recette Banque.',
@@ -208,8 +238,14 @@ class SyncController extends Controller
     {
         unset($data['_temp_id'], $data['funding_sources']);
 
-        if (! $user->hasRole('super_admin')) {
+        if (! $user->hasRole('super_admin') || empty($data['paroisse_id'])) {
             $data['paroisse_id'] = $user->paroisse_id;
+        }
+
+        if ((int) ($data['paroisse_id'] ?? 0) <= 0) {
+            throw ValidationException::withMessages([
+                'paroisse_id' => 'La paroisse de la dépense est obligatoire.',
+            ]);
         }
 
         $data['created_by'] = $user->id;
